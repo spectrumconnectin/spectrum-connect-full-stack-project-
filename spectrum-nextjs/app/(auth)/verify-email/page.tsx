@@ -17,14 +17,10 @@ function VerifyEmailContent() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [err, setErr] = useState('');
-  const [devOtp, setDevOtp] = useState('');
-
   // Auto-send OTP on mount if email is present
   useEffect(() => {
     if (!email) return;
-    auth.sendOtp(email, 'verification')
-      .then(res => { if (res.dev_otp) setDevOtp(res.dev_otp); })
-      .catch(() => {});
+    auth.sendOtp(email, 'verification').catch(() => {});
   }, [email]);
 
   const onVerify = async (e: React.FormEvent) => {
@@ -47,8 +43,7 @@ function VerifyEmailContent() {
     if (resending) return;
     setResending(true); setErr('');
     try {
-      const res = await auth.sendOtp(email, 'verification');
-      if (res.dev_otp) setDevOtp(res.dev_otp);
+      await auth.sendOtp(email, 'verification');
       setStatus('resent');
       setTimeout(() => setStatus('input'), 4000);
     } catch (e) {
@@ -118,17 +113,6 @@ function VerifyEmailContent() {
                   We sent a 6-digit code to <strong>{email || 'your email'}</strong>.
                   Enter it below to verify your account.
                 </p>
-
-                {/* Dev mode OTP display */}
-                {devOtp && (
-                  <div style={{ background: '#fefce8', border: '1.5px solid #fbbf24', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Dev Mode — OTP Code
-                    </div>
-                    <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.3em', color: '#1d4ed8' }}>{devOtp}</div>
-                    <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Email not integrated · expires in 10 min</div>
-                  </div>
-                )}
 
                 {status === 'resent' && (
                   <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#166534', fontWeight: 500 }}>

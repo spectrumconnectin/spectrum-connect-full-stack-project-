@@ -38,12 +38,11 @@ const IconEye = ({ open }: { open: boolean }) => open ? (
 );
 
 // ── OTP Step ────────────────────────────────────────────────────────────────
-function OtpStep({ email, accountType, onVerified, devOtp: initialDevOtp }: { email: string; accountType: string; onVerified: () => void; devOtp?: string }) {
+function OtpStep({ email, accountType, onVerified }: { email: string; accountType: string; onVerified: () => void }) {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [resending, setResending] = useState(false);
-  const [devOtp, setDevOtp] = useState(initialDevOtp);
 
   const verify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,8 +61,7 @@ function OtpStep({ email, accountType, onVerified, devOtp: initialDevOtp }: { em
   const resend = async () => {
     setResending(true); setErr('');
     try {
-      const res = await auth.sendOtp(email, 'verification');
-      if (res.dev_otp) setDevOtp(res.dev_otp);
+      await auth.sendOtp(email, 'verification');
     } catch {
       // ignore
     } finally {
@@ -75,17 +73,6 @@ function OtpStep({ email, accountType, onVerified, devOtp: initialDevOtp }: { em
     <form noValidate onSubmit={verify}>
       <h2>Verify your email</h2>
       <p className="lede">Enter the 6-digit code to activate your account.</p>
-
-      {/* DEV MODE: show OTP directly in UI */}
-      {devOtp && (
-        <div style={{ background: '#fefce8', border: '1.5px solid #fbbf24', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Dev Mode — OTP Code
-          </div>
-          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '0.3em', color: '#1d4ed8' }}>{devOtp}</div>
-          <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Email not integrated · expires in 10 min</div>
-        </div>
-      )}
 
       {err && (
         <div className="alert">
@@ -166,7 +153,6 @@ export default function SignUpPage() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState('');
   const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
-  const [devOtp, setDevOtp] = useState<string | undefined>();
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const phoneValid = /^\+[1-9]\d{6,14}$/.test(phone);
@@ -201,7 +187,7 @@ export default function SignUpPage() {
     setSubmitting(true);
     setErr('');
     try {
-      const res = await auth.register({
+      await auth.register({
         email,
         username,
         password,
@@ -209,7 +195,6 @@ export default function SignUpPage() {
         account_type: accountType,
         name: `${first} ${last}`.trim(),
       });
-      if (res.dev_otp) setDevOtp(res.dev_otp);
       setStep('otp');
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Registration failed');
@@ -240,7 +225,6 @@ export default function SignUpPage() {
                 email={email}
                 accountType={accountType}
                 onVerified={() => setStep('done')}
-                devOtp={devOtp}
               />
             </div>
           </div>
