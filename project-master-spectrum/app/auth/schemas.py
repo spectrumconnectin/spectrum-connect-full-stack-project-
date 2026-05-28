@@ -24,6 +24,7 @@ class UserRead(BaseModel):
     email: EmailStr
     username: str
     account_type: str
+    dev_otp: Optional[str] = None  # shown in UI when email is not configured
 
 class Token(BaseModel):
     access_token: str
@@ -163,9 +164,9 @@ class SendOTPRequest(BaseModel):
 
 class OTPResponse(BaseModel):
     """OTP send response"""
-    success: bool
+    success: bool = True
     message: str
-    phone_number: str
+    dev_otp: Optional[str] = None  # shown in UI when email is not configured
     expires_in_seconds: Optional[int] = 600
 
 
