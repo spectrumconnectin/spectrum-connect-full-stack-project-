@@ -23,12 +23,9 @@ class Settings(BaseSettings):
     FACEBOOK_CLIENT_SECRET: str = "dev-facebook-app-secret"
     FACEBOOK_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/facebook_callback"
 
-    # Email Configuration
-    SMTP_SERVER: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: Union[EmailStr, str] = "dev@example.com"
-    SMTP_PASSWORD: str = "dev-smtp-password"
-    FROM_EMAIL: Union[EmailStr, str] = "no-reply@example.com"
+    # Email Configuration (Resend)
+    RESEND_API_KEY: str = ""
+    FROM_EMAIL: Union[EmailStr, str] = "onboarding@resend.dev"
 
     # Frontend URL
     FRONTEND_URL: Union[AnyUrl, str] = "http://localhost:5173"

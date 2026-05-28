@@ -14,7 +14,7 @@ from app.models.schema import User, Profile, Location, Skill, CrewProfile
 from .auth import get_password_hash, verify_password, create_access_token, get_current_user
 from .schemas import UserCreate, UserRead, Token, CreatorOnboarding, ProducerOnboarding, PasswordResetRequest, PasswordResetConfirm, OTPResponse
 from .oauth import google_oauth_client, facebook_oauth_client
-from app.services.email import send_email, get_verification_email_html, get_password_reset_email_html
+from app.services.email import send_email, get_otp_email_html, get_verification_email_html, get_password_reset_email_html
 from app.services.verification import create_verification_token, verify_token, create_password_reset_token, verify_password_reset_token
 from app.core.config import settings
 from app.core.rate_limit import rate_limiter
@@ -44,30 +44,27 @@ class OTPVerifyRequest(_PydanticBase):
     otp: str
 
 
-@router.post("/otp/send", response_model=OTPResponse, summary="Send OTP (prints to console in dev)")
+@router.post("/otp/send", response_model=OTPResponse, summary="Send OTP to email")
 async def send_otp(request: OTPSendRequest):
-    """
-    Generate a 6-digit OTP for the given email.
-    Since email is not integrated, the OTP is printed to the server console
-    and also returned in the response (dev mode only).
-    """
+    """Generate a 6-digit OTP and email it to the user."""
     otp = str(random.randint(100000, 999999))
     expires_at = datetime.utcnow() + timedelta(minutes=10)
     _otp_store[request.email] = {"otp": otp, "expires_at": expires_at, "purpose": request.purpose}
 
-    print("\n" + "=" * 55)
-    print(f"  📧  OTP for: {request.email}")
-    print(f"  🔑  Code:    {otp}")
-    print(f"  ⏱   Purpose: {request.purpose}")
-    print(f"  ⌛  Expires: {expires_at.strftime('%H:%M:%S')} UTC (10 min)")
-    print("=" * 55 + "\n")
+    print(f"  📧  OTP for {request.email}: {otp}")
+
+    # Look up username for the email (fallback to email prefix)
+    user = await User.find_one(User.email == request.email)
+    username = user.username if user else request.email.split("@")[0]
+
+    html = get_otp_email_html(username, otp)
+    email_sent = await send_email(request.email, "Your Spectrum Connect verification code", html)
 
     return {
         "success": True,
-        "message": "OTP generated",
-        "phone_number": request.email,
+        "message": "Verification code sent to your email",
         "expires_in_seconds": 600,
-        "dev_otp": otp,  # shown in UI since email is not integrated
+        "dev_otp": otp if not email_sent else None,
     }
 
 
@@ -172,34 +169,23 @@ async def register_user(user: UserCreate):
     )
     await user_db.insert()
 
-    # Generate OTP and print to console (email not integrated in dev)
+    # Generate OTP and store it
     otp = str(random.randint(100000, 999999))
     expires_at = datetime.utcnow() + timedelta(minutes=10)
     _otp_store[user_db.email] = {"otp": otp, "expires_at": expires_at, "purpose": "verification"}
 
-    print("\n" + "=" * 55)
-    print(f"  🆕  NEW USER REGISTERED: {user_db.username}")
-    print(f"  📧  Email:   {user_db.email}")
-    print(f"  🔑  OTP:     {otp}")
-    print(f"  ⌛  Expires: {expires_at.strftime('%H:%M:%S')} UTC (10 min)")
-    print(f"  👉  Use POST /auth/otp/verify to verify")
-    print("=" * 55 + "\n")
+    print(f"  🆕  NEW USER: {user_db.username} | OTP: {otp}")
 
-    # Also attempt email (will silently fail in dev)
-    try:
-        token = create_verification_token(user_db.email)
-        verification_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-        html = get_verification_email_html(user_db.username, verification_link)
-        await send_email(user_db.email, "Verify your Spectrum Connect account", html)
-    except Exception:
-        pass
+    # Send OTP via email
+    html = get_otp_email_html(user_db.username, otp)
+    email_sent = await send_email(user_db.email, "Your Spectrum Connect verification code", html)
 
     return {
         "id": str(user_db.id),
         "email": user_db.email,
         "username": user_db.username,
         "account_type": user_db.account_type,
-        "dev_otp": otp,  # shown in UI since email is not integrated
+        "dev_otp": otp if not email_sent else None,  # only expose in UI if email failed
     }
 
 @router.post("/login", response_model=Token, summary="Login user")
