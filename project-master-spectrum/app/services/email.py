@@ -11,11 +11,11 @@ SENDER_NAME = "Spectrum Connect"
 
 async def send_email(to_email: str, subject: str, html_content: str) -> bool:
     """Send an email via Brevo SMTP relay."""
-    smtp_user = getattr(settings, "BREVO_SMTP_USER", "")
-    smtp_pass = getattr(settings, "BREVO_API_KEY", "")
-    from_email = getattr(settings, "FROM_EMAIL", "")
+    smtp_user = settings.BREVO_SMTP_USER
+    smtp_pass = settings.BREVO_API_KEY
+    from_email = str(settings.FROM_EMAIL)
 
-    if not smtp_pass or not from_email:
+    if not smtp_user or not smtp_pass or not from_email:
         print(f"[email] BREVO credentials not set — skipping send to {to_email}")
         return False
     try:
@@ -28,7 +28,7 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
         with smtplib.SMTP(BREVO_SMTP_HOST, BREVO_SMTP_PORT) as server:
             server.ehlo()
             server.starttls()
-            server.login(smtp_user or from_email, smtp_pass)
+            server.login(smtp_user, smtp_pass)
             server.send_message(msg)
 
         print(f"[email] Sent '{subject}' to {to_email}")

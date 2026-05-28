@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     # Email Configuration (Brevo)
     BREVO_API_KEY: str = ""
+    BREVO_SMTP_USER: str = ""
     FROM_EMAIL: Union[EmailStr, str] = "team.spectrumstudios@gmail.com"
 
     # Frontend URL
