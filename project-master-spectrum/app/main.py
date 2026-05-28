@@ -2,8 +2,6 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 from app.core.config import settings
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
@@ -116,11 +114,6 @@ app.include_router(skill_challenge_router, tags=["Skill Verification Challenges"
 app.include_router(upload_router, prefix="/upload", tags=["File Upload"])
 app.include_router(proposals_router, tags=["Proposals"])
 app.include_router(earnings_router, tags=["Earnings"])
-
-# Serve locally stored files
-_storage_path = Path(__file__).resolve().parents[1] / "storage"
-_storage_path.mkdir(exist_ok=True)
-app.mount("/storage", StaticFiles(directory=str(_storage_path)), name="storage")
 
 
 @app.get("/health")

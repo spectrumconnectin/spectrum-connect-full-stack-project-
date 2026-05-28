@@ -12,3 +12,4 @@ python-multipart
 passlib
 python-dateutil
 eval_type_backport
+boto3
