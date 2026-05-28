@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Al-Fateh\\\\Documents\\\\Spectrum\\\\spectrum-nextjs\\\\lib\")",
+      "Bash(xargs grep -l \"submit_proposal\\\\|get_proposals\\\\|@router.*proposal\")",
+      "Bash(xargs grep -l \"earning\\\\|Transaction\\\\|payout\\\\|withdrawal\")",
+      "Bash(npx tsc *)",
+      "Bash(git -C \"c:\\\\Users\\\\Al-Fateh\\\\Documents\\\\Spectrum\" status --short)",
+      "Bash(dir app *)",
+      "Bash(findstr \"page.tsx\")",
+      "Bash(dir \"app\\\\\\(creator\\)\" /B /S)",
+      "Bash(node -e \"const p = require\\('./spectrum-nextjs/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")",
+      "Bash(git ls-tree *)"
+    ]
+  }
+}
