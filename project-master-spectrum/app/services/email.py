@@ -1,27 +1,40 @@
 import httpx
 from app.core.config import settings
 
-FROM_ADDRESS = "Spectrum Connect <onboarding@resend.dev>"
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+SENDER_NAME = "Spectrum Connect"
+
 
 async def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an email via Resend API."""
-    api_key = getattr(settings, "RESEND_API_KEY", "")
+    """Send an email via Brevo (Sendinblue) API."""
+    api_key = getattr(settings, "BREVO_API_KEY", "")
+    from_email = getattr(settings, "FROM_EMAIL", "team.spectrumstudios@gmail.com")
+
     if not api_key:
-        print(f"[email] RESEND_API_KEY not set — skipping send to {to_email}")
+        print(f"[email] BREVO_API_KEY not set — skipping send to {to_email}")
         return False
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"from": FROM_ADDRESS, "to": [to_email], "subject": subject, "html": html_content},
-                timeout=10,
+                BREVO_API_URL,
+                headers={
+                    "api-key": api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json={
+                    "sender": {"name": SENDER_NAME, "email": from_email},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html_content,
+                },
+                timeout=15,
             )
         if resp.status_code in (200, 201):
             print(f"[email] Sent '{subject}' to {to_email}")
             return True
         else:
-            print(f"[email] Resend error {resp.status_code}: {resp.text}")
+            print(f"[email] Brevo error {resp.status_code}: {resp.text}")
             return False
     except Exception as e:
         print(f"[email] Exception sending to {to_email}: {e}")
@@ -43,7 +56,7 @@ def get_otp_email_html(username: str, otp: str) -> str:
             <tr>
               <td style="padding:40px 48px;">
                 <h2 style="color:#111827;margin:0 0 8px;">Verify your email</h2>
-                <p style="color:#6b7280;font-size:15px;margin:0 0 32px;">Hi {username}, use the code below to verify your account.</p>
+                <p style="color:#6b7280;font-size:15px;margin:0 0 32px;">Hi {username}, use the code below to verify your Spectrum Connect account.</p>
                 <div style="background:#f5f3ff;border:2px solid #7c3aed;border-radius:12px;padding:24px;text-align:center;margin-bottom:32px;">
                   <div style="font-size:40px;font-weight:800;letter-spacing:12px;color:#4c1d95;font-family:monospace;">{otp}</div>
                   <div style="color:#7c3aed;font-size:13px;margin-top:8px;">Expires in 10 minutes</div>

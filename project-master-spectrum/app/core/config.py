@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     FACEBOOK_CLIENT_SECRET: str = "dev-facebook-app-secret"
     FACEBOOK_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/facebook_callback"
 
-    # Email Configuration (Resend)
-    RESEND_API_KEY: str = ""
-    FROM_EMAIL: Union[EmailStr, str] = "onboarding@resend.dev"
+    # Email Configuration (Brevo)
+    BREVO_API_KEY: str = ""
+    FROM_EMAIL: Union[EmailStr, str] = "team.spectrumstudios@gmail.com"
 
     # Frontend URL
     FRONTEND_URL: Union[AnyUrl, str] = "http://localhost:5173"
