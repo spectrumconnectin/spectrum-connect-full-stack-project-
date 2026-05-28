@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 // ── Token helpers ────────────────────────────────────────────────────────────
 const COOKIE_NAME = 'spectrum_token';
