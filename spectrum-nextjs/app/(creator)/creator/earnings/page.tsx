@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { earnings, EarningTransaction, EarningsStats } from '../../../../lib/api';
+import { earnings, EarningTransaction, EarningsStats } from '@/lib/api';
 
 const TXN_STATUS_STYLE: Record<string, string> = {
   completed:  'bg-emerald-50 text-emerald-700',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { etf, EtfVaultSummary, EtfContribution, EtfProjection } from '../../../../lib/api';
+import { etf, EtfVaultSummary, EtfContribution, EtfProjection } from '@/lib/api';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

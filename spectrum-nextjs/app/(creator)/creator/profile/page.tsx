@@ -10,7 +10,7 @@ import {
   type ExperienceCreate,
   type EducationCreate,
   type CertificationCreate,
-} from '../../../../lib/api';
+} from '@/lib/api';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function fmt(date?: string) {

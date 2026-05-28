@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { skillChallenges, SkillChallengeItem, SkillBadge, SkillSubmissionItem } from '../../../../lib/api';
+import { skillChallenges, SkillChallengeItem, SkillBadge, SkillSubmissionItem } from '@/lib/api';
 
 const DIFFICULTY_COLOR: Record<string, string> = {
   beginner: 'bg-green-50 text-green-700',

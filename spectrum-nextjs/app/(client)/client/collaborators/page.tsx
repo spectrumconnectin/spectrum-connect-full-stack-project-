@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { talent, TalentItem } from '../../../../lib/api';
+import { talent, TalentItem } from '@/lib/api';
 
 const ROLES = ['All Roles', 'Cinematographer', 'Editor', 'Sound Designer', 'Motion Designer',
   'Director', 'Photographer', 'Animator', 'VFX Artist', 'Colorist'];

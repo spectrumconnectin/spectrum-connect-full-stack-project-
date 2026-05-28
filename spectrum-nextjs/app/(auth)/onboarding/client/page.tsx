@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile } from '../../../../lib/api';
+import { profile } from '@/lib/api';
 
 const CATEGORIES = ['Video Production', 'Photography', 'Graphic Design', 'Motion & Animation', 'Copywriting & Content', 'Music & Audio', 'Social Media', 'Branding', 'Web & App Design', 'Other'];
 const BUDGETS = ['< $500', '$500–$2,000', '$2,000–$10,000', '$10,000–$50,000', '$50,000+'];

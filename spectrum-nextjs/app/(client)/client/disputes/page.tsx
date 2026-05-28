@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { disputes, escrow, DisputeListItem, EscrowListItem } from '../../../../lib/api';
+import { disputes, escrow, DisputeListItem, EscrowListItem } from '@/lib/api';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   open:                   { label: 'Open',         color: 'bg-blue-50 text-blue-700',       icon: 'fa-circle-dot' },

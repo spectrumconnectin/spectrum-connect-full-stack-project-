@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { creatorProjects, profile, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile } from '../../../../../lib/api';
+import { creatorProjects, profile, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile } from '@/lib/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_STYLE: Record<string, string> = {

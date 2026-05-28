@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { jobs, JobCreatePayload } from '../../../../../lib/api';
+import { jobs, JobCreatePayload } from '@/lib/api';
 
 const DEPARTMENTS = [
   'Camera', 'Cinematography', 'Directing', 'Editing', 'Post-Production',

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { messaging, ConversationItem, MessageItem, auth } from '../../../../lib/api';
+import { messaging, ConversationItem, MessageItem, auth } from '@/lib/api';
 
 function relTime(iso?: string): string {
   if (!iso) return '';

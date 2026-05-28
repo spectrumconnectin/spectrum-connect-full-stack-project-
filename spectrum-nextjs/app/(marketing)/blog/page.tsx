@@ -121,7 +121,7 @@ export default function BlogPage() {
           <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24 }}>Featured</h2>
           <Link href={`/blog/${featured.slug}`} style={{ display: 'block', textDecoration: 'none', borderRadius: 24, overflow: 'hidden', border: '1px solid #e5e7eb', background: '#fff', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }} className="group">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 300 }}>
-              <div style={{ background: `linear-gradient(135deg,${featured.gradient.replace('from-','').replace('to-','').split(' ').map((c,i) => `${c}${i===0?' 0%':' 100%'}`).join(',')})`, background: 'linear-gradient(135deg,#3b82f6,#195ad7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
+              <div style={{ background: 'linear-gradient(135deg,#3b82f6,#195ad7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
                 <div style={{ textAlign: 'center' }}>
                   <i className="fa-solid fa-newspaper" style={{ fontSize: 64, color: 'rgba(255,255,255,0.3)' }}></i>
                 </div>

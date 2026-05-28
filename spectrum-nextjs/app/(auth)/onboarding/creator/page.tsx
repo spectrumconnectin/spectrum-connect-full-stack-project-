@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile } from '../../../../lib/api';
+import { profile } from '@/lib/api';
 
 const SKILLS = ['Video Editing', 'Photography', 'Graphic Design', 'Motion Graphics', 'Copywriting', 'Social Media', 'Music Production', 'Voiceover', 'Animation', 'Web Design', 'Brand Strategy', 'Illustration'];
 const RATES = ['< $25/hr', '$25–$50/hr', '$50–$100/hr', '$100–$150/hr', '$150+/hr'];

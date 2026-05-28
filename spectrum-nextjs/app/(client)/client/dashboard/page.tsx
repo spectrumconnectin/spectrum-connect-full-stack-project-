@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, type ClientDashboardResponse } from '../../../../lib/api';
+import { dashboard, auth, type ClientDashboardResponse } from '@/lib/api';
 
 const statusColors: Record<string, string> = {
   open: 'bg-green-100 text-green-700',

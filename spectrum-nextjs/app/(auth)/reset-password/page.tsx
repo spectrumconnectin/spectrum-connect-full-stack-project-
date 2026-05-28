@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { auth } from '../../../lib/api';
+import { auth } from '@/lib/api';
 
 const IconLock = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -33,7 +35,7 @@ function strength(pw: string) {
   return s;
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token') ?? '';
@@ -236,4 +238,8 @@ export default function ResetPasswordPage() {
       </main>
     </div>
   );
+}
+
+export default function ResetPasswordPage() {
+  return <Suspense><ResetPasswordPageInner /></Suspense>;
 }

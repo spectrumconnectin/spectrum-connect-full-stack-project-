@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
-import { profile as profileApi, auth } from '../../lib/api';
+import { profile as profileApi, auth } from '@/lib/api';
 
 const navLinks = [
   { href: '/client/dashboard', label: 'Dashboard' },

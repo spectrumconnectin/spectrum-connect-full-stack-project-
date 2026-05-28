@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { smartConnect, CreatorSmartMatch } from '../../../../lib/api';
+import { smartConnect, CreatorSmartMatch } from '@/lib/api';
 
 function formatBudget(type?: string, min?: number, max?: number): string | null {
   if (!type) return null;

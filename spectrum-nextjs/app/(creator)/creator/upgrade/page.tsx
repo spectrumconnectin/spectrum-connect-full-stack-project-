@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -42,7 +44,7 @@ const plans = {
 
 type PlanKey = keyof typeof plans;
 
-export default function UpgradePage() {
+function UpgradePageInner() {
   const searchParams = useSearchParams();
   const initialPlan = (searchParams.get('plan') as PlanKey) || 'pro';
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>(initialPlan);
@@ -249,4 +251,8 @@ export default function UpgradePage() {
       </div>
     </div>
   );
+}
+
+export default function UpgradePage() {
+  return <Suspense><UpgradePageInner /></Suspense>;
 }

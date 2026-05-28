@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '../../../../lib/api';
+import { jobs, JobPostItem } from '@/lib/api';
 
 const DEPARTMENTS = [
   'All Departments', 'Camera', 'Cinematography', 'Directing', 'Editing',

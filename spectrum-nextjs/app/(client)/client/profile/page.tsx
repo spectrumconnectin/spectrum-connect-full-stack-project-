@@ -7,7 +7,7 @@ import {
   account as accountApi,
   auth,
   type MeResponse,
-} from '../../../../lib/api';
+} from '@/lib/api';
 
 const inp = 'w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 text-sm';
 

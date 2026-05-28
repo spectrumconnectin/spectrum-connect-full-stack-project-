@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { creatorProjects, ProjectItem, ActivityLogItem } from '../../../../../../lib/api';
+import { creatorProjects, ProjectItem, ActivityLogItem } from '@/lib/api';
 
 function fmtDate(iso?: string) {
   if (!iso) return '—';

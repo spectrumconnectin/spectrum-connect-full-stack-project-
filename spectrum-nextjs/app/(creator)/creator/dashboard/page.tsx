@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, type CreatorDashboardResponse } from '../../../../lib/api';
+import { dashboard, auth, type CreatorDashboardResponse } from '@/lib/api';
 
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-green-50 text-green-700 border-green-200',

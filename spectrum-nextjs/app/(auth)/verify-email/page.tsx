@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { auth } from '../../../lib/api';
+import { auth } from '@/lib/api';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();

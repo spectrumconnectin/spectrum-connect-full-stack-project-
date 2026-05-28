@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '../../../../../lib/api';
+import { jobs, JobPostItem } from '@/lib/api';
 
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, suffix = '') => {

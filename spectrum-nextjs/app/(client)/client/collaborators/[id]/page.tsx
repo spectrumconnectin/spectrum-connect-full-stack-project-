@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { profile as profileApi, PublicProfile } from '../../../../lib/api';
+import { profile as profileApi, PublicProfile } from '@/lib/api';
 
 function formatRate(min?: number, max?: number): string {
   if (!min && !max) return 'Rate TBD';

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { jobs, proposals, JobPostItem, JobProposalItem } from '../../../../../../lib/api';
+import { jobs, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
 
 const categories = [
   { key: 'quality',       label: 'Quality of Work',     icon: 'fa-star',          desc: 'How good was the final deliverable?' },

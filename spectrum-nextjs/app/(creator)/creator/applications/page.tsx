@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { proposals, ProposalItem } from '../../../../lib/api';
+import { proposals, ProposalItem } from '@/lib/api';
 
 const STATUS_TABS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected', 'withdrawn'];
 

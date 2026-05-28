@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { creatorProjects, ProjectItem } from '../../../../../lib/api';
+import { creatorProjects, ProjectItem } from '@/lib/api';
 
 function fmtDate(iso?: string) {
   if (!iso) return '';

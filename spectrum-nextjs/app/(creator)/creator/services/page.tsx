@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { services as servicesApi, ServiceItem } from '../../../../lib/api';
+import { services as servicesApi, ServiceItem } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

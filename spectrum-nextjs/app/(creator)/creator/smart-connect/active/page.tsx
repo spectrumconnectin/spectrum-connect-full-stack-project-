@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { smartConnect, CreatorSmartMatch } from '../../../../../lib/api';
+import { smartConnect, CreatorSmartMatch } from '@/lib/api';
 
 function formatBudget(m: CreatorSmartMatch): string {
   if (m.budget_min && m.budget_max) return `$${m.budget_min.toLocaleString()} – $${m.budget_max.toLocaleString()}`;

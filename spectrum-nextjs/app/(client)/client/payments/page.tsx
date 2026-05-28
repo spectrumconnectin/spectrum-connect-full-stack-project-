@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { escrow, EscrowDetail, EscrowMilestone } from '../../../../lib/api';
+import { escrow, EscrowDetail, EscrowMilestone } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {

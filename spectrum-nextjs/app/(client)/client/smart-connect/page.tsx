@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { smartConnect, SmartCreativeProfile } from '../../../../lib/api';
+import { smartConnect, SmartCreativeProfile } from '@/lib/api';
 
 const ROLE_OPTIONS = [
   'Cinematographer', 'Director of Photography', 'Video Editor', 'Sound Designer',

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, JobPostItem } from '../../../../lib/api';
+import { jobs, JobPostItem } from '@/lib/api';
 
 const STATUS_STYLE: Record<string, string> = {
   open:        'bg-green-100 text-green-700',

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, proposals, JobPostItem } from '../../../../../../lib/api';
+import { jobs, proposals, JobPostItem } from '@/lib/api';
 
 const DURATION_OPTIONS = [
   { label: 'Less than 1 week', value: 1 },

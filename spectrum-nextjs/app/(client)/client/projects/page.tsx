@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '../../../../lib/api';
+import { jobs, JobPostItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['All', 'open', 'draft', 'paused', 'closed', 'completed'];
 
