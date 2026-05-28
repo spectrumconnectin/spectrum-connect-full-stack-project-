@@ -9,3 +9,6 @@ pydantic[email]
 httpx
 httpx-oauth
 python-multipart
+passlib
+python-dateutil
+eval_type_backport

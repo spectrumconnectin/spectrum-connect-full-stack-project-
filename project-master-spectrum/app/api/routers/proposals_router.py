@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Proposals Router — Creator applies to job posts, client reviews applicants.
 

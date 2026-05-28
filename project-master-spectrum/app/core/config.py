@@ -1,5 +1,7 @@
+from __future__ import annotations
 from pydantic_settings import BaseSettings
 from pydantic import AnyUrl, EmailStr
+from typing import Union
 
 class Settings(BaseSettings):
     """
@@ -14,22 +16,22 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = "dev-google-client-id"
     GOOGLE_CLIENT_SECRET: str = "dev-google-client-secret"
-    GOOGLE_REDIRECT_URI: AnyUrl | str = "http://localhost:8000/auth/google/callback"
+    GOOGLE_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/google/callback"
 
     # Facebook OAuth
     FACEBOOK_CLIENT_ID: str = "dev-facebook-app-id"
     FACEBOOK_CLIENT_SECRET: str = "dev-facebook-app-secret"
-    FACEBOOK_REDIRECT_URI: AnyUrl | str = "http://localhost:8000/auth/facebook_callback"
+    FACEBOOK_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/facebook_callback"
 
     # Email Configuration
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USERNAME: EmailStr | str = "dev@example.com"
+    SMTP_USERNAME: Union[EmailStr, str] = "dev@example.com"
     SMTP_PASSWORD: str = "dev-smtp-password"
-    FROM_EMAIL: EmailStr | str = "no-reply@example.com"
+    FROM_EMAIL: Union[EmailStr, str] = "no-reply@example.com"
 
     # Frontend URL
-    FRONTEND_URL: AnyUrl | str = "http://localhost:5173"
+    FRONTEND_URL: Union[AnyUrl, str] = "http://localhost:5173"
 
     # Environment
     ENVIRONMENT: str = "development"

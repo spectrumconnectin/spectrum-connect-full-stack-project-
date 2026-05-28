@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Contact API Routes
 """
