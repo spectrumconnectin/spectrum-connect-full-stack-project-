@@ -1,43 +1,40 @@
-import httpx
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 
-BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+# Brevo SMTP relay settings
+BREVO_SMTP_HOST = "smtp-relay.brevo.com"
+BREVO_SMTP_PORT = 587
 SENDER_NAME = "Spectrum Connect"
 
 
 async def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send an email via Brevo (Sendinblue) API."""
-    api_key = getattr(settings, "BREVO_API_KEY", "")
-    from_email = getattr(settings, "FROM_EMAIL", "team.spectrumstudios@gmail.com")
+    """Send an email via Brevo SMTP relay."""
+    smtp_user = getattr(settings, "BREVO_SMTP_USER", "")
+    smtp_pass = getattr(settings, "BREVO_API_KEY", "")
+    from_email = getattr(settings, "FROM_EMAIL", "")
 
-    if not api_key:
-        print(f"[email] BREVO_API_KEY not set — skipping send to {to_email}")
+    if not smtp_pass or not from_email:
+        print(f"[email] BREVO credentials not set — skipping send to {to_email}")
         return False
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                BREVO_API_URL,
-                headers={
-                    "api-key": api_key,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                json={
-                    "sender": {"name": SENDER_NAME, "email": from_email},
-                    "to": [{"email": to_email}],
-                    "subject": subject,
-                    "htmlContent": html_content,
-                },
-                timeout=15,
-            )
-        if resp.status_code in (200, 201):
-            print(f"[email] Sent '{subject}' to {to_email}")
-            return True
-        else:
-            print(f"[email] Brevo error {resp.status_code}: {resp.text}")
-            return False
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{SENDER_NAME} <{from_email}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_content, "html"))
+
+        with smtplib.SMTP(BREVO_SMTP_HOST, BREVO_SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(smtp_user or from_email, smtp_pass)
+            server.send_message(msg)
+
+        print(f"[email] Sent '{subject}' to {to_email}")
+        return True
     except Exception as e:
-        print(f"[email] Exception sending to {to_email}: {e}")
+        print(f"[email] SMTP error sending to {to_email}: {e}")
         return False
 
 
@@ -86,7 +83,6 @@ def get_verification_email_html(username: str, verification_link: str) -> str:
         <a href="{verification_link}" style="display:inline-block;padding:12px 24px;background:#667eea;color:white;text-decoration:none;border-radius:6px;margin:20px 0;">
             Verify Email
         </a>
-        <p>Or copy this link: {verification_link}</p>
         <p>This link will expire in 24 hours.</p>
     </body>
     </html>
@@ -101,18 +97,14 @@ def get_password_reset_email_html(username: str, reset_link: str) -> str:
             <h1 style="color:white;margin:0;">Spectrum Connect</h1>
         </div>
         <div style="background:#f9fafb;padding:30px;border-radius:0 0 10px 10px;">
-            <h2 style="color:#1f2937;margin-top:0;">Password Reset Request</h2>
-            <p style="color:#4b5563;font-size:16px;">Hi {username},</p>
-            <p style="color:#4b5563;font-size:16px;">Click the button below to create a new password:</p>
+            <h2 style="color:#1f2937;margin-top:0;">Password Reset</h2>
+            <p style="color:#4b5563;">Hi {username}, click below to reset your password:</p>
             <div style="text-align:center;margin:30px 0;">
-                <a href="{reset_link}" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+                <a href="{reset_link}" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;text-decoration:none;border-radius:8px;font-weight:600;">
                     Reset Password
                 </a>
             </div>
-            <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:15px;margin:20px 0;border-radius:4px;">
-                <p style="color:#92400e;margin:0;font-size:14px;"><strong>This link expires in 1 hour.</strong></p>
-            </div>
-            <p style="color:#6b7280;font-size:14px;">If you didn&apos;t request a reset, you can safely ignore this email.</p>
+            <p style="color:#6b7280;font-size:13px;">This link expires in 1 hour. If you didn&apos;t request this, ignore the email.</p>
         </div>
     </body>
     </html>
