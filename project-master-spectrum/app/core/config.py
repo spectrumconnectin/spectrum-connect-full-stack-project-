@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = "dev-google-client-id"
     GOOGLE_CLIENT_SECRET: str = "dev-google-client-secret"
-    GOOGLE_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/google/callback"
+    GOOGLE_REDIRECT_URI: Union[AnyUrl, str] = "http://localhost:8000/auth/google_callback"
 
     # Facebook OAuth
     FACEBOOK_CLIENT_ID: str = "dev-facebook-app-id"
