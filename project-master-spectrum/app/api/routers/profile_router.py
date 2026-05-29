@@ -234,6 +234,20 @@ async def get_user_trust_summary(user_id: str):
 
 
 # ============================================================================
+# PROFILE STATISTICS ENDPOINT
+# (Must be registered BEFORE /{user_id} to avoid being shadowed)
+# ============================================================================
+
+@router.get("/me/stats", summary="Get user statistics")
+async def get_my_stats(current_user: User = Depends(get_current_user)):
+    """Get detailed statistics for the current user."""
+    if not current_user.stats:
+        from app.models.schema import UserStats
+        current_user.stats = UserStats()
+    return current_user.stats
+
+
+# ============================================================================
 # PUBLIC PROFILE ENDPOINTS (View Other Users)
 # ============================================================================
 
@@ -270,19 +284,6 @@ async def get_user_profile_by_username(
         await ProfileService.increment_profile_views(user)
 
     return await ProfileService.get_public_profile(user)
-
-
-# ============================================================================
-# PROFILE STATISTICS ENDPOINT
-# ============================================================================
-
-@router.get("/me/stats", summary="Get user statistics")
-async def get_my_stats(current_user: User = Depends(get_current_user)):
-    """Get detailed statistics for the current user."""
-    if not current_user.stats:
-        from app.models.schema import UserStats
-        current_user.stats = UserStats()
-    return current_user.stats
 
 
 # ============================================================================

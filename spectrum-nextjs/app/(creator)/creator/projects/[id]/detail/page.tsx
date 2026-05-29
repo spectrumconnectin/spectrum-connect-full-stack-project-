@@ -196,7 +196,7 @@ export default function CreatorProjectDetailPage() {
             ))}
           </div>
 
-          <Link href="/creator/messaging"
+          <Link href={`/creator/messaging?userId=${project.client_id}`}
             className="block bg-cobalt text-white p-4 rounded-2xl font-bold hover:bg-blue-700 transition text-center shadow-md">
             <i className="fa-solid fa-comment mr-2"></i>Message Client
           </Link>

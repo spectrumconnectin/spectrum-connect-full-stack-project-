@@ -53,6 +53,7 @@ export default function EarningsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
 
@@ -295,7 +296,7 @@ export default function EarningsPage() {
             </div>
 
             <div className="px-7 pb-7">
-              <button onClick={() => setShowModal(false)}
+              <button onClick={() => { setShowModal(false); setWithdrawSuccess(true); setTimeout(() => setWithdrawSuccess(false), 4000); }}
                 className="w-full py-3.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-sm">
                 Confirm Withdrawal
               </button>
@@ -305,6 +306,16 @@ export default function EarningsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Withdrawal submitted toast */}
+      {withdrawSuccess && (
+        <div className="fixed bottom-6 right-6 z-50 bg-green-600 text-white px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-fade-in">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+          Withdrawal request submitted! Processing within 3–5 business days.
         </div>
       )}
     </>

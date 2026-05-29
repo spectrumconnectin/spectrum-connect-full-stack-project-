@@ -109,21 +109,6 @@ async def get_my_jobs(
     return [job_to_dict(j) for j in jobs]
 
 
-@router.patch(
-    "/{job_id}/status",
-    response_model=JobPostRead,
-    summary="Update job status (publish/unpublish)",
-)
-async def update_job_status(
-    job_id: str,
-    status_update: JobPostStatusUpdate,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Update status of a job post (e.g., draft -> open).
-    """
-    job = await JobService.update_status(job_id, current_user, status_update.status)
-    return job_to_dict(job)
 
 
 @router.get(

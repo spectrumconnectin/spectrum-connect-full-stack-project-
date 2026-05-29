@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { messaging, ConversationItem, MessageItem, auth } from '@/lib/api';
 
 function relTime(iso?: string): string {
@@ -39,7 +40,10 @@ function Avatar({ url, name, size = 'md' }: { url?: string; name: string; size?:
   );
 }
 
-export default function ClientMessagingPage() {
+function ClientMessagingPageInner() {
+  const searchParams = useSearchParams();
+  const targetUserId = searchParams.get('userId');
+
   const [myId, setMyId] = useState('');
   const [convos, setConvos] = useState<ConversationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -49,10 +53,12 @@ export default function ClientMessagingPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
+  const [creatingConvo, setCreatingConvo] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const selectedIdRef = useRef<string | null>(null);
+  const targetHandledRef = useRef(false);
   selectedIdRef.current = selectedId;
 
   useEffect(() => {
@@ -63,7 +69,7 @@ export default function ClientMessagingPage() {
     try {
       const res = await messaging.listConversations({ limit: 50 });
       setConvos(res.conversations);
-      if (!selectedIdRef.current && res.conversations.length > 0) {
+      if (!selectedIdRef.current && !targetUserId && res.conversations.length > 0) {
         setSelectedId(res.conversations[0].id);
       }
     } catch {
@@ -71,7 +77,38 @@ export default function ClientMessagingPage() {
     } finally {
       setLoadingConvos(false);
     }
-  }, []);
+  }, [targetUserId]);
+
+  // When ?userId is present, find or create conversation with that user
+  useEffect(() => {
+    if (!targetUserId || targetHandledRef.current || loadingConvos || !myId) return;
+    if (targetUserId === myId) return; // can't message yourself
+
+    const existing = convos.find(c =>
+      c.participants.some(p => p.user_id === targetUserId)
+    );
+
+    if (existing) {
+      targetHandledRef.current = true;
+      setSelectedId(existing.id);
+      setConvos(prev => prev.map(c => c.id === existing.id ? { ...c, unread_count: 0 } : c));
+      return;
+    }
+
+    // No existing conversation — create one
+    targetHandledRef.current = true;
+    setCreatingConvo(true);
+    messaging.createConversation([targetUserId])
+      .then(newConvo => {
+        setConvos(prev => [newConvo, ...prev]);
+        setSelectedId(newConvo.id);
+      })
+      .catch(() => {
+        // If creation fails, just select first conversation if any
+        if (convos.length > 0) setSelectedId(convos[0].id);
+      })
+      .finally(() => setCreatingConvo(false));
+  }, [targetUserId, loadingConvos, myId, convos]);
 
   useEffect(() => {
     loadConversations();
@@ -164,7 +201,7 @@ export default function ClientMessagingPage() {
         </div>
 
         <div className="overflow-y-auto flex-1">
-          {loadingConvos ? (
+          {(loadingConvos || creatingConvo) ? (
             <div className="flex justify-center py-12">
               <div className="w-7 h-7 border-3 border-cobalt border-t-transparent rounded-full animate-spin" />
             </div>
@@ -299,5 +336,13 @@ export default function ClientMessagingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ClientMessagingPage() {
+  return (
+    <Suspense fallback={<div className="h-[calc(100vh-8rem)] flex items-center justify-center"><div className="w-8 h-8 border-4 border-cobalt border-t-transparent rounded-full animate-spin" /></div>}>
+      <ClientMessagingPageInner />
+    </Suspense>
   );
 }

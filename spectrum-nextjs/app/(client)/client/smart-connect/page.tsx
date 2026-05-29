@@ -289,7 +289,7 @@ export default function ClientSmartConnectPage() {
                         className="flex-1 bg-cobalt text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition text-center">
                         View Profile
                       </Link>
-                      <Link href="/client/messaging"
+                      <Link href={`/client/messaging?userId=${c.user_id}`}
                         className="flex-1 bg-gray-50 text-gray-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-100 transition border border-gray-200 text-center">
                         <i className="fa-solid fa-comment mr-1"></i>Message
                       </Link>

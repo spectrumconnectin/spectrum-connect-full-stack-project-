@@ -78,10 +78,14 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await auth.login(email, password);
+      // Fetch actual account_type from server — don't rely on the UI toggle
+      const me = await auth.me();
+      // Map backend values: producer/both → client, crew → creator
+      const dest = (me.account_type === 'producer' || me.account_type === 'both')
+        ? '/client/dashboard'
+        : '/creator/dashboard';
       setDone(true);
-      setTimeout(() => {
-        router.push(role === 'client' ? '/client/dashboard' : '/creator/dashboard');
-      }, 900);
+      setTimeout(() => { router.push(dest); }, 900);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Login failed';
       // If email not verified, offer OTP re-send

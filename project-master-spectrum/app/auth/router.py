@@ -6,7 +6,7 @@ import secrets
 import random
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -570,7 +570,7 @@ async def request_password_reset(
         try:
             # Create reset token
             reset_token = create_password_reset_token(user.email)
-            reset_link = f"{settings.FRONTEND_URL}/reset-password/confirm?token={reset_token}"
+            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
 
             # Send email
             html = get_password_reset_email_html(user.username, reset_link)
@@ -829,35 +829,6 @@ async def producer_onboarding(
     return JSONResponse({"message": "Producer onboarding completed successfully"})
 
 
-
-# ─── TEMPORARY DEV ENDPOINT ──────────────────────────────────────────
-# Remove this before going to production
-@router.get("/force-verify")
-async def force_verify_email(email: str):
-    user = await User.find_one(User.email == email)
-    
-    if not user:
-        raise HTTPException(
-            status_code=404, 
-            detail="No user found with this email"
-        )
-    
-    if user.is_verified:
-        return {
-            "message": "User is already verified",
-            "email": user.email,
-            "is_verified": user.is_verified
-        }
-    
-    user.is_verified = True
-    await user.save()
-    
-    return {
-        "message": "Email verified successfully. You can now log in.",
-        "email": user.email,
-        "is_verified": user.is_verified
-    }
-
 # ============================================================================
 # ADMIN REGISTRATION
 # ============================================================================
@@ -970,7 +941,7 @@ async def check_my_role(current_user: User = Depends(get_current_user)):
 @router.patch("/promote-to-admin", summary="Promote user to admin by email")
 async def promote_to_admin(
     email: str,
-    admin_key: str,
+    admin_key: str = Header(..., alias="X-Admin-Key"),
 ):
     """
     Promote any existing user to admin role using the admin secret key.
@@ -978,7 +949,8 @@ async def promote_to_admin(
 
     Query params:
         email     - email of the user to promote
-        admin_key - must match ADMIN_REGISTRATION_KEY in your .env
+    Headers:
+        X-Admin-Key - must match ADMIN_REGISTRATION_KEY in your .env
     """
     from app.core.config import settings as _settings
 

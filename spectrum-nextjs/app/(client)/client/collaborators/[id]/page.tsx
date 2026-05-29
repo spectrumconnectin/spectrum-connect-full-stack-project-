@@ -137,7 +137,7 @@ export default function CollaboratorProfilePage() {
           </div>
 
           <div className="flex flex-col gap-3 flex-shrink-0">
-            <Link href="/client/messaging"
+            <Link href={`/client/messaging?userId=${id}`}
               className="bg-white text-cobalt px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition shadow-md text-sm text-center">
               <i className="fa-solid fa-comment mr-2"></i>Message
             </Link>
@@ -322,7 +322,7 @@ export default function CollaboratorProfilePage() {
             ) : (
               <p className="text-blue-200 text-sm mb-5">Rate negotiable</p>
             )}
-            <Link href="/client/messaging"
+            <Link href={`/client/messaging?userId=${id}`}
               className="block bg-white text-cobalt px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition mb-3 text-sm">
               Message {name.split(' ')[0]}
             </Link>

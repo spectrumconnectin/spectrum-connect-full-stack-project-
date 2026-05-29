@@ -86,7 +86,7 @@ export default function ProjectsUnderReviewPage() {
                   className="flex-1 bg-cobalt text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition text-sm text-center">
                   View Project
                 </Link>
-                <Link href="/creator/messaging"
+                <Link href={`/creator/messaging?userId=${p.client_id}`}
                   className="flex-1 bg-gray-50 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 text-center">
                   <i className="fa-solid fa-comment mr-2"></i>Message Client
                 </Link>

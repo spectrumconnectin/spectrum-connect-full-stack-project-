@@ -56,7 +56,7 @@ load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGODB_DB = os.getenv("MONGODB_DB", "spectrum-connect")
-print("MONGO_URI:", MONGO_URI)
+print("MONGO_URI: [configured]")
 print("MONGODB_DB:", MONGODB_DB)
 
 app = FastAPI(
@@ -67,11 +67,14 @@ app = FastAPI(
 
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
 _extra_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+_frontend_url = os.getenv("FRONTEND_URL", "").strip()
 _origins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "http://localhost:5174",
-] + _extra_origins
+    "https://spectrum-nextjs-izcmc8k6f-teamspectrumstudios-7353s-projects.vercel.app",
+] + ([_frontend_url] if _frontend_url and _frontend_url not in ["http://localhost:3000", "http://localhost:5173"] else []) \
+  + _extra_origins
 
 app.add_middleware(
     CORSMiddleware,

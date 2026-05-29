@@ -998,6 +998,8 @@ class TransactionMetadata(BaseModel):
     description: Optional[str] = None
     notes: Optional[str] = None
     invoice_url: Optional[str] = None
+    project_title: Optional[str] = None
+    milestone_title: Optional[str] = None
 
 class Transaction(Document):
     transaction_id: str

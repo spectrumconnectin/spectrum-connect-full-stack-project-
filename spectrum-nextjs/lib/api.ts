@@ -57,6 +57,10 @@ async function request<T>(
   if (!res.ok) {
     if (res.status === 401) {
       tokenStore.clear();
+      // Redirect to login on the client side (skip during SSR)
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
       throw new Error('HTTP_401');
     }
     const body = await res.json().catch(() => ({ detail: res.statusText }));

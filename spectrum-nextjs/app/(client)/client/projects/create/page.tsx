@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { jobs, JobCreatePayload } from '@/lib/api';
 
@@ -74,6 +74,8 @@ export default function CreateProjectPage() {
   // Submission
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Use a ref so the value is available synchronously when handleSubmit fires
+  const publishDraftRef = useRef<'open' | 'draft'>('open');
   const [publishDraft, setPublishDraft] = useState<'open' | 'draft'>('open');
 
   const addSkill = (s: string) => {
@@ -117,7 +119,7 @@ export default function CreateProjectPage() {
       budget_type: budgetType,
       experience_level: experienceLevel,
       estimated_duration: estimatedDuration ? Number(estimatedDuration) : undefined,
-      status: publishDraft,
+      status: publishDraftRef.current,
       ...buildRateField(),
     };
 
@@ -391,11 +393,11 @@ export default function CreateProjectPage() {
             Cancel
           </Link>
           <div className="flex items-center gap-3">
-            <button type="submit" disabled={submitting} onClick={() => setPublishDraft('draft')}
+            <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'draft'; setPublishDraft('draft'); }}
               className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
               {submitting && publishDraft === 'draft' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Saving…</> : 'Save as Draft'}
             </button>
-            <button type="submit" disabled={submitting} onClick={() => setPublishDraft('open')}
+            <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'open'; setPublishDraft('open'); }}
               className="bg-cobalt text-white px-10 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
               {submitting && publishDraft === 'open' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Publishing…</> : 'Publish Project'}
             </button>

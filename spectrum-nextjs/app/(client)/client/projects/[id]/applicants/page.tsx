@@ -224,7 +224,7 @@ export default function ApplicantsPage() {
                     </button>
                   </div>
                 )}
-                <Link href="/client/messaging"
+                <Link href={`/client/messaging?userId=${a.creator_id}`}
                   className="px-5 py-3 bg-gray-50 text-gray-700 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200">
                   <i className="fa-solid fa-comment mr-2"></i>Message
                 </Link>
