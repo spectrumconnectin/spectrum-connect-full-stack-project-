@@ -217,7 +217,7 @@ async def refund_escrow(
 # DISPUTE ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@dispute_router.post("/", summary="Raise a dispute")
+@dispute_router.post("", summary="Raise a dispute")
 async def create_dispute(
     request: CreateDisputeRequest,
     current_user: User = Depends(get_current_user),

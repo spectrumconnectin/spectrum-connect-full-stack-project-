@@ -253,6 +253,12 @@ export default function ClientProjectDetailPage() {
                   <i className="fa-solid fa-trash-can"></i>Delete Draft
                 </button>
               )}
+              {job.status === 'completed' && (
+                <Link href={`/client/projects/${id}/review`}
+                  className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
+                  <i className="fa-solid fa-star"></i>Leave a Review
+                </Link>
+              )}
             </div>
           </div>
 

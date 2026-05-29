@@ -43,7 +43,7 @@ def job_to_dict(job: JobPost) -> dict:
 # ============================================================================
 
 @router.post(
-    "/",
+    "",
     response_model=JobPostRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create new job post",

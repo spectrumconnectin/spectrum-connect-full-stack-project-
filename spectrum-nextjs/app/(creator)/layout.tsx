@@ -10,6 +10,7 @@ import { profile as profileApi, auth, tokenStore } from '@/lib/api';
 const navLinks = [
   { href: '/creator/dashboard', label: 'Dashboard' },
   { href: '/creator/find-projects', label: 'Find Projects' },
+  { href: '/creator/smart-connect', label: 'Smart Connect' },
   { href: '/creator/applications', label: 'Applications' },
   { href: '/creator/projects', label: 'Projects' },
   { href: '/creator/services', label: 'Services' },
@@ -52,7 +53,11 @@ function CreatorHeader() {
             {/* Nav links */}
             <nav className="hidden md:flex items-center gap-1">
               {navLinks.map(({ href, label, isMiya: isAi }) => {
-                const active = pathname === href || (href !== '/creator/dashboard' && pathname.startsWith(href));
+                const active = pathname === href || (
+                  href !== '/creator/dashboard' &&
+                  pathname.startsWith(href + '/') &&
+                  !navLinks.some(nl => nl.href !== href && nl.href.startsWith(href) && (pathname === nl.href || pathname.startsWith(nl.href + '/')))
+                );
                 return (
                   <Link
                     key={href}
@@ -167,6 +172,7 @@ function CreatorFooter() {
             <h3 className="font-semibold text-gray-900 mb-4 text-sm">Workspace</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/creator/dashboard" className="hover:text-cobalt transition">Dashboard</Link></li>
+              <li><Link href="/creator/smart-connect" className="hover:text-cobalt transition">Smart Connect</Link></li>
               <li><Link href="/creator/projects" className="hover:text-cobalt transition">Projects</Link></li>
               <li><Link href="/creator/services" className="hover:text-cobalt transition">Services</Link></li>
               <li><Link href="/creator/messaging" className="hover:text-cobalt transition">Messages</Link></li>

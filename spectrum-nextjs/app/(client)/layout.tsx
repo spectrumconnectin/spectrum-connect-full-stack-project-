@@ -10,10 +10,10 @@ import { profile as profileApi, auth } from '@/lib/api';
 const navLinks = [
   { href: '/client/dashboard', label: 'Dashboard' },
   { href: '/client/collaborators', label: 'Find Creators' },
+  { href: '/client/smart-connect', label: 'Smart Connect' },
   { href: '/client/projects/create', label: 'Post a Project' },
   { href: '/client/projects', label: 'My Projects' },
   { href: '/client/disputes', label: 'Disputes' },
-  { href: '/client/resources', label: 'Resources' },
   {
     href: '/client/ai-assistant',
     label: 'Miya',
@@ -52,7 +52,11 @@ function ClientHeader() {
             {/* Nav links */}
             <nav className="hidden md:flex items-center gap-1">
               {navLinks.map(({ href, label, isMiya: isAi }) => {
-                const active = pathname === href || (href !== '/client/dashboard' && pathname.startsWith(href));
+                const active = pathname === href || (
+                  href !== '/client/dashboard' &&
+                  pathname.startsWith(href + '/') &&
+                  !navLinks.some(nl => nl.href !== href && nl.href.startsWith(href) && (pathname === nl.href || pathname.startsWith(nl.href + '/')))
+                );
                 return (
                   <Link
                     key={href}
@@ -171,6 +175,7 @@ function ClientFooter() {
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/client/dashboard" className="hover:text-cobalt transition">Dashboard</Link></li>
               <li><Link href="/client/collaborators" className="hover:text-cobalt transition">Find Creators</Link></li>
+              <li><Link href="/client/smart-connect" className="hover:text-cobalt transition">Smart Connect</Link></li>
               <li><Link href="/client/projects" className="hover:text-cobalt transition">My Projects</Link></li>
               <li><Link href="/client/messaging" className="hover:text-cobalt transition">Messages</Link></li>
               <li><Link href="/client/disputes" className="hover:text-cobalt transition">Disputes</Link></li>

@@ -82,7 +82,7 @@ def _skill_set(user: User) -> set[str]:
     return {s.name.lower() for s in user.profile.skills if getattr(s, "name", None)}
 
 
-@router.get("/", response_model=CreatorDashboardResponse)
+@router.get("", response_model=CreatorDashboardResponse)
 async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
     # Stats
     stats = current_user.stats or {}

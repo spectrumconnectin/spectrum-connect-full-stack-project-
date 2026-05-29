@@ -131,7 +131,7 @@ async def get_pending_submissions(
 
 
 @router.get(
-    "/",
+    "",
     response_model=ChallengeListResponse,
     summary="Browse active challenges",
 )

@@ -451,7 +451,7 @@ export interface ClientDashboardResponse {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
   getCreator: (): Promise<CreatorDashboardResponse> =>
-    request<CreatorDashboardResponse>('/creator/dashboard/'),
+    request<CreatorDashboardResponse>('/creator/dashboard'),
 
   getClient: (): Promise<ClientDashboardResponse> =>
     request<ClientDashboardResponse>('/client/dashboard'),
@@ -534,7 +534,7 @@ export const jobs = {
     request<JobPostItem>(`/jobs/${id}`),
 
   create: (data: JobCreatePayload): Promise<JobPostItem> =>
-    request<JobPostItem>('/jobs/', { method: 'POST', body: JSON.stringify(data) }),
+    request<JobPostItem>('/jobs', { method: 'POST', body: JSON.stringify(data) }),
 
   update: (id: string, data: Partial<JobCreatePayload>): Promise<JobPostItem> =>
     request<JobPostItem>(`/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -828,6 +828,14 @@ export const proposals = {
 
   withdraw: (proposalId: string): Promise<void> =>
     request<void>(`/proposals/${proposalId}`, { method: 'DELETE' }),
+
+  rate: (proposalId: string, data: {
+    ratings: Record<string, number>;
+    review: string;
+    tags?: string[];
+    private_note?: string;
+  }): Promise<{ success: boolean; message: string }> =>
+    request(`/proposals/${proposalId}/rate`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Escrow & Payments ─────────────────────────────────────────────────────────
@@ -934,7 +942,7 @@ export const disputes = {
     request<DisputeListResponse>(`/disputes/my-disputes${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
   create: (data: { escrow_id: string; reason: string; details?: string; milestone_id?: string }): Promise<{ success?: boolean; dispute_id?: string; message?: string }> =>
-    request('/disputes/', { method: 'POST', body: JSON.stringify(data) }),
+    request('/disputes', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── ETF Trust Fund ────────────────────────────────────────────────────────────
@@ -1067,7 +1075,7 @@ export interface SkillSubmissionListResponse {
 
 export const skillChallenges = {
   list: (params?: { skill_category?: string; difficulty?: string; limit?: number; offset?: number }): Promise<SkillChallengeListResponse> =>
-    request<SkillChallengeListResponse>(`/skill-challenges/${buildQS(params as Record<string, string | number | undefined> || {})}`),
+    request<SkillChallengeListResponse>(`/skill-challenges${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
   getMyBadges: (active_only = true): Promise<SkillBadgeListResponse> =>
     request<SkillBadgeListResponse>(`/skill-challenges/my-badges?active_only=${active_only}`),

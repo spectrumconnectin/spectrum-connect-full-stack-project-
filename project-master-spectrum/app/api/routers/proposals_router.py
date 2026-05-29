@@ -10,8 +10,9 @@ Model used: Application (schema.py)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Path
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from bson import ObjectId
+from datetime import datetime
 
 from app.models.schema import User, Application, JobPost
 from app.auth.auth import get_current_user
@@ -30,6 +31,13 @@ class ProposalSubmit(BaseModel):
 
 class ProposalStatusUpdate(BaseModel):
     status: str  # shortlisted | interviewing | accepted | rejected
+
+
+class RatingCreate(BaseModel):
+    ratings: Dict[str, int]        # e.g. {"quality": 5, "communication": 4, ...}
+    review: str
+    tags: Optional[List[str]] = []
+    private_note: Optional[str] = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -227,3 +235,51 @@ async def withdraw_proposal(
     if job and (job.proposal_count or 0) > 0:
         job.proposal_count -= 1
         await job.save()
+
+
+@router.post(
+    "/{proposal_id}/rate",
+    summary="Submit a rating/review for a creator after project completion (client)",
+)
+async def rate_proposal(
+    proposal_id: str = Path(...),
+    data: RatingCreate = ...,
+    current_user: User = Depends(get_current_user),
+):
+    app = await Application.get(_oid(proposal_id))
+    if not app:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    job = await JobPost.get(app.project_id)
+    if not job or str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the project client can leave a review")
+
+    if not data.ratings:
+        raise HTTPException(status_code=400, detail="At least one rating is required")
+
+    overall = round(sum(data.ratings.values()) / len(data.ratings), 2)
+
+    # Persist review directly on the application document (no model migration needed)
+    await app.update(
+        {"$set": {
+            "client_rating": {
+                "ratings": data.ratings,
+                "overall": overall,
+                "review": data.review,
+                "tags": data.tags or [],
+                "private_note": data.private_note,
+                "reviewed_at": datetime.utcnow().isoformat(),
+            }
+        }}
+    )
+
+    # Optionally update creator profile's aggregate rating
+    creator = await User.get(app.crew_id)
+    if creator and creator.profile:
+        old_count = getattr(creator, "review_count", None) or 0
+        old_rating = getattr(creator, "rating", None) or 0.0
+        new_count = old_count + 1
+        new_rating = round((old_rating * old_count + overall) / new_count, 2)
+        await creator.update({"$set": {"rating": new_rating, "review_count": new_count}})
+
+    return {"success": True, "message": "Review submitted successfully", "overall": overall}

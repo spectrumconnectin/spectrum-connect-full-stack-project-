@@ -30,6 +30,7 @@ export default function ReviewPage() {
   const [privateNote, setPrivateNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -54,11 +55,22 @@ export default function ReviewPage() {
     setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
   const handleSubmit = async () => {
-    if (!allRated || review.trim().length < 20) return;
+    if (!allRated || review.trim().length < 20 || !creator) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1200));
-    setSubmitting(false);
-    setSubmitted(true);
+    setSubmitError('');
+    try {
+      await proposals.rate(creator.id, {
+        ratings,
+        review: review.trim(),
+        tags,
+        private_note: privateNote.trim() || undefined,
+      });
+      setSubmitted(true);
+    } catch (e: unknown) {
+      setSubmitError(e instanceof Error ? e.message : 'Failed to submit review. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loadingData) {
@@ -233,14 +245,19 @@ export default function ReviewPage() {
       </div>
 
       {/* Submit */}
+      {submitError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+          <i className="fa-solid fa-circle-exclamation mr-2"></i>{submitError}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4 pb-12">
         <Link href={`/client/projects/${id}`} className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">
           Cancel
         </Link>
         <button
           onClick={handleSubmit}
-          disabled={!allRated || review.trim().length < 20 || submitting}
-          className={`px-8 py-3 rounded-xl font-semibold text-sm transition flex items-center gap-2 ${allRated && review.trim().length >= 20 && !submitting ? 'bg-cobalt text-white hover:bg-blue-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+          disabled={!allRated || review.trim().length < 20 || submitting || !creator}
+          className={`px-8 py-3 rounded-xl font-semibold text-sm transition flex items-center gap-2 ${allRated && review.trim().length >= 20 && !submitting && creator ? 'bg-cobalt text-white hover:bg-blue-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
         >
           {submitting ? <><i className="fa-solid fa-spinner animate-spin"></i> Submitting…</> : <><i className="fa-solid fa-paper-plane"></i> Submit Review</>}
         </button>

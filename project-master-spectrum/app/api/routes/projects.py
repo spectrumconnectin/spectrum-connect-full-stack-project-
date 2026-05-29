@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.models.schema import User
 from app.models.project import Project, ActivityLog, ProjectDeadline
-from app.services.profile_service import ProfileService as ProjectService
+from app.services.project_service import ProjectService
 from app.api.schemas.project_schemas import (
     ProjectCreate,
     ProjectUpdate,
