@@ -83,10 +83,6 @@ export default function HomePage() {
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(139,92,246,0.35), transparent 60%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
           <div>
-            <div className="mk-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 600, marginBottom: 24, letterSpacing: '0.02em' }}>
-              <span className="hero-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
-              AI-Powered Creative Marketplace
-            </div>
             <h1 className="mk-reveal" style={{ fontSize: 'clamp(34px, 5vw, 58px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 20px' }}>
               Find trusted creators.<br />Build amazing teams.<br />Work better together.
             </h1>
