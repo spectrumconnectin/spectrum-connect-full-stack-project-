@@ -248,7 +248,7 @@ export default function ClientProfilePage() {
   if (authError) return (
     <div className="min-h-[70vh]">
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-2xl">🔒</div>
+        <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
         <p className="text-gray-800 font-semibold text-lg">Session expired</p>
         <p className="text-gray-500 text-sm">Please log in again to view your profile.</p>
         <button onClick={() => router.push('/login')}
@@ -262,7 +262,7 @@ export default function ClientProfilePage() {
   if (loadError) return (
     <div className="min-h-[70vh]">
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-red-600"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
         <p className="text-gray-800 font-semibold text-lg">Could not load profile</p>
         <p className="text-red-500 text-sm max-w-sm text-center">{loadError}</p>
         <div className="flex gap-3">
