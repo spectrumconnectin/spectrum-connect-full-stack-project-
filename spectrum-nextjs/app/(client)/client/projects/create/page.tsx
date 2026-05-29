@@ -18,23 +18,22 @@ const SKILLS_SUGGESTIONS = [
 ];
 
 const EXPERIENCE_LEVELS = [
-  { val: 'entry', label: 'Entry Level', desc: '0–2 years' },
-  { val: 'mid', label: 'Mid Level', desc: '2–5 years' },
-  { val: 'senior', label: 'Senior Level', desc: '5+ years' },
-  { val: 'expert', label: 'Expert', desc: 'Principal / Lead' },
+  { val: 'student',      label: 'Student',       desc: 'Learning & growing' },
+  { val: 'entry',        label: 'Entry Level',    desc: '0–2 years' },
+  { val: 'intermediate', label: 'Mid Level',      desc: '2–5 years' },
+  { val: 'expert',       label: 'Senior / Expert', desc: '5+ years' },
 ];
 
 const CREW_SIZES = [
-  { val: 'solo', label: 'Solo', desc: '1 person' },
-  { val: 'small', label: 'Small', desc: '2–5 people' },
-  { val: 'medium', label: 'Medium', desc: '6–15 people' },
-  { val: 'large', label: 'Large', desc: '15+ people' },
+  { val: 'individual', label: 'Solo',       desc: '1 person' },
+  { val: 'small_crew', label: 'Small Crew', desc: '2–10 people' },
+  { val: 'full_crew',  label: 'Full Crew',  desc: '10+ people' },
 ];
 
 const COMPLEXITY_LEVELS = [
-  { val: 'simple', label: 'Simple', icon: 'fa-circle', desc: 'Straightforward task' },
-  { val: 'moderate', label: 'Moderate', icon: 'fa-circle-half-stroke', desc: 'Some complexity' },
-  { val: 'complex', label: 'Complex', icon: 'fa-circle-dot', desc: 'Multi-faceted project' },
+  { val: 'simple',       label: 'Simple',   icon: 'fa-circle',             desc: 'Straightforward task' },
+  { val: 'intermediate', label: 'Moderate', icon: 'fa-circle-half-stroke', desc: 'Some complexity' },
+  { val: 'complex',      label: 'Complex',  icon: 'fa-circle-dot',         desc: 'Multi-faceted project' },
 ];
 
 const BUDGET_TYPES = [
@@ -60,9 +59,9 @@ export default function CreateProjectPage() {
   const [budgetMax, setBudgetMax] = useState('');
 
   // Scope
-  const [crewSize, setCrewSize] = useState('small');
-  const [complexity, setComplexity] = useState('moderate');
-  const [experienceLevel, setExperienceLevel] = useState('mid');
+  const [crewSize, setCrewSize] = useState('small_crew');
+  const [complexity, setComplexity] = useState('intermediate');
+  const [experienceLevel, setExperienceLevel] = useState('intermediate');
   const [estimatedDuration, setEstimatedDuration] = useState('');
 
   // Skills & Tags
@@ -105,6 +104,19 @@ export default function CreateProjectPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+
+    // Client-side validation
+    const errors: string[] = [];
+    if (title.trim().length < 10) errors.push('Title must be at least 10 characters');
+    if (description.trim().length < 50) errors.push('Description must be at least 50 characters');
+    if (!department) errors.push('Please select a department');
+    if (skills.length === 0) errors.push('Add at least one required skill');
+    if (tags.length === 0) errors.push('Add at least one project tag');
+    if (errors.length > 0) {
+      setSubmitError(errors.join('\n'));
+      return;
+    }
+
     setSubmitting(true);
 
     const payload: JobCreatePayload = {
@@ -381,9 +393,13 @@ export default function CreateProjectPage() {
 
         {/* ── Error ── */}
         {submitError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-red-700 text-sm font-medium flex items-start gap-3">
-            <i className="fa-solid fa-circle-exclamation mt-0.5"></i>
-            <span>{submitError}</span>
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-red-700 text-sm flex items-start gap-3">
+            <i className="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i>
+            <ul className="space-y-1">
+              {submitError.split('\n').map((line, i) => (
+                <li key={i} className="font-medium">{line}</li>
+              ))}
+            </ul>
           </div>
         )}
 

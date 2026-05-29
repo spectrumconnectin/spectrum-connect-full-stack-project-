@@ -64,10 +64,20 @@ async function request<T>(
       throw new Error('HTTP_401');
     }
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    const msg =
-      typeof body.detail === 'string'
-        ? body.detail
-        : body.detail?.message ?? JSON.stringify(body.detail);
+    let msg: string;
+    if (typeof body.detail === 'string') {
+      msg = body.detail;
+    } else if (Array.isArray(body.detail)) {
+      // Pydantic v2 validation errors — format into readable bullet list
+      msg = body.detail
+        .map((e: { loc?: string[]; msg?: string }) => {
+          const field = e.loc ? e.loc.filter(l => l !== 'body').join('.') : '';
+          return field ? `${field}: ${e.msg}` : e.msg ?? 'Validation error';
+        })
+        .join('\n');
+    } else {
+      msg = body.detail?.message ?? body.message ?? `HTTP ${res.status}`;
+    }
     throw new Error(msg || `HTTP ${res.status}`);
   }
 
