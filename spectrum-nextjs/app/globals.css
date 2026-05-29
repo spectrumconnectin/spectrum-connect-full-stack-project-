@@ -1148,6 +1148,24 @@ header nav a.active::after {
   animation-play-state: paused;
 }
 
+/* Hero responsive: stack on narrow screens so absolute cards don't overlap */
+@media (max-width: 860px) {
+  .hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+  .hero-stage {
+    min-height: 420px !important;
+    transform: scale(0.92);
+    transform-origin: top left;
+  }
+}
+@media (max-width: 520px) {
+  .hero-stage {
+    display: none !important;
+  }
+}
+
 /* Trust-score bars — fill width from 0 to --bar-w on load */
 @keyframes homeBarFill {
   from { width: 0; }

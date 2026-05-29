@@ -79,14 +79,21 @@ export default function HomePage() {
       <Nav />
 
       {/* ═══ HERO ═══ */}
-      <section style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #7c3aed 80%, #9333ea 100%)', color: '#fff', padding: '80px 24px 100px', overflow: 'hidden', position: 'relative' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 50%, rgba(139,92,246,0.35), transparent 60%)', pointerEvents: 'none' }} />
-        <div style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
+      <section style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 40%, #7c3aed 80%, #9333ea 100%)', color: '#fff', padding: '76px 24px 88px', overflow: 'hidden', position: 'relative' }}>
+        {/* Decorative blurred orbs for depth */}
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% 45%, rgba(139,92,246,0.35), transparent 60%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -120, right: -80, width: 360, height: 360, borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,0.35), transparent 70%)', filter: 'blur(20px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -140, left: -100, width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.28), transparent 70%)', filter: 'blur(24px)', pointerEvents: 'none' }} />
+        <div className="hero-grid" style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 56, alignItems: 'center' }}>
           <div>
+            <div className="mk-reveal" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: 999, padding: '6px 14px', fontSize: 12.5, fontWeight: 600, marginBottom: 22, letterSpacing: '0.01em' }}>
+              <span className="hero-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', display: 'inline-block' }} />
+              Trusted by 15,000+ creators &amp; clients
+            </div>
             <h1 className="mk-reveal" style={{ fontSize: 'clamp(34px, 5vw, 58px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 20px' }}>
               Find trusted creators.<br />Build amazing teams.<br />Work better together.
             </h1>
-            <p className="mk-reveal" style={{ fontSize: 17, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)', margin: '0 0 36px', maxWidth: 480 }}>
+            <p className="mk-reveal" style={{ fontSize: 17, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)', margin: '0 0 32px', maxWidth: 480 }}>
               A creative marketplace built on trust — verified creators, fair payments, and projects matched to your needs.
             </p>
             <div className="mk-reveal" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -97,30 +104,70 @@ export default function HomePage() {
                 Post a Project
               </Link>
             </div>
-            <p className="mk-reveal" style={{ marginTop: 18, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Free to join · No credit card required</p>
-          </div>
-          {/* Floating profile cards */}
-          <div style={{ position: 'relative', minHeight: 320, display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'flex-end' }}>
-            {[
-              { name: 'Mia Johnson', role: 'Motion Designer', tags: ['After Effects', '3D', 'Branding'], initials: 'MJ', color: '#ec4899', rating: '5.0', float: 'home-float-a' },
-              { name: 'Alex Rivera', role: 'Cinematographer', tags: ['ARRI', 'Color', 'Short Film'], initials: 'AR', color: '#6366f1', rating: '4.9', float: 'home-float-b' },
-            ].map((c, i) => (
-              <div key={c.name} className={c.float} style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 20, padding: '18px 22px', width: 280, transform: i === 0 ? 'translateX(20px)' : 'translateX(-10px)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <Avatar initials={c.initials} color={c.color} size={42} />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{c.role}</div>
+            <p className="mk-reveal" style={{ marginTop: 16, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Free to join · No credit card required</p>
+            {/* Trust stats strip */}
+            <div className="mk-reveal" style={{ display: 'flex', gap: 28, marginTop: 30, paddingTop: 26, borderTop: '1px solid rgba(255,255,255,0.15)', flexWrap: 'wrap' }}>
+              {[
+                { v: '15K+', l: 'Verified Creators' },
+                { v: '4.9', l: 'Avg. Rating', star: true },
+                { v: '98%', l: 'On-Time Delivery' },
+              ].map(s => (
+                <div key={s.l}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                    {s.v}{s.star && <span style={{ color: '#fbbf24', display: 'inline-flex' }}><Icon.Star size={16} /></span>}
                   </div>
-                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontWeight: 700 }}>
-                    <span style={{ color: '#fbbf24', display: 'inline-flex' }}><Icon.Star size={13} /></span>{c.rating}
-                  </div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>{s.l}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {c.tags.map(t => <span key={t} style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 500 }}>{t}</span>)}
+              ))}
+            </div>
+          </div>
+          {/* Floating profile cards + notifications */}
+          <div className="mk-reveal-r hero-stage" style={{ position: 'relative', minHeight: 460 }}>
+            {/* AI match pill — top */}
+            <div className="home-float-b" style={{ position: 'absolute', top: 4, left: 8, zIndex: 3, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '8px 14px', fontSize: 13, fontWeight: 600 }}>
+              <span style={{ display: 'inline-flex', color: '#a5b4fc' }}><Icon.Bolt size={16} /></span>
+              AI Match · 96% fit
+            </div>
+            {/* Mia card — upper right */}
+            <div className="home-float-a" style={{ position: 'absolute', top: 56, right: 0, zIndex: 2, background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 20, padding: '18px 22px', width: 286, boxShadow: '0 16px 40px rgba(15,23,42,0.22)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <Avatar initials="MJ" color="#ec4899" size={42} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Mia Johnson</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Motion Designer</div>
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontWeight: 700 }}>
+                  <span style={{ color: '#fbbf24', display: 'inline-flex' }}><Icon.Star size={13} /></span>5.0
                 </div>
               </div>
-            ))}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['After Effects', '3D', 'Branding'].map(t => <span key={t} style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 500 }}>{t}</span>)}
+              </div>
+            </div>
+            {/* Alex card — middle left */}
+            <div className="home-float-b" style={{ position: 'absolute', top: 218, left: 0, zIndex: 2, background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 20, padding: '18px 22px', width: 286, boxShadow: '0 16px 40px rgba(15,23,42,0.22)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <Avatar initials="AR" color="#6366f1" size={42} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Alex Rivera</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Cinematographer</div>
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: '4px 8px', fontSize: 13, fontWeight: 700 }}>
+                  <span style={{ color: '#fbbf24', display: 'inline-flex' }}><Icon.Star size={13} /></span>4.9
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {['ARRI', 'Color', 'Short Film'].map(t => <span key={t} style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 6, padding: '3px 9px', fontSize: 11, fontWeight: 500 }}>{t}</span>)}
+              </div>
+            </div>
+            {/* Milestone released notification — bottom right */}
+            <div className="home-float-a" style={{ position: 'absolute', bottom: 6, right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 11, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 16, padding: '12px 16px', width: 250, boxShadow: '0 12px 30px rgba(15,23,42,0.2)' }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(74,222,128,0.25)', color: '#86efac', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon.Check size={18} /></span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>Milestone released</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>$2,400 paid securely</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
