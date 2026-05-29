@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
+import NotificationBell from '@/components/NotificationBell';
 import { profile as profileApi, auth, tokenStore } from '@/lib/api';
 
 const navLinks = [
@@ -100,10 +101,7 @@ function CreatorHeader() {
             </div>
 
             {/* Notifications */}
-            <button className="relative p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all">
-              <i className="fa-solid fa-bell text-[18px]"></i>
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            <NotificationBell />
 
             {/* Profile */}
             <div className="relative ml-1">

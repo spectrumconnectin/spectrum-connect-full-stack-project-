@@ -252,6 +252,32 @@ export interface UserSettingsUpdate {
   two_factor_auth?: boolean;
 }
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+export interface NotificationItem {
+  id: string;
+  type: string;
+  category: string;
+  title: string;
+  message: string;
+  action_url?: string;
+  action_text?: string;
+  actor_name?: string;
+  actor_image?: string;
+  is_read: boolean;
+  created_at?: string;
+}
+
+export const notifications = {
+  getAll: (limit = 20): Promise<{ notifications: NotificationItem[]; unread_count: number }> =>
+    request(`/header/notifications?limit=${limit}`),
+
+  markAllRead: (): Promise<{ success: boolean }> =>
+    request('/header/notifications/read-all', { method: 'POST' }),
+
+  markOneRead: (id: string): Promise<{ success: boolean }> =>
+    request(`/header/notifications/${id}/read`, { method: 'POST' }),
+};
+
 // ── Profile ──────────────────────────────────────────────────────────────────
 export const profile = {
   getMe: (): Promise<MeResponse> => request<MeResponse>('/profiles/me'),
@@ -1264,4 +1290,4 @@ export const smartConnect = {
     }),
 };
 
-export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, skillChallenges, messaging, smartConnect, tokenStore };
+export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, skillChallenges, messaging, smartConnect, notifications, tokenStore };
