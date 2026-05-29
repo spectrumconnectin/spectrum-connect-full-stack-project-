@@ -125,14 +125,19 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
   onClose: () => void;
   onSave: (s: ServiceCard) => void;
 }) {
+  const isEdit = Boolean(initial?.id);
+
+  const [step, setStep] = useState(0);
   const [title, setTitle] = useState(initial?.title ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [department, setDepartment] = useState(initial?.department ?? FILM_DEPARTMENTS[0]);
-  const [tags, setTags] = useState(initial?.tags?.join(', ') ?? '');
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const [price, setPrice] = useState(initial?.price?.toString() ?? '');
   const [deliveryDays, setDeliveryDays] = useState(initial?.deliveryDays?.toString() ?? '');
   const [revisions, setRevisions] = useState(initial?.revisions?.toString() ?? '1');
-  const [features, setFeatures] = useState(initial?.features?.join(', ') ?? '');
+  const [featureInput, setFeatureInput] = useState('');
+  const [features, setFeatures] = useState<string[]>(initial?.features ?? []);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -142,27 +147,43 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
     setTitle(initial.title ?? '');
     setDescription(initial.description ?? '');
     setDepartment(initial.department ?? FILM_DEPARTMENTS[0]);
-    setTags(initial.tags?.join(', ') ?? '');
+    setTags(initial.tags ?? []);
     setPrice(initial.price?.toString() ?? '');
     setDeliveryDays(initial.deliveryDays?.toString() ?? '');
     setRevisions(initial.revisions?.toString() ?? '1');
-    setFeatures(initial.features?.join(', ') ?? '');
+    setFeatures(initial.features ?? []);
   }, [initial]);
 
-  const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
-  const featureList = features.split(',').map(f => f.trim()).filter(Boolean);
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (t && !tags.includes(t) && tags.length < 10) {
+      setTags(prev => [...prev, t]);
+      setTagInput('');
+    }
+  };
 
-  const valid =
-    title.trim().length >= 10 &&
-    description.trim().length >= 100 &&
-    tagList.length >= 1 &&
-    price !== '' && Number(price) > 0 &&
-    deliveryDays !== '' && Number(deliveryDays) > 0 &&
-    featureList.length >= 1;
+  const removeTag = (t: string) => setTags(prev => prev.filter(x => x !== t));
+
+  const addFeature = () => {
+    const f = featureInput.trim();
+    if (f && !features.includes(f)) {
+      setFeatures(prev => [...prev, f]);
+      setFeatureInput('');
+    }
+  };
+
+  const removeFeature = (f: string) => setFeatures(prev => prev.filter(x => x !== f));
+
+  const step0Valid = title.trim().length >= 10 && description.trim().length >= 100;
+  const step1Valid = tags.length >= 1;
+  const step2Valid = price !== '' && Number(price) > 0 && deliveryDays !== '' && Number(deliveryDays) > 0 && features.length >= 1;
+  const allValid = step0Valid && step1Valid && step2Valid;
+
+  const STEPS = ['Service Info', 'Category & Tags', 'Pricing & Scope'];
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valid) return;
+    if (!allValid) return;
     setSaving(true);
     setSaveError('');
     try {
@@ -170,14 +191,14 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
         title: title.trim(),
         description: description.trim(),
         department,
-        tags: tagList,
+        tags,
         packages: [{
           name: 'basic',
-          description: `${title.trim()} · Basic Package`,
+          description: `${title.trim()} – Basic Package`,
           price: Number(price),
           delivery_time: Number(deliveryDays),
           revisions: revisions === '-1' ? -1 : Number(revisions),
-          features: featureList,
+          features,
         }],
       };
 
@@ -188,8 +209,8 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
         result = await servicesApi.create(payload);
       }
       onSave(mapService(result));
-    } catch (e) {
-      setSaveError((e as Error).message);
+    } catch (err) {
+      setSaveError((err as Error).message || 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -197,104 +218,287 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">{initial?.id ? 'Edit Service' : 'Create Service'}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">
-            <i className="fa-solid fa-xmark"></i>
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)' }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col"
+        style={{ maxHeight: 'min(90vh, 680px)' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">
+              {isEdit ? 'Edit Service' : 'Create a Service'}
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {STEPS[step]} · Step {step + 1} of {STEPS.length}
+            </p>
+          </div>
+          <button onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-500 transition">
+            <i className="fa-solid fa-xmark text-base"></i>
           </button>
         </div>
 
+        {/* Step indicator */}
+        <div className="px-6 pt-4 shrink-0">
+          <div className="flex gap-1.5">
+            {STEPS.map((s, i) => (
+              <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${
+                i < step ? 'bg-cobalt' : i === step ? 'bg-cobalt opacity-50' : 'bg-gray-200'
+              }`} />
+            ))}
+          </div>
+        </div>
+
+        {/* Body + Footer wrapped in a single form */}
         {modalLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+          <div className="flex-1 flex items-center justify-center py-16">
+            <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Service title <span className="text-red-500">*</span>
-                <span className="text-xs font-normal text-gray-400 ml-1">(min 10 chars)</span>
-              </label>
-              <input className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
-                placeholder="e.g. Professional Cinematography for Short Films"
-                value={title} onChange={e => setTitle(e.target.value)} />
+          <form onSubmit={onSubmit} className="flex-1 flex flex-col min-h-0">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+              {/* Step 0 – Service Info */}
+              {step === 0 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                      Service title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none transition ${
+                        title.trim().length > 0 && title.trim().length < 10
+                          ? 'border-orange-300 focus:border-orange-400 bg-orange-50'
+                          : 'border-gray-200 focus:border-cobalt'
+                      }`}
+                      placeholder="e.g. Professional Cinematography for Short Films"
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                    />
+                    <p className={`text-xs mt-1.5 ${title.trim().length > 0 && title.trim().length < 10 ? 'text-orange-500' : 'text-gray-400'}`}>
+                      {title.trim().length}/80 chars {title.trim().length > 0 && title.trim().length < 10 && `· ${10 - title.trim().length} more needed`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                      Description <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      rows={6}
+                      className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none resize-none transition ${
+                        description.trim().length > 0 && description.trim().length < 100
+                          ? 'border-orange-300 focus:border-orange-400 bg-orange-50'
+                          : 'border-gray-200 focus:border-cobalt'
+                      }`}
+                      placeholder="Describe your service in detail — what clients receive, your experience, your approach, turnaround time, etc."
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                    />
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className={`text-xs ${description.trim().length < 100 ? 'text-orange-500' : 'text-emerald-600'}`}>
+                        {description.trim().length < 100
+                          ? `${description.length}/100 — ${100 - description.length} more chars needed`
+                          : `${description.length} chars ✓`}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Step 1 – Category & Tags */}
+              {step === 1 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1.5">Department</label>
+                    <select
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt bg-white"
+                      value={department}
+                      onChange={e => setDepartment(e.target.value)}
+                    >
+                      {FILM_DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1.5">Choose the film/production department that best fits your service.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                      Tags <span className="text-red-500">*</span>
+                      <span className="text-xs font-normal text-gray-400 ml-1">(at least 1, max 10)</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
+                        placeholder="e.g. ARRI, documentary, short film"
+                        value={tagInput}
+                        onChange={e => setTagInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                      />
+                      <button type="button" onClick={addTag}
+                        className="px-4 py-3 bg-blue-50 text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-100 transition">
+                        Add
+                      </button>
+                    </div>
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {tags.map(t => (
+                          <span key={t} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-cobalt text-sm rounded-xl font-medium">
+                            {t}
+                            <button type="button" onClick={() => removeTag(t)}
+                              className="text-cobalt/50 hover:text-cobalt transition text-xs leading-none">
+                              <i className="fa-solid fa-xmark"></i>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {tags.length === 0 && (
+                      <p className="text-xs text-gray-400 mt-2">Press Enter or click Add after each tag.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Step 2 – Pricing & Scope */}
+              {step === 2 && (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                        Price (USD) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
+                        <input
+                          type="number" min="1"
+                          className="w-full pl-7 pr-3 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
+                          placeholder="500"
+                          value={price}
+                          onChange={e => setPrice(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                        Delivery <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number" min="1"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
+                          placeholder="7"
+                          value={deliveryDays}
+                          onChange={e => setDeliveryDays(e.target.value)}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">days</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-1.5">Revisions</label>
+                      <select
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt bg-white"
+                        value={revisions}
+                        onChange={e => setRevisions(e.target.value)}
+                      >
+                        {['0','1','2','3','5','-1'].map(v => (
+                          <option key={v} value={v}>{v === '-1' ? 'Unlimited' : v}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1.5">
+                      What&apos;s included <span className="text-red-500">*</span>
+                      <span className="text-xs font-normal text-gray-400 ml-1">(at least 1 item)</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
+                        placeholder="e.g. 8-hour on-location shoot"
+                        value={featureInput}
+                        onChange={e => setFeatureInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addFeature(); } }}
+                      />
+                      <button type="button" onClick={addFeature}
+                        className="px-4 py-3 bg-blue-50 text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-100 transition">
+                        Add
+                      </button>
+                    </div>
+                    {features.length > 0 ? (
+                      <ul className="mt-3 space-y-2">
+                        {features.map((f, i) => (
+                          <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 rounded-xl text-sm text-gray-700">
+                            <span className="flex items-center gap-2">
+                              <i className="fa-solid fa-check text-emerald-500 text-xs"></i>
+                              {f}
+                            </span>
+                            <button type="button" onClick={() => removeFeature(f)}
+                              className="text-gray-400 hover:text-red-500 transition">
+                              <i className="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-2">Add items one at a time. Press Enter or click Add.</p>
+                    )}
+                  </div>
+
+                  {saveError && (
+                    <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                      <i className="fa-solid fa-circle-exclamation text-red-500 mt-0.5 shrink-0"></i>
+                      <p className="text-sm text-red-700">{saveError}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Description <span className="text-red-500">*</span>
-                <span className="text-xs font-normal text-gray-400 ml-1">(min 100 chars)</span>
-              </label>
-              <textarea rows={4} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt resize-none"
-                placeholder="Describe your service, what clients get, your experience and approach…"
-                value={description} onChange={e => setDescription(e.target.value)} />
-              <p className={`text-xs mt-1 ${description.length < 100 ? 'text-orange-500' : 'text-gray-400'}`}>
-                {description.length}/5000 {description.length < 100 ? `(${100 - description.length} more needed)` : '✓'}
-              </p>
-            </div>
+            {/* Footer inside the form */}
+            <div className="px-6 pb-6 pt-4 border-t border-gray-100 shrink-0 flex gap-3">
+              {step > 0 ? (
+                <button type="button" onClick={() => setStep(s => s - 1)}
+                  className="px-5 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                  Back
+                </button>
+              ) : (
+                <button type="button" onClick={onClose}
+                  className="px-5 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                  Cancel
+                </button>
+              )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Department</label>
-                <select className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt bg-white"
-                  value={department} onChange={e => setDepartment(e.target.value)}>
-                  {FILM_DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tags <span className="text-red-500">*</span>
-                </label>
-                <input className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
-                  placeholder="e.g. ARRI, short film, doc"
-                  value={tags} onChange={e => setTags(e.target.value)} />
-                <p className="text-xs text-gray-400 mt-1">Comma-separated</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Price ($) <span className="text-red-500">*</span></label>
-                <input type="number" min="1" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
-                  placeholder="500" value={price} onChange={e => setPrice(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Delivery (days) <span className="text-red-500">*</span></label>
-                <input type="number" min="1" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
-                  placeholder="7" value={deliveryDays} onChange={e => setDeliveryDays(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Revisions</label>
-                <input type="number" min="-1" className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt"
-                  placeholder="1 (-1 = ∞)" value={revisions} onChange={e => setRevisions(e.target.value)} />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                What's included <span className="text-red-500">*</span>
-              </label>
-              <textarea rows={2} className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt resize-none"
-                placeholder="e.g. 8-hour shoot, raw footage, colour grade, 1 round of revisions"
-                value={features} onChange={e => setFeatures(e.target.value)} />
-              <p className="text-xs text-gray-400 mt-1">Comma-separated bullet points ({featureList.length} item{featureList.length !== 1 ? 's' : ''})</p>
-            </div>
-
-            {saveError && (
-              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{saveError}</div>
-            )}
-
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={onClose}
-                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
-                Cancel
-              </button>
-              <button type="submit" disabled={!valid || saving}
-                className={`flex-1 px-4 py-3 rounded-xl bg-cobalt text-white text-sm font-semibold transition ${!valid || saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'}`}>
-                {saving ? 'Saving…' : initial?.id ? 'Save changes' : 'Create service'}
-              </button>
+              {step < STEPS.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setStep(s => s + 1)}
+                  disabled={step === 0 ? !step0Valid : !step1Valid}
+                  className={`flex-1 px-5 py-3 rounded-xl bg-cobalt text-white text-sm font-semibold transition flex items-center justify-center gap-2 ${
+                    (step === 0 ? !step0Valid : !step1Valid) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-700'
+                  }`}
+                >
+                  Continue <i className="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!allValid || saving}
+                  className={`flex-1 px-5 py-3 rounded-xl bg-cobalt text-white text-sm font-semibold transition flex items-center justify-center gap-2 ${
+                    !allValid || saving ? 'opacity-40 cursor-not-allowed' : 'hover:bg-blue-700'
+                  }`}
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>{isEdit ? 'Save changes' : 'Create service'} <i className="fa-solid fa-check text-xs"></i></>
+                  )}
+                </button>
+              )}
             </div>
           </form>
         )}

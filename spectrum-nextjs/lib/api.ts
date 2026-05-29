@@ -597,7 +597,7 @@ export const services = {
     request<ServiceItem>(`/services/${id}`),
 
   create: (data: ServiceCreatePayload): Promise<ServiceItem> =>
-    request<ServiceItem>('/services/', { method: 'POST', body: JSON.stringify(data) }),
+    request<ServiceItem>('/services', { method: 'POST', body: JSON.stringify(data) }),
 
   update: (id: string, data: Partial<ServiceCreatePayload>): Promise<ServiceItem> =>
     request<ServiceItem>(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

@@ -40,7 +40,7 @@ def service_to_dict(service: Service) -> dict:
 # ============================================================================
 
 @router.post(
-    "/",
+    "",
     response_model=ServiceRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create new service/gig",
@@ -52,39 +52,17 @@ async def create_service(
 ):
     """
     Create a new service/gig with packages, extras, and requirements.
-
-    **Film Industry Departments:**
-    - Camera, Sound, Lighting, Grip, Electric
-    - Art Department, Costume, Makeup & Hair, VFX
-    - Post-Production, Editing, Color Grading, Sound Design
-    - Music Composition, Production Management
-    - Directing, Producing, Cinematography
-    - Scripting, Storyboarding, Animation
-    - 3D Modeling, Motion Graphics
-
-    **Example:**
-    ```json
-    {
-        "title": "Professional Cinematography for Short Films",
-        "description": "Expert cinematographer with 10 years experience...",
-        "department": "Cinematography",
-        "role": "Director of Photography",
-        "tags": ["cinematography", "short-film", "documentary"],
-        "packages": [
-            {
-                "name": "basic",
-                "description": "1-day shoot with basic equipment",
-                "price": 500,
-                "delivery_time": 3,
-                "revisions": 1,
-                "features": ["8 hours shooting", "Basic camera package", "Raw footage delivery"]
-            }
-        ]
-    }
-    ```
     """
-    service = await ServiceService.create_service(current_user, service_data)
-    return service_to_dict(service)
+    try:
+        service = await ServiceService.create_service(current_user, service_data)
+        return service_to_dict(service)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create service: {str(e)}"
+        )
 
 
 @router.get(

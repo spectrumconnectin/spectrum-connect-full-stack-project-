@@ -224,8 +224,8 @@ class ServiceRead(BaseModel):
     user_id: str
     title: str
     slug: str
-    description: str
-    department: str
+    description: Optional[str] = None
+    department: Optional[str] = None
     role: Optional[str] = None
     tags: List[str]
     media: Optional[dict] = None
@@ -248,7 +248,7 @@ class ServiceListRead(BaseModel):
     user_id: str
     title: str
     slug: str
-    department: str
+    department: Optional[str] = None
     role: Optional[str] = None
     tags: List[str]
     media: Optional[dict] = None
