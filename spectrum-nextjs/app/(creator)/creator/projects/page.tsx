@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { creatorProjects, ProjectItem } from '@/lib/api';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { creatorProjects, proposals, ProjectItem, ProposalItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['all', 'in_progress', 'active', 'on_hold', 'completed'];
 
@@ -22,7 +23,27 @@ const STATUS_LABEL: Record<string, string> = {
   draft:       'Draft',
 };
 
-function formatDate(dateStr?: string): string {
+const APP_STATUS_TABS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected', 'withdrawn'];
+
+const APP_STATUS_STYLE: Record<string, string> = {
+  submitted:    'bg-blue-50 text-blue-700',
+  shortlisted:  'bg-purple-50 text-purple-700',
+  interviewing: 'bg-amber-50 text-amber-700',
+  accepted:     'bg-emerald-50 text-emerald-700',
+  rejected:     'bg-rose-50 text-rose-700',
+  withdrawn:    'bg-gray-100 text-gray-500',
+};
+
+const APP_STATUS_LABEL: Record<string, string> = {
+  submitted:    'Under Review',
+  shortlisted:  'Shortlisted',
+  interviewing: 'Interviewing',
+  accepted:     'Hired',
+  rejected:     'Declined',
+  withdrawn:    'Withdrawn',
+};
+
+function formatRelative(dateStr?: string): string {
   if (!dateStr) return '—';
   const diff = Date.now() - new Date(dateStr).getTime();
   const hrs = Math.floor(diff / 3600000);
@@ -33,6 +54,12 @@ function formatDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function ProgressBar({ value }: { value: number }) {
   return (
     <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -41,18 +68,33 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-export default function CreatorProjectsPage() {
+type TopTab = 'projects' | 'applications';
+
+function MyWorkInner() {
+  const searchParams = useSearchParams();
+  const initialTab: TopTab = searchParams.get('tab') === 'applications' ? 'applications' : 'projects';
+  const [topTab, setTopTab] = useState<TopTab>(initialTab);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (topTab === 'applications') url.searchParams.set('tab', 'applications');
+    else url.searchParams.delete('tab');
+    window.history.replaceState({}, '', url.toString());
+  }, [topTab]);
+
+  // --- Projects state ---
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [projectList, setProjectList] = useState<ProjectItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    if (topTab !== 'projects') return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    setProjectsLoading(true);
+    setProjectsError(null);
 
     const params: { status?: string; search?: string } = {};
     if (filter !== 'all') params.status = filter;
@@ -60,19 +102,123 @@ export default function CreatorProjectsPage() {
 
     creatorProjects.list(params)
       .then(data => { if (!cancelled) setProjectList(data.projects || []); })
-      .catch(e => { if (!cancelled) setError((e as Error).message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch(e => { if (!cancelled) setProjectsError((e as Error).message); })
+      .finally(() => { if (!cancelled) setProjectsLoading(false); });
 
     return () => { cancelled = true; };
-  }, [filter, search, refreshKey]);
+  }, [filter, search, refreshKey, topTab]);
+
+  // --- Applications state ---
+  const [appTab, setAppTab] = useState('All');
+  const [appList, setAppList] = useState<ProposalItem[]>([]);
+  const [appLoading, setAppLoading] = useState(true);
+  const [appError, setAppError] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState<string | null>(null);
+  const [appsFetched, setAppsFetched] = useState(false);
+
+  useEffect(() => {
+    if (topTab !== 'applications' || appsFetched) return;
+    let cancelled = false;
+    setAppLoading(true);
+    setAppError(null);
+    proposals.getMe()
+      .then(data => { if (!cancelled) { setAppList(data || []); setAppsFetched(true); } })
+      .catch(e => { if (!cancelled) setAppError((e as Error).message); })
+      .finally(() => { if (!cancelled) setAppLoading(false); });
+    return () => { cancelled = true; };
+  }, [topTab, appsFetched]);
+
+  const filteredApps = appTab === 'All'
+    ? appList
+    : appList.filter(a => a.status === appTab);
+
+  const appCounts = {
+    total:        appList.length,
+    submitted:    appList.filter(a => a.status === 'submitted').length,
+    shortlisted:  appList.filter(a => a.status === 'shortlisted').length,
+    accepted:     appList.filter(a => a.status === 'accepted').length,
+  };
+
+  const handleWithdraw = async (id: string) => {
+    if (!confirm('Withdraw this proposal? This cannot be undone.')) return;
+    setWithdrawing(id);
+    try {
+      await proposals.withdraw(id);
+      setAppList(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setWithdrawing(null);
+    }
+  };
 
   return (
     <>
       <section className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Projects</h1>
-        <p className="text-gray-600">All your active and completed work</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Work</h1>
+        <p className="text-gray-600">Your active projects and outstanding applications, all in one place.</p>
       </section>
 
+      {/* Top-level sub-tabs */}
+      <div className="bg-white rounded-xl border border-gray-200 p-1.5 inline-flex items-center gap-1 mb-8">
+        <button
+          onClick={() => setTopTab('projects')}
+          className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition ${topTab === 'projects' ? 'bg-cobalt text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
+        >
+          <i className="fa-solid fa-briefcase mr-2"></i>
+          Projects
+        </button>
+        <button
+          onClick={() => setTopTab('applications')}
+          className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition ${topTab === 'applications' ? 'bg-cobalt text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
+        >
+          <i className="fa-solid fa-paper-plane mr-2"></i>
+          Applications
+          {appCounts.total > 0 && topTab !== 'applications' && (
+            <span className="ml-2 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{appCounts.total}</span>
+          )}
+        </button>
+      </div>
+
+      {topTab === 'projects' ? (
+        <ProjectsView
+          filter={filter} setFilter={setFilter}
+          search={search} setSearch={setSearch}
+          projectList={projectList}
+          loading={projectsLoading}
+          error={projectsError}
+          onRetry={() => setRefreshKey(k => k + 1)}
+        />
+      ) : (
+        <ApplicationsView
+          counts={appCounts}
+          tabs={APP_STATUS_TABS}
+          activeTab={appTab} setActiveTab={setAppTab}
+          appList={appList}
+          filtered={filteredApps}
+          loading={appLoading}
+          error={appError}
+          withdrawing={withdrawing}
+          onWithdraw={handleWithdraw}
+        />
+      )}
+    </>
+  );
+}
+
+function ProjectsView({
+  filter, setFilter, search, setSearch,
+  projectList, loading, error, onRetry,
+}: {
+  filter: string; setFilter: (v: string) => void;
+  search: string; setSearch: (v: string) => void;
+  projectList: ProjectItem[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <>
       {/* Filter bar */}
       <section className="mb-8">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -104,7 +250,7 @@ export default function CreatorProjectsPage() {
         <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
           <i className="fa-solid fa-circle-exclamation text-4xl text-red-300 mb-4 block"></i>
           <p className="text-red-500 text-sm mb-4">{error}</p>
-          <button onClick={() => setRefreshKey(k => k + 1)}
+          <button onClick={onRetry}
             className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
             Try again
           </button>
@@ -207,7 +353,7 @@ export default function CreatorProjectsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
-                    {p.updated_at && <span className="text-xs">Updated {formatDate(p.updated_at)}</span>}
+                    {p.updated_at && <span className="text-xs">Updated {formatRelative(p.updated_at)}</span>}
                     {(p.budget_min || p.budget_max) && (
                       <span className="font-semibold text-gray-900 text-sm">
                         ${p.budget_min?.toLocaleString()}{p.budget_max ? `–$${p.budget_max.toLocaleString()}` : '+'}
@@ -221,7 +367,6 @@ export default function CreatorProjectsPage() {
         </section>
       )}
 
-      {/* Tip */}
       {!loading && !error && projectList.length > 0 && (
         <section className="mt-8 bg-blue-50 rounded-xl border border-blue-100 p-5">
           <div className="flex items-start gap-4">
@@ -236,5 +381,148 @@ export default function CreatorProjectsPage() {
         </section>
       )}
     </>
+  );
+}
+
+function ApplicationsView({
+  counts, tabs, activeTab, setActiveTab,
+  appList, filtered, loading, error,
+  withdrawing, onWithdraw,
+}: {
+  counts: { total: number; submitted: number; shortlisted: number; accepted: number };
+  tabs: string[];
+  activeTab: string; setActiveTab: (v: string) => void;
+  appList: ProposalItem[];
+  filtered: ProposalItem[];
+  loading: boolean;
+  error: string | null;
+  withdrawing: string | null;
+  onWithdraw: (id: string) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-end mb-6">
+        <Link href="/creator/find-projects"
+          className="inline-flex items-center px-5 py-2.5 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+          <i className="fa-solid fa-magnifying-glass mr-2"></i>Find More Work
+        </Link>
+      </div>
+
+      {/* Stats */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        {[
+          { label: 'Total Applied',  value: counts.total,       icon: 'fa-paper-plane', bg: 'bg-blue-50',   iconColor: 'text-cobalt' },
+          { label: 'Under Review',   value: counts.submitted,   icon: 'fa-clock',       bg: 'bg-amber-50',  iconColor: 'text-amber-600' },
+          { label: 'Shortlisted',    value: counts.shortlisted, icon: 'fa-star',        bg: 'bg-purple-50', iconColor: 'text-purple-600' },
+          { label: 'Hired',          value: counts.accepted,    icon: 'fa-circle-check',bg: 'bg-emerald-50',iconColor: 'text-emerald-600' },
+        ].map(({ label, value, icon, bg, iconColor }) => (
+          <div key={label} className="bg-white rounded-2xl p-6 border border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-gray-600">{label}</span>
+              <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
+                <i className={`fa-solid ${icon} ${iconColor}`}></i>
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-500 text-sm">Loading applications…</p>
+        </div>
+      ) : error ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
+          <i className="fa-solid fa-circle-exclamation text-4xl text-red-300 mb-4 block"></i>
+          <p className="text-red-500 text-sm">{error}</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          {/* Status tabs */}
+          <div className="flex items-center border-b border-gray-200 px-2 overflow-x-auto no-scrollbar">
+            {tabs.map(tab => {
+              const count = tab === 'All' ? appList.length : appList.filter(a => a.status === tab).length;
+              return (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-4 text-sm font-semibold whitespace-nowrap transition ${activeTab === tab ? 'text-cobalt border-b-2 border-cobalt' : 'text-gray-500 hover:text-gray-900'}`}>
+                  {tab === 'All' ? 'All' : (APP_STATUS_LABEL[tab] ?? tab)}
+                  {count > 0 && (
+                    <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="p-20 text-center">
+              <i className="fa-solid fa-inbox text-4xl text-gray-300 mb-4 block"></i>
+              <h3 className="font-semibold text-gray-600 mb-2">No applications here</h3>
+              <p className="text-gray-400 text-sm">
+                {appList.length === 0 ? 'Start applying to jobs to see them here.' : 'No applications match this filter.'}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {filtered.map(app => (
+                <div key={app.id} className="p-6 hover:bg-gray-50 transition">
+                  <div className="flex items-start justify-between gap-6 flex-wrap">
+                    <div className="flex items-start gap-4 flex-1 min-w-0">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i className="fa-solid fa-clapperboard text-cobalt"></i>
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-bold text-gray-900 mb-0.5">{app.job_title}</h3>
+                        <p className="text-sm text-gray-500 mb-2">
+                          {app.job_department}
+                          {app.proposed_budget ? ` · Proposed $${app.proposed_budget.toLocaleString()}` : ''}
+                          {app.role ? ` · ${app.role}` : ''}
+                        </p>
+                        {app.cover_letter && (
+                          <p className="text-sm text-gray-400 line-clamp-1 italic">&ldquo;{app.cover_letter}&rdquo;</p>
+                        )}
+                        <div className="flex items-center gap-3 text-xs text-gray-400 mt-2">
+                          <span><i className="fa-regular fa-calendar mr-1"></i>Applied {formatDate(app.submitted_at)}</span>
+                          <span>·</span>
+                          <span>{formatRelative(app.submitted_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {APP_STATUS_LABEL[app.status] ?? app.status}
+                      </span>
+                      {['submitted', 'shortlisted', 'interviewing'].includes(app.status) && (
+                        <button
+                          onClick={() => onWithdraw(app.id)}
+                          disabled={withdrawing === app.id}
+                          className="px-3 py-1.5 text-xs font-semibold text-red-500 border border-red-100 rounded-lg hover:bg-red-50 transition disabled:opacity-50">
+                          {withdrawing === app.id ? 'Withdrawing…' : 'Withdraw'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function CreatorMyWorkPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <MyWorkInner />
+    </Suspense>
   );
 }

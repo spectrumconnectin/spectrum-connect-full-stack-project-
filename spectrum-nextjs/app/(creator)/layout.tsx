@@ -11,8 +11,7 @@ const navLinks = [
   { href: '/creator/dashboard', label: 'Dashboard' },
   { href: '/creator/find-projects', label: 'Find Projects' },
   { href: '/creator/smart-connect', label: 'Smart Connect' },
-  { href: '/creator/applications', label: 'Applications' },
-  { href: '/creator/projects', label: 'Projects' },
+  { href: '/creator/projects', label: 'My Work' },
   { href: '/creator/services', label: 'Services' },
   { href: '/creator/disputes', label: 'Disputes' },
   {
@@ -173,7 +172,8 @@ function CreatorFooter() {
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/creator/dashboard" className="hover:text-cobalt transition">Dashboard</Link></li>
               <li><Link href="/creator/smart-connect" className="hover:text-cobalt transition">Smart Connect</Link></li>
-              <li><Link href="/creator/projects" className="hover:text-cobalt transition">Projects</Link></li>
+              <li><Link href="/creator/projects" className="hover:text-cobalt transition">My Work</Link></li>
+              <li><Link href="/creator/projects?tab=applications" className="hover:text-cobalt transition">Applications</Link></li>
               <li><Link href="/creator/services" className="hover:text-cobalt transition">Services</Link></li>
               <li><Link href="/creator/messaging" className="hover:text-cobalt transition">Messages</Link></li>
               <li><Link href="/creator/disputes" className="hover:text-cobalt transition">Disputes</Link></li>

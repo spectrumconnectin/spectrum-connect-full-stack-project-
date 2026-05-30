@@ -67,7 +67,7 @@ export default function ProjectApplicationPage() {
         proposed_duration: proposedDuration ? Number(proposedDuration) : undefined,
       });
       setSubmitted(true);
-      setTimeout(() => router.push('/creator/applications'), 1800);
+      setTimeout(() => router.push('/creator/projects?tab=applications'), 1800);
     } catch (e) {
       setError((e as Error).message);
     } finally {
