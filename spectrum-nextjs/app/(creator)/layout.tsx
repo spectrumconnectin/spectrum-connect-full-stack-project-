@@ -75,9 +75,6 @@ function CreatorHeader() {
                       <span className="mr-1.5">✦</span>
                     )}
                     {label}
-                    {isAi && (
-                      <span className={`ml-1.5 inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none align-middle ${active ? 'bg-white/25 text-white' : 'bg-violet-500 text-white'}`}>AI</span>
-                    )}
                   </Link>
                 );
               })}
