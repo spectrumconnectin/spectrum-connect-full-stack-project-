@@ -85,7 +85,7 @@ function ClientHeader() {
           </div>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="flex items-center gap-3 lg:gap-4 shrink-0 ml-4 lg:ml-6 pl-1">
             {/* Messages icon */}
             <div className="relative">
               <Link
