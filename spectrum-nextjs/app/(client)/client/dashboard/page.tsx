@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, type ClientDashboardResponse } from '@/lib/api';
+import { dashboard, profile as profileApi, type ClientDashboardResponse } from '@/lib/api';
 
 const statusColors: Record<string, string> = {
   open: 'bg-green-100 text-green-700',
@@ -17,10 +17,13 @@ export default function ClientDashboardPage() {
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    // Load user name and dashboard in parallel
+    // Load user name and dashboard in parallel. Use /profiles/me so we get the
+    // full profile (display_name, first/last name) rather than /auth/me/role
+    // which returns only the flat role payload and would fall back to the
+    // raw `username` field (which is the email for older OAuth signups).
     Promise.allSettled([
       dashboard.getClient(),
-      auth.me(),
+      profileApi.getMe(),
     ]).then(([dashResult, meResult]) => {
       if (dashResult.status === 'fulfilled') setData(dashResult.value);
       if (meResult.status === 'fulfilled') {
