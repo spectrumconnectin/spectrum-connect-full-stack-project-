@@ -75,8 +75,8 @@ function ClientHeader() {
                       <span className="mr-1.5">✦</span>
                     )}
                     {label}
-                    {isAi && !active && (
-                      <span className="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-violet-500 text-white px-1.5 py-0.5 rounded-full leading-none">AI</span>
+                    {isAi && (
+                      <span className={`ml-1.5 inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none align-middle ${active ? 'bg-white/25 text-white' : 'bg-violet-500 text-white'}`}>AI</span>
                     )}
                   </Link>
                 );
