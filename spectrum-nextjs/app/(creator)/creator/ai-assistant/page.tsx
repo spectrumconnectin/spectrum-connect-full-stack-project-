@@ -85,18 +85,30 @@ export default function AIAssistantPage() {
 
   const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  // Escape HTML-significant chars before applying any formatting. Without this,
+  // an AI response (or any echoed user input) that contains "<script>" would
+  // execute when injected via dangerouslySetInnerHTML.
+  const escapeHtml = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
   const formatContent = (text: string) => {
-    // Basic markdown-like formatting
+    // Basic markdown-like formatting applied to ESCAPED text.
     return text
       .split('\n')
-      .map((line, i) => {
-        const bold = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      .map(line => {
+        const safe = escapeHtml(line);
+        const bold = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         if (line.startsWith('**') && line.endsWith('**') && !line.slice(2, -2).includes('**')) {
-          return `<p key="${i}" style="font-weight:700;margin:8px 0 4px">${bold}</p>`;
+          return `<p style="font-weight:700;margin:8px 0 4px">${bold}</p>`;
         }
-        if (line.match(/^[—•-]/)) return `<p key="${i}" style="margin:2px 0;padding-left:4px">${bold}</p>`;
-        if (line.trim() === '') return `<br key="${i}"/>`;
-        return `<p key="${i}" style="margin:3px 0">${bold}</p>`;
+        if (line.match(/^[—•-]/)) return `<p style="margin:2px 0;padding-left:4px">${bold}</p>`;
+        if (line.trim() === '') return '<br/>';
+        return `<p style="margin:3px 0">${bold}</p>`;
       })
       .join('');
   };

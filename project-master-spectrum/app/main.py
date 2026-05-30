@@ -1,10 +1,17 @@
+import logging
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("spectrum.main")
 
 from app.models.schema import (
     User, CrewProfile, JobPost, Application, ContactMessage,
@@ -56,33 +63,67 @@ load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGODB_DB = os.getenv("MONGODB_DB", "spectrum-connect")
-print("MONGO_URI: [configured]")
-print("MONGODB_DB:", MONGODB_DB)
+logger.info("MONGO_URI: [configured]")
+logger.info("MONGODB_DB: %s", MONGODB_DB)
 
 app = FastAPI(
     title="Spectrum Connect API",
     description="Film Production Crew Marketplace - Connect crew members with producers",
-    version="1.0.1"
+    version="1.0.1",
+    # Hide interactive docs in production to reduce attack surface (still
+    # reachable via /openapi.json if explicitly enabled).
+    docs_url="/docs" if not settings.is_production() else None,
+    redoc_url="/redoc" if not settings.is_production() else None,
 )
 
+# Build CORS allowlist from configuration only — no hardcoded preview URLs.
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
 _extra_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 _frontend_url = os.getenv("FRONTEND_URL", "").strip()
-_origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "https://spectrum-nextjs-izcmc8k6f-teamspectrumstudios-7353s-projects.vercel.app",
-] + ([_frontend_url] if _frontend_url and _frontend_url not in ["http://localhost:3000", "http://localhost:5173"] else []) \
-  + _extra_origins
+
+if settings.is_production():
+    # Production: ONLY origins explicitly allowed via env vars. No localhost.
+    _origins = list({o for o in ([_frontend_url] + _extra_origins) if o})
+    if not _origins:
+        logger.warning(
+            "CORS: no FRONTEND_URL or ALLOWED_ORIGINS configured in production. "
+            "Browser clients will be blocked."
+        )
+else:
+    # Development: localhost defaults plus anything in env.
+    _origins = list({o for o in (
+        ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
+        + ([_frontend_url] if _frontend_url else [])
+        + _extra_origins
+    ) if o})
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Pin to verbs we actually use rather than wildcarding.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Admin-Key", "X-Requested-With"],
+    max_age=600,
 )
+
+
+# ─── Security headers middleware ─────────────────────────────────────────────
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Apply baseline security headers to every response."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    if settings.is_production():
+        # Tell browsers to upgrade and pin HTTPS once a TLS cert is in front of
+        # the LB. Harmless on HTTP origins (browsers ignore HSTS over HTTP).
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
+    return response
 
 # ==================================================================
 # ROUTERS
@@ -129,11 +170,10 @@ def read_root():
 
 @app.on_event("startup")
 async def startup_db_client():
-    print("Connecting to MongoDB...")
+    logger.info("Connecting to MongoDB...")
     client = AsyncIOMotorClient(MONGO_URI)
     database = client.get_database(MONGODB_DB)
-    print("MongoDB client initialized:", client)
-    print("Database object:", database)
+    logger.info("MongoDB client initialized")
 
     try:
         await init_beanie(
@@ -153,7 +193,7 @@ async def startup_db_client():
                 SkillChallenge, ChallengeSubmission, SkillBadge,
             ],
         )
-        print("Beanie initialized successfully")
+        logger.info("Beanie initialized successfully")
     except Exception as e:
-        print("Error initializing Beanie:", e)
+        logger.exception("Error initializing Beanie")
         raise e

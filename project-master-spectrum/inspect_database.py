@@ -1,4 +1,8 @@
 import asyncio
+import os
+import sys
+
+from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.models.schema import (
@@ -9,8 +13,16 @@ from app.models.schema import (
     Analytics, SearchHistory, SystemLog
 )
 
-MONGO_URI = "mongodb+srv://nasireaglines_db_user:Mk9%239AvT@rag.d74ni5g.mongodb.net"
-DATABASE_NAME = "spectrum"
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI")
+DATABASE_NAME = os.getenv("MONGODB_DB", "spectrum-connect")
+
+if not MONGO_URI:
+    sys.exit(
+        "MONGO_URI is not set. Copy .env.example to .env and configure your database "
+        "credentials before running this script."
+    )
 
 async def inspect_database():
     client = AsyncIOMotorClient(MONGO_URI)
@@ -31,7 +43,7 @@ async def inspect_database():
     print("SPECTRUM DATABASE STRUCTURE")
     print("=" * 80)
     print(f"Database: {DATABASE_NAME}")
-    print(f"MongoDB URL: {MONGO_URI}\n")
+    print("MongoDB URL: [configured]\n")
 
     collection_names = await database.list_collection_names()
     print(f"Total Collections: {len(collection_names)}\n")

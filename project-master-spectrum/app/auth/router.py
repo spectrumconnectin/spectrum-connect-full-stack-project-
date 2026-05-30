@@ -25,8 +25,18 @@ logger = logging.getLogger(__name__)
 # In‑memory store mapping OAuth "state" values to issued JWTs.
 oauth_state_tokens: Dict[str, str] = {}
 
-# In-memory OTP store: email -> {otp, expires_at}
+# In-memory OTP store: email -> {otp, expires_at, attempts}
+# NOTE: in-memory; only works for single-process deployments. For multi-instance
+# autoscaling, move this to Redis. Attempts counter prevents brute force.
 _otp_store: Dict[str, Dict] = {}
+
+# Maximum failed verification attempts before an OTP is invalidated.
+_OTP_MAX_ATTEMPTS = 5
+
+
+def _is_dev_env() -> bool:
+    """True only when ENVIRONMENT/ENV is not production. Used to gate OTP echo."""
+    return not settings.is_production()
 
 
 # ============================================================================
@@ -45,13 +55,26 @@ class OTPVerifyRequest(_PydanticBase):
 
 
 @router.post("/otp/send", response_model=OTPResponse, summary="Send OTP to email")
-async def send_otp(request: OTPSendRequest):
-    """Generate a 6-digit OTP and email it to the user."""
-    otp = str(random.randint(100000, 999999))
-    expires_at = datetime.utcnow() + timedelta(minutes=10)
-    _otp_store[request.email] = {"otp": otp, "expires_at": expires_at, "purpose": request.purpose}
+async def send_otp(
+    request: OTPSendRequest,
+    _: None = Depends(rate_limiter("otp_send_ip", limit=5, window_seconds=300)),
+):
+    """Generate a 6-digit OTP and email it to the user.
 
-    print(f"  📧  OTP for {request.email}: {otp}")
+    Rate-limited to 5 sends per 5 minutes per IP to prevent OTP spam.
+    """
+    # Use a cryptographically secure RNG instead of `random` for OTPs.
+    otp = f"{secrets.randbelow(1_000_000):06d}"
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+    _otp_store[request.email] = {
+        "otp": otp,
+        "expires_at": expires_at,
+        "purpose": request.purpose,
+        "attempts": 0,
+    }
+
+    # Never log OTPs. They are bearer credentials.
+    logger.info("OTP issued for %s (purpose=%s)", request.email, request.purpose)
 
     # Look up username for the email (fallback to email prefix)
     user = await User.find_one(User.email == request.email)
@@ -64,20 +87,36 @@ async def send_otp(request: OTPSendRequest):
         "success": True,
         "message": "Verification code sent to your email",
         "expires_in_seconds": 600,
-        "dev_otp": otp if not email_sent else None,
+        # Only echo the OTP back in dev environments and only when email failed.
+        # In production, never expose OTPs over the API regardless of email state.
+        "dev_otp": otp if (_is_dev_env() and not email_sent) else None,
     }
 
 
 @router.post("/otp/verify", summary="Verify OTP and mark account as verified")
-async def verify_otp(request: OTPVerifyRequest):
-    """Verify OTP code for the given email. Marks user as verified on success."""
+async def verify_otp(
+    request: OTPVerifyRequest,
+    _: None = Depends(rate_limiter("otp_verify_ip", limit=10, window_seconds=60)),
+):
+    """Verify OTP code for the given email. Marks user as verified on success.
+
+    Per-OTP attempts are capped to prevent brute force.
+    """
     stored = _otp_store.get(request.email)
     if not stored:
         raise HTTPException(status_code=400, detail="No OTP found for this email. Please request a new one.")
     if stored["expires_at"] < datetime.utcnow():
         _otp_store.pop(request.email, None)
         raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
-    if stored["otp"] != request.otp.strip():
+
+    # Brute-force guard: invalidate OTP after too many failed attempts.
+    if stored.get("attempts", 0) >= _OTP_MAX_ATTEMPTS:
+        _otp_store.pop(request.email, None)
+        raise HTTPException(status_code=429, detail="Too many failed attempts. Please request a new code.")
+
+    # Constant-time comparison to avoid timing side-channels.
+    if not secrets.compare_digest(stored["otp"], request.otp.strip()):
+        stored["attempts"] = stored.get("attempts", 0) + 1
         raise HTTPException(status_code=400, detail="Invalid OTP. Please check and try again.")
 
     _otp_store.pop(request.email, None)
@@ -87,7 +126,7 @@ async def verify_otp(request: OTPVerifyRequest):
         user.is_verified = True
         await user.save()
 
-    logger.info(f"OTP verified for {request.email}")
+    logger.info("OTP verified for %s", request.email)
     return {"success": True, "message": "Email verified successfully. You can now log in."}
 
 @router.get("/google_login")
@@ -101,7 +140,10 @@ async def google_login():
     return RedirectResponse(authorize_request_url)
 
 @router.post("/register", response_model=UserRead, summary="Register new user")
-async def register_user(user: UserCreate):
+async def register_user(
+    user: UserCreate,
+    _: None = Depends(rate_limiter("register_ip", limit=10, window_seconds=300)),
+):
     """
     Register a new user account.
     
@@ -169,12 +211,18 @@ async def register_user(user: UserCreate):
     )
     await user_db.insert()
 
-    # Generate OTP and store it
-    otp = str(random.randint(100000, 999999))
+    # Generate OTP and store it (cryptographically secure RNG)
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)
-    _otp_store[user_db.email] = {"otp": otp, "expires_at": expires_at, "purpose": "verification"}
+    _otp_store[user_db.email] = {
+        "otp": otp,
+        "expires_at": expires_at,
+        "purpose": "verification",
+        "attempts": 0,
+    }
 
-    print(f"  🆕  NEW USER: {user_db.username} | OTP: {otp}")
+    # Never log OTPs. Log only that registration happened.
+    logger.info("New user registered: %s", user_db.username)
 
     # Send OTP via email
     html = get_otp_email_html(user_db.username, otp)
@@ -185,7 +233,8 @@ async def register_user(user: UserCreate):
         "email": user_db.email,
         "username": user_db.username,
         "account_type": user_db.account_type,
-        "dev_otp": otp if not email_sent else None,  # only expose in UI if email failed
+        # Only echo OTP back in dev environments and only when email failed.
+        "dev_otp": otp if (_is_dev_env() and not email_sent) else None,
     }
 
 @router.post("/login", response_model=Token, summary="Login user")
@@ -869,8 +918,8 @@ async def register_admin(request: AdminRegisterRequest):
         account_type - crew | producer | both  (default: both)
         user_role    - admin | moderator        (default: admin)
     """
-    # Validate secret key
-    if request.admin_key != settings.ADMIN_REGISTRATION_KEY:
+    # Validate secret key with a constant-time comparison.
+    if not secrets.compare_digest(request.admin_key, settings.ADMIN_REGISTRATION_KEY):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid admin registration key.",
@@ -920,12 +969,11 @@ async def register_admin(request: AdminRegisterRequest):
         "message": f"{new_admin.user_role.capitalize()} account created successfully.",
     }
 
-# ── Debug endpoint — remove after fixing admin issue ─────────────────────────
 @router.get("/me/role", summary="Check current user role")
 async def check_my_role(current_user: User = Depends(get_current_user)):
     """
     Returns the role and verification status of the currently logged-in user.
-    Use this to confirm whether your token belongs to an admin account.
+    Returns only the caller's own data so this is safe to leave authenticated.
     """
     return {
         "id": str(current_user.id),
@@ -942,6 +990,7 @@ async def check_my_role(current_user: User = Depends(get_current_user)):
 async def promote_to_admin(
     email: str,
     admin_key: str = Header(..., alias="X-Admin-Key"),
+    _: None = Depends(rate_limiter("promote_admin_ip", limit=5, window_seconds=300)),
 ):
     """
     Promote any existing user to admin role using the admin secret key.
@@ -951,10 +1000,12 @@ async def promote_to_admin(
         email     - email of the user to promote
     Headers:
         X-Admin-Key - must match ADMIN_REGISTRATION_KEY in your .env
+
+    Hardened with a constant-time key comparison and per-IP rate limiting.
     """
     from app.core.config import settings as _settings
 
-    if admin_key != _settings.ADMIN_REGISTRATION_KEY:
+    if not secrets.compare_digest(admin_key, _settings.ADMIN_REGISTRATION_KEY):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid admin key.",
@@ -970,6 +1021,7 @@ async def promote_to_admin(
     user.user_role = "admin"
     user.is_verified = True
     await user.save()
+    logger.warning("User %s promoted to admin via /promote-to-admin", user.email)
 
     return {
         "success": True,

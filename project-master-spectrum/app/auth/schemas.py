@@ -4,8 +4,8 @@ import re
 
 class UserCreate(BaseModel):
     email: EmailStr
-    username: str
-    password: str
+    username: str = Field(..., min_length=3, max_length=30)
+    password: str = Field(..., min_length=8, max_length=128)
     phone_number: str = Field(..., description="Phone number in E.164 format (e.g., +1234567890)")
     phone_country_code: Optional[str] = Field(None, description="Country code (e.g., US, IN, GB)")
     account_type: str
@@ -17,6 +17,28 @@ class UserCreate(BaseModel):
             raise ValueError('Phone number must start with + (E.164 format)')
         if not re.match(r'^\+[1-9]\d{1,14}$', v):
             raise ValueError('Invalid phone number format. Use E.164 format (e.g., +1234567890)')
+        return v
+
+    @validator('username')
+    def validate_username(cls, v):
+        # Username may contain letters, digits, dot, dash, underscore.
+        if not re.match(r'^[A-Za-z0-9._-]+$', v):
+            raise ValueError('Username may only contain letters, digits, ".", "_" and "-".')
+        return v
+
+    @validator('password')
+    def validate_password_strength(cls, v):
+        # Require some basic complexity to defend against trivial credential stuffing.
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r'[A-Za-z]', v) or not re.search(r'\d', v):
+            raise ValueError('Password must contain both letters and numbers')
+        return v
+
+    @validator('account_type')
+    def validate_account_type(cls, v):
+        if v not in {'crew', 'producer', 'both'}:
+            raise ValueError("account_type must be 'crew', 'producer', or 'both'")
         return v
 
 class UserRead(BaseModel):
@@ -182,10 +204,12 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     """Confirm password reset with token"""
     token: str = Field(..., description="Reset token from email")
-    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+    new_password: str = Field(..., min_length=8, max_length=128, description="New password (min 8 characters)")
 
     @validator('new_password')
     def validate_password_strength(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
+        if not re.search(r'[A-Za-z]', v) or not re.search(r'\d', v):
+            raise ValueError('Password must contain both letters and numbers')
         return v
