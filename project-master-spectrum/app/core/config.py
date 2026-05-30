@@ -57,6 +57,19 @@ class Settings(BaseSettings):
     # Admin Registration — keep this secret, only share with trusted team
     ADMIN_REGISTRATION_KEY: str = _INSECURE_ADMIN_KEY
 
+    # ── Commission (v1 split 8/4) ────────────────────────────────────────
+    # See app/services/commission_service.py and the spec
+    # "Spectrum Connect — Commission Logic (v1, Split 8/4)" for details.
+    # Stored as strings so callers can convert to Decimal without float
+    # round-tripping (Pydantic 2 happily reads floats from env, but we want
+    # the exact decimal representation: "0.12" not 0.11999999...).
+    COMM_TOTAL_RATE: str = "0.12"
+    COMM_CREATOR_PART: str = "0.6666666666666667"   # 8/12
+    COMM_CLIENT_PART: str = "0.3333333333333333"    # 4/12
+    COMM_MICRO_THRESHOLD: str = "20.00"
+    COMM_MICRO_CAP: str = "2.00"
+    COMM_VERSION: str = "v1.split.8_4"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -208,7 +208,15 @@ export default function EarningsPage() {
                           ${t.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-400 whitespace-nowrap">
-                          {t.platform_fee > 0 ? `-$${t.platform_fee.toFixed(2)}` : '—'}
+                          {(() => {
+                            // Prefer the new creator_fee field (precise per-creator deduction).
+                            // Fall back to platform_fee for legacy records that pre-date the
+                            // commission rollout.
+                            const fee = (t.creator_fee && t.creator_fee > 0)
+                              ? t.creator_fee
+                              : t.platform_fee;
+                            return fee > 0 ? `-$${fee.toFixed(2)}` : '—';
+                          })()}
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-gray-900 whitespace-nowrap">
                           ${t.net_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -1007,10 +1007,19 @@ class Transaction(Document):
     from_user_id: Optional[PydanticObjectId] = None
     to_user_id: Optional[PydanticObjectId] = None
     type: str # payment, withdrawal, refund, subscription, boost, verification, team_split
-    amount: float
+    amount: float                     # project subtotal (creator-side gross)
     currency: str = "USD"
+    # Fee breakdown — see app/services/commission_service.py.
+    # `platform_fee` is the total platform take (creator_fee + client_fee).
+    # `creator_fee` and `client_fee` are the two sides of the v1 split. We
+    # keep `platform_fee` for backwards compatibility with existing reports.
     platform_fee: float = 0
+    creator_fee: float = 0            # deducted from creator's payout
+    client_fee: float = 0             # added on top of subtotal client pays
+    commission_version: Optional[str] = None  # e.g. "v1.split.8_4"
     payment_processing_fee: float = 0
+    # Net amount the receiving party actually gets (for payouts) or pays
+    # (for charges). Computed by the caller.
     net_amount: float
     order_id: Optional[PydanticObjectId] = None
     deal_memo_id: Optional[PydanticObjectId] = None

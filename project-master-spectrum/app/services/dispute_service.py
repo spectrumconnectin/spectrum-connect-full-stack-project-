@@ -27,8 +27,10 @@ from typing import Any, Dict, List, Optional
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
+from app.core.config import settings
 from app.models.escrow import Escrow, Dispute, DisputeEvidence, GuaranteeFund
 from app.models.schema import User, Transaction
+from app.services.commission_service import calc_commission
 import uuid
 
 
@@ -344,7 +346,9 @@ class DisputeService:
         escrow.updated_at = now
         await escrow.save()
 
-        # Create transaction
+        # Apply v1 8/4 commission split to the aggregate released amount.
+        fees = calc_commission(released, currency=escrow.currency).to_dict()
+
         transaction = Transaction(
             transaction_id=tx_id,
             from_user_id=escrow.client_id,
@@ -352,9 +356,12 @@ class DisputeService:
             type="payment",
             amount=released,
             currency=escrow.currency,
-            platform_fee=0.0,
+            platform_fee=fees["platform_take"],
+            creator_fee=fees["creator_fee"],
+            client_fee=fees["client_fee"],
+            commission_version=fees["commission_version"],
             payment_processing_fee=0.0,
-            net_amount=released,
+            net_amount=fees["creator_payout"],
             status="completed",
             initiated_at=now,
             processed_at=now,
@@ -392,6 +399,10 @@ class DisputeService:
         await escrow.save()
 
         if creator_amount > 0:
+            # Apply commission to the creator's portion only — the client
+            # portion is a refund and reverses its share of fees separately
+            # (handled by the caller via _apply_full_refund if needed).
+            fees = calc_commission(creator_amount, currency=escrow.currency).to_dict()
             transaction = Transaction(
                 transaction_id=tx_id,
                 from_user_id=escrow.client_id,
@@ -399,9 +410,12 @@ class DisputeService:
                 type="payment",
                 amount=creator_amount,
                 currency=escrow.currency,
-                platform_fee=0.0,
+                platform_fee=fees["platform_take"],
+                creator_fee=fees["creator_fee"],
+                client_fee=fees["client_fee"],
+                commission_version=fees["commission_version"],
                 payment_processing_fee=0.0,
-                net_amount=creator_amount,
+                net_amount=fees["creator_payout"],
                 status="completed",
                 initiated_at=now,
                 processed_at=now,

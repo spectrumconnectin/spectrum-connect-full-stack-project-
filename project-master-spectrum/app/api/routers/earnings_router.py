@@ -19,6 +19,8 @@ router = APIRouter(prefix="/earnings", tags=["Earnings"])
 
 
 def _fmt_txn(t: Transaction) -> dict:
+    # New fee fields default to 0 when the Transaction was written before the
+    # commission rollout, keeping historical reads safe.
     return {
         "id": str(t.id),
         "transaction_id": t.transaction_id,
@@ -26,6 +28,9 @@ def _fmt_txn(t: Transaction) -> dict:
         "amount": t.amount,
         "net_amount": t.net_amount,
         "platform_fee": t.platform_fee,
+        "creator_fee": getattr(t, "creator_fee", 0.0) or 0.0,
+        "client_fee": getattr(t, "client_fee", 0.0) or 0.0,
+        "commission_version": getattr(t, "commission_version", None),
         "currency": t.currency,
         "status": t.status,
         "payment_method": t.payment_method,

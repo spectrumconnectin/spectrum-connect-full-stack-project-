@@ -144,6 +144,24 @@ function ReleaseModal({
               </span>
               <span className="font-medium text-gray-700 truncate max-w-[180px]">{row.milestone.title}</span>
             </div>
+
+            {/* Fee breakdown (v1 8/4 commission) */}
+            {row.milestone.fees && (
+              <div className="border-t border-gray-200 pt-3 mt-3 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-gray-500">
+                  <span>Milestone subtotal</span>
+                  <span className="font-medium text-gray-700 tabular-nums">${row.milestone.fees.project_subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-500">
+                  <span>Platform fee (creator side, 8%)</span>
+                  <span className="font-medium text-rose-600 tabular-nums">-${row.milestone.fees.creator_fee.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-gray-100 pt-1.5">
+                  <span className="font-semibold text-gray-900">Creator receives</span>
+                  <span className="font-bold text-emerald-600 tabular-nums">${row.milestone.fees.creator_payout.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Warning */}
@@ -243,6 +261,11 @@ export default function PaymentsPage() {
   const totalReleased = details.reduce((s, d) => s + d.released_amount, 0);
   const totalInEscrow = details.reduce((s, d) => s + (d.funded_amount - d.released_amount), 0);
   const awaitingCount = rows.filter(r => r.milestone.status === 'funded').length;
+  // Total platform fees charged to the client across all funded milestones.
+  const totalClientFees = details.reduce(
+    (s, d) => s + (d.fees_summary?.client_fee_total ?? 0),
+    0,
+  );
 
   const handleReleased = (escrowId: string, milestoneId: string) => {
     setDetails(prev => prev.map(d => {
@@ -282,7 +305,7 @@ export default function PaymentsPage() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
             <div className="bg-gradient-to-br from-cobalt to-blue-600 text-white rounded-2xl p-6 shadow-lg">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
                 <i className="fa-solid fa-wallet text-lg"></i>
@@ -300,6 +323,15 @@ export default function PaymentsPage() {
                 ${Math.max(0, totalInEscrow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="text-gray-500 text-sm">In Escrow</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mb-4 text-purple-600">
+                <i className="fa-solid fa-percent text-lg"></i>
+              </div>
+              <div className="text-3xl font-bold text-gray-900 mb-1">
+                ${totalClientFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-gray-500 text-sm">Platform Fees (4%)</div>
             </div>
             <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
               <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-4 text-green-600">
@@ -387,6 +419,11 @@ export default function PaymentsPage() {
                       <p className="font-bold text-gray-900">
                         ${row.milestone.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
+                      {row.milestone.fees && row.milestone.fees.client_fee > 0 && (
+                        <p className="text-[11px] text-gray-500 leading-tight">
+                          + ${row.milestone.fees.client_fee.toFixed(2)} fee
+                        </p>
+                      )}
                       <p className="text-xs text-gray-400">
                         {formatDate(row.milestone.released_at || row.milestone.funded_at || row.created_at)}
                       </p>

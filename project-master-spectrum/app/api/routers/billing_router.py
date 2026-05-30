@@ -10,9 +10,29 @@ from typing import Dict, Any, Optional
 
 from app.models.schema import User
 from app.services.billing_service import BillingService
+from app.services.commission_service import calc_commission
 from app.auth.auth import get_current_user
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
+
+
+class CommissionPreviewRequest(BaseModel):
+    """Request schema for previewing the commission split on a subtotal."""
+    subtotal: float
+    currency: str = "USD"
+
+
+@router.post("/commission/preview", summary="Preview platform fees for a subtotal")
+async def preview_commission(request: CommissionPreviewRequest) -> Dict[str, Any]:
+    """Return the v1 8/4 commission breakdown for a hypothetical project value.
+
+    Used by client checkout and creator earnings widgets to display the
+    fee structure without duplicating the calculation in the frontend.
+    Does not require auth so it can be used on pricing pages too.
+    """
+    if request.subtotal < 0:
+        raise HTTPException(status_code=400, detail="subtotal must be >= 0")
+    return calc_commission(request.subtotal, currency=request.currency).to_dict()
 
 
 class CheckoutRequest(BaseModel):

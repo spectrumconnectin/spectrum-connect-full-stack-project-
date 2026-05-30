@@ -757,7 +757,10 @@ export interface EarningTransaction {
   type: string;
   amount: number;
   net_amount: number;
-  platform_fee: number;
+  platform_fee: number;           // total platform take (creator_fee + client_fee)
+  creator_fee?: number;           // deducted from this creator's payout
+  client_fee?: number;            // added to the client's charge (informational)
+  commission_version?: string;
   currency: string;
   status: string;
   payment_method?: string;
@@ -860,6 +863,18 @@ export interface EscrowMilestone {
   refunded_at?: string;
   release_transaction_id?: string;
   deadline_id?: string;
+  /** Per-milestone fee breakdown (v1 8/4 commission). */
+  fees?: CommissionBreakdown;
+}
+
+export interface EscrowFeesSummary {
+  subtotal: number;
+  client_fee_total: number;
+  creator_fee_total: number;
+  platform_take_total: number;
+  client_charge_total: number;
+  creator_payout_total: number;
+  commission_version: string;
 }
 
 export interface EscrowUserBrief {
@@ -881,6 +896,8 @@ export interface EscrowDetail {
   client?: EscrowUserBrief;
   creator?: EscrowUserBrief;
   milestones: EscrowMilestone[];
+  /** Aggregated v1 8/4 commission summary across all milestones. */
+  fees_summary?: EscrowFeesSummary;
   created_at: string;
   updated_at: string;
   completed_at?: string;
@@ -917,11 +934,33 @@ export const escrow = {
   getById: (id: string): Promise<EscrowDetail> =>
     request<EscrowDetail>(`/escrow/${id}`),
 
-  releaseMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; escrow_id: string; message: string }> =>
+  releaseMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; escrow_id: string; message: string; creator_payout?: number; fees?: CommissionBreakdown }> =>
     request(`/escrow/${escrowId}/release-milestone`, {
       method: 'POST',
       body: JSON.stringify({ milestone_id: milestoneId }),
     }),
+};
+
+// ── Commission (v1 split 8/4) ────────────────────────────────────────────────
+// Mirrors app/services/commission_service.py::CommissionBreakdown.
+export interface CommissionBreakdown {
+  project_subtotal: number;
+  creator_fee: number;
+  client_fee: number;
+  platform_take: number;
+  client_total: number;
+  creator_payout: number;
+  commission_version: string;
+  currency: string;
+}
+
+export const commission = {
+  /** Preview platform fees for a hypothetical subtotal. No auth required. */
+  preview: (subtotal: number, currency = 'USD'): Promise<CommissionBreakdown> =>
+    request<CommissionBreakdown>('/billing/commission/preview', {
+      method: 'POST',
+      body: JSON.stringify({ subtotal, currency }),
+    }, false),
 };
 
 // ── Disputes ──────────────────────────────────────────────────────────────────
@@ -1308,4 +1347,4 @@ export const smartConnect = {
     }),
 };
 
-export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, skillChallenges, messaging, smartConnect, notifications, tokenStore };
+export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };

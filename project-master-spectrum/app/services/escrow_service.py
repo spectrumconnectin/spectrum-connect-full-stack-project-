@@ -21,8 +21,10 @@ import uuid
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
+from app.core.config import settings
 from app.models.escrow import Escrow, EscrowMilestone
 from app.models.schema import User, Transaction
+from app.services.commission_service import calc_commission, calc_refund_reversal
 
 
 class EscrowService:
@@ -151,13 +153,26 @@ class EscrowService:
         escrow.updated_at = datetime.utcnow()
         await escrow.save()
 
+        # Compute the v1 8/4 commission so the client UI can show what they
+        # were actually charged (subtotal + client_fee). No Transaction is
+        # written at the funding step — funds are only held in escrow here;
+        # the charge transaction is recorded on release.
+        fees = calc_commission(milestone.amount, currency=escrow.currency)
+
         return {
             "success": True,
             "escrow_id": escrow_id,
             "milestone_id": milestone_id,
             "amount_funded": milestone.amount,
             "total_funded": escrow.funded_amount,
-            "message": f"Milestone '{milestone.title}' funded. Creator can now begin work.",
+            "fees": fees.to_dict(),
+            "client_charge": fees.to_dict()["client_total"],
+            "message": (
+                f"Milestone '{milestone.title}' funded. "
+                f"Client charged ${fees.to_dict()['client_total']:.2f} "
+                f"(${milestone.amount:.2f} subtotal + ${fees.to_dict()['client_fee']:.2f} platform fee). "
+                "Creator can now begin work."
+            ),
         }
 
     # ------------------------------------------------------------------ #
@@ -202,7 +217,13 @@ class EscrowService:
         now = datetime.utcnow()
         tx_id = str(uuid.uuid4())
 
-        # Create transaction record
+        # Apply v1 8/4 commission split — see app/services/commission_service.py.
+        fees = calc_commission(milestone.amount, currency=escrow.currency)
+        fees_dict = fees.to_dict()
+
+        # Create transaction record. `amount` is the gross subtotal; we
+        # also record the full fee breakdown so historical reads are exact
+        # and reproducible under future rate changes (via commission_version).
         transaction = Transaction(
             transaction_id=tx_id,
             from_user_id=escrow.client_id,
@@ -210,9 +231,12 @@ class EscrowService:
             type="payment",
             amount=milestone.amount,
             currency=escrow.currency,
-            platform_fee=0.0,          # Commission calculated separately
+            platform_fee=fees_dict["platform_take"],
+            creator_fee=fees_dict["creator_fee"],
+            client_fee=fees_dict["client_fee"],
+            commission_version=fees_dict["commission_version"],
             payment_processing_fee=0.0,
-            net_amount=milestone.amount,
+            net_amount=fees_dict["creator_payout"],
             status="completed",
             initiated_at=now,
             processed_at=now,
@@ -245,9 +269,15 @@ class EscrowService:
             "escrow_id": escrow_id,
             "milestone_id": milestone_id,
             "amount_released": milestone.amount,
+            "creator_payout": fees_dict["creator_payout"],
+            "fees": fees_dict,
             "transaction_id": tx_id,
             "escrow_status": escrow.status,
-            "message": f"${milestone.amount} released to creator for '{milestone.title}'.",
+            "message": (
+                f"${fees_dict['creator_payout']:.2f} released to creator for "
+                f"'{milestone.title}' "
+                f"(${milestone.amount:.2f} subtotal - ${fees_dict['creator_fee']:.2f} platform fee)."
+            ),
         }
 
     # ------------------------------------------------------------------ #
@@ -283,6 +313,7 @@ class EscrowService:
             )
 
         refund_total = 0.0
+        client_fee_refund_total = 0.0
         now = datetime.utcnow()
 
         for milestone in escrow.milestones:
@@ -290,18 +321,51 @@ class EscrowService:
                 milestone.status = "refunded"
                 milestone.refunded_at = now
                 refund_total += milestone.amount
+                # Per spec §7: never released funds → fully reverse client_fee
+                # collected at funding time.
+                m_fees = calc_commission(milestone.amount, currency=escrow.currency)
+                client_fee_refund_total += float(m_fees.client_fee)
 
         escrow.refunded_amount = round(escrow.refunded_amount + refund_total, 2)
         escrow.status = "refunded"
         escrow.updated_at = now
         await escrow.save()
 
+        client_refund_total = round(refund_total + client_fee_refund_total, 2)
+
+        # Record refund transaction so the ledger reflects the reversal.
+        if refund_total > 0:
+            await Transaction(
+                transaction_id=str(uuid.uuid4()),
+                from_user_id=escrow.creator_id,        # funds leaving creator's escrow side
+                to_user_id=escrow.client_id,           # back to client
+                type="refund",
+                amount=refund_total,
+                currency=escrow.currency,
+                platform_fee=-round(client_fee_refund_total, 2),  # negative — refunded back
+                client_fee=-round(client_fee_refund_total, 2),
+                creator_fee=0.0,
+                commission_version=getattr(settings, "COMM_VERSION", "v1.split.8_4"),
+                payment_processing_fee=0.0,
+                net_amount=client_refund_total,
+                status="completed",
+                initiated_at=now,
+                processed_at=now,
+                completed_at=now,
+            ).insert()
+
         return {
             "success": True,
             "escrow_id": escrow_id,
             "refund_total": refund_total,
+            "client_fee_refund": round(client_fee_refund_total, 2),
+            "client_total_refund": client_refund_total,
             "escrow_status": "refunded",
-            "message": f"${refund_total} refunded to client. Escrow closed.",
+            "message": (
+                f"${client_refund_total:.2f} refunded to client "
+                f"(${refund_total:.2f} subtotal + ${client_fee_refund_total:.2f} platform fee). "
+                "Escrow closed."
+            ),
         }
 
     # ------------------------------------------------------------------ #
@@ -329,6 +393,30 @@ class EscrowService:
         client  = await User.get(escrow.client_id)
         creator = await User.get(escrow.creator_id)
 
+        # Pre-compute per-milestone fees so the UI can show the breakdown
+        # without re-implementing the calc client-side.
+        milestone_payload = []
+        for m in escrow.milestones:
+            m_fees = calc_commission(m.amount, currency=escrow.currency).to_dict()
+            milestone_payload.append({
+                "milestone_id": m.milestone_id,
+                "title": m.title,
+                "amount": m.amount,
+                "status": m.status,
+                "funded_at": m.funded_at,
+                "released_at": m.released_at,
+                "refunded_at": m.refunded_at,
+                "release_transaction_id": m.release_transaction_id,
+                "deadline_id": m.deadline_id,
+                "fees": m_fees,
+            })
+
+        # Whole-escrow fee summary (sum of per-milestone fees).
+        client_fee_total = round(sum(m["fees"]["client_fee"] for m in milestone_payload), 2)
+        creator_fee_total = round(sum(m["fees"]["creator_fee"] for m in milestone_payload), 2)
+        client_charge_total = round(escrow.total_amount + client_fee_total, 2)
+        creator_payout_total = round(escrow.total_amount - creator_fee_total, 2)
+
         return {
             "escrow_id": str(escrow.id),
             "status": escrow.status,
@@ -349,20 +437,16 @@ class EscrowService:
                 "username": creator.username,
                 "profile_picture": creator.profile.profile_picture if creator.profile else None,
             } if creator else None,
-            "milestones": [
-                {
-                    "milestone_id": m.milestone_id,
-                    "title": m.title,
-                    "amount": m.amount,
-                    "status": m.status,
-                    "funded_at": m.funded_at,
-                    "released_at": m.released_at,
-                    "refunded_at": m.refunded_at,
-                    "release_transaction_id": m.release_transaction_id,
-                    "deadline_id": m.deadline_id,
-                }
-                for m in escrow.milestones
-            ],
+            "milestones": milestone_payload,
+            "fees_summary": {
+                "subtotal": escrow.total_amount,
+                "client_fee_total": client_fee_total,
+                "creator_fee_total": creator_fee_total,
+                "platform_take_total": round(client_fee_total + creator_fee_total, 2),
+                "client_charge_total": client_charge_total,
+                "creator_payout_total": creator_payout_total,
+                "commission_version": getattr(settings, "COMM_VERSION", "v1.split.8_4"),
+            },
             "created_at": escrow.created_at,
             "updated_at": escrow.updated_at,
             "completed_at": escrow.completed_at,
