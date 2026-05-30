@@ -1148,6 +1148,15 @@ header nav a.active::after {
   animation-play-state: paused;
 }
 
+/* Hide scrollbar while keeping horizontal scroll (used by compact nav) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Hero responsive: stack on narrow screens so absolute cards don't overlap */
 @media (max-width: 860px) {
   .hero-grid {

@@ -42,7 +42,7 @@ function ClientHeader() {
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Brand */}
-          <div className="flex items-center gap-4 xl:gap-8 min-w-0">
+          <div className="flex items-center gap-4 xl:gap-8 min-w-0 flex-1">
             <Link href="/" className="flex items-center gap-2.5 shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/assets/spectrum-logo.svg" alt="Spectrum" className="w-10 h-10 rounded-xl" />
@@ -50,7 +50,7 @@ function ClientHeader() {
             </Link>
 
             {/* Nav links */}
-            <nav className="hidden md:flex items-center gap-0.5 lg:gap-1">
+            <nav className="no-scrollbar hidden md:flex items-center gap-0.5 lg:gap-1 min-w-0 overflow-x-auto py-2">
               {navLinks.map(({ href, label, isMiya: isAi }) => {
                 const active = pathname === href || (
                   href !== '/client/dashboard' &&
@@ -61,7 +61,7 @@ function ClientHeader() {
                   <Link
                     key={href}
                     href={href}
-                    className={`relative whitespace-nowrap px-2.5 lg:px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                    className={`relative shrink-0 whitespace-nowrap px-2.5 lg:px-3.5 py-2.5 text-sm font-medium rounded-xl transition-all ${
                       isAi
                         ? active
                           ? 'bg-gradient-to-r from-violet-600 to-blue-500 text-white shadow-md shadow-blue-200'
