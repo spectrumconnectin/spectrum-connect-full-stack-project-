@@ -12,7 +12,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { portfolio, PortfolioItem, PortfolioResponse } from '@/lib/api';
+import { portfolio, tokenStore, PortfolioItem, PortfolioResponse } from '@/lib/api';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -244,17 +246,20 @@ function PortfolioModal({ mode, item, data, onClose, onSaved }: ModalProps) {
     try {
       const fd = new FormData();
       fd.append('files', file);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://api.spectrumconnect.co'}/upload/images`, {
+      const token = tokenStore.get();
+      const res = await fetch(`${API_BASE}/upload/images`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       });
-      if (!res.ok) throw new Error('Upload failed');
+      if (!res.ok) {
+        const msg = await res.json().then(j => j.detail || j.message).catch(() => null);
+        throw new Error(msg || `Upload failed (${res.status})`);
+      }
       const json = await res.json();
       setUrl(json[0]?.url ?? '');
-    } catch {
-      setError('Upload failed. Please try again.');
+    } catch (e) {
+      setError((e as Error).message || 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -266,7 +271,10 @@ function PortfolioModal({ mode, item, data, onClose, onSaved }: ModalProps) {
 
     if (mode === 'add') {
       const info = classifyUrl(url);
-      if (!info.type) { setError('URL format not recognised. Paste a YouTube, Vimeo, or direct image URL.'); return; }
+      if (!info.type) {
+        setError('URL not recognised. For YouTube, use a video link like youtube.com/watch?v=… — channel links don\'t work. For images, paste a direct .jpg/.png/.webp URL or use the upload button.');
+        return;
+      }
       if (info.type === 'video' && data.video_count >= data.max_videos) {
         setError(`You already have ${data.max_videos} videos. Delete one to add another.`); return;
       }
@@ -316,7 +324,7 @@ function PortfolioModal({ mode, item, data, onClose, onSaved }: ModalProps) {
               type="url"
               value={url}
               onChange={e => { setUrl(e.target.value); setError(''); }}
-              placeholder="https://youtube.com/watch?v=… or https://…/image.jpg"
+              placeholder="https://youtube.com/watch?v=VIDEO_ID or https://vimeo.com/123456"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent"
             />
             <div className="flex items-center gap-3 mt-3">
