@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, profile as profileApi, type ClientDashboardResponse } from '@/lib/api';
+import { dashboard, jobs as jobsApi, profile as profileApi, type ClientDashboardResponse, type JobPostItem } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 
 const statusColors: Record<string, string> = {
@@ -14,19 +14,21 @@ const statusColors: Record<string, string> = {
 
 export default function ClientDashboardPage() {
   const [data, setData] = useState<ClientDashboardResponse | null>(null);
+  const [myJobs, setMyJobs] = useState<JobPostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
 
   useEffect(() => {
-    // Load user name and dashboard in parallel. Use /profiles/me so we get the
-    // full profile (display_name, first/last name) rather than /auth/me/role
-    // which returns only the flat role payload and would fall back to the
-    // raw `username` field (which is the email for older OAuth signups).
+    // Fetch dashboard meta, all client jobs, and profile in parallel.
+    // Jobs come from /jobs/me (same source as My Projects page) to ensure
+    // the Active Projects section is always in sync.
     Promise.allSettled([
       dashboard.getClient(),
+      jobsApi.getMe(),
       profileApi.getMe(),
-    ]).then(([dashResult, meResult]) => {
+    ]).then(([dashResult, jobsResult, meResult]) => {
       if (dashResult.status === 'fulfilled') setData(dashResult.value);
+      if (jobsResult.status === 'fulfilled') setMyJobs(jobsResult.value);
       if (meResult.status === 'fulfilled') {
         const me = meResult.value;
         setUserName(
@@ -38,7 +40,9 @@ export default function ClientDashboardPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const jobs = data?.jobs ?? [];
+  // Use /jobs/me data for projects (always in sync with My Projects page).
+  // Fall back to dashboard jobs if /jobs/me fails.
+  const jobs = myJobs.length > 0 ? myJobs : (data?.jobs ?? []);
   const activityFeed = data?.activity_feed ?? [];
   const messages = data?.messages ?? [];
   const deadlines = data?.deadlines ?? [];
