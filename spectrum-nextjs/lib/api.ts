@@ -495,6 +495,7 @@ export interface JobPostItem {
   cover_image?: string;
   published_at?: string;
   created_at?: string;
+  workspace?: { progress: number; roles_required: number; roles_filled: number };
 }
 
 export interface JobSearchResponse {
