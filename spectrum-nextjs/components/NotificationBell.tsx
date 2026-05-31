@@ -146,7 +146,7 @@ export default function NotificationBell() {
                   <i className="fa-solid fa-bell-slash text-gray-400 text-lg"></i>
                 </div>
                 <p className="text-sm font-medium text-gray-500">No notifications yet</p>
-                <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens.</p>
+                <p className="text-xs text-gray-400 mt-1">We&apos;ll notify you when something happens.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-50">

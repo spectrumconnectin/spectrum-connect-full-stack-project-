@@ -195,7 +195,7 @@ export default function HowItWorksPage() {
 
       <div className="flow-intro">
         <h2>The Flow from A to Z</h2>
-        <p>Every successful collaboration follows five simple stages. Here's how yours will work — with trust and fairness built into every step.</p>
+        <p>Every successful collaboration follows five simple stages. Here&apos;s how yours will work — with trust and fairness built into every step.</p>
       </div>
 
       <div className="flow-steps">

@@ -111,7 +111,7 @@ export default function CreatorSmartConnectPage() {
                 <span>1 project</span><span>10 projects</span>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                You'll stop appearing in Smart Connect results once you reach this limit.
+                You&apos;ll stop appearing in Smart Connect results once you reach this limit.
               </p>
             </div>
 
@@ -208,6 +208,7 @@ export default function CreatorSmartConnectPage() {
                         {m.client_name && (
                           <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
                             {m.client_avatar
+                              // eslint-disable-next-line @next/next/no-img-element
                               ? <img src={m.client_avatar} alt={m.client_name} className="w-5 h-5 rounded-full object-cover" />
                               : <span className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-xs text-cobalt font-bold flex-shrink-0">{m.client_name[0]}</span>
                             }

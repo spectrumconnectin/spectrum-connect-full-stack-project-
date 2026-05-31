@@ -176,7 +176,7 @@ export default function ApplicantsPage() {
                   {/* Cover letter */}
                   {a.cover_letter && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                      <p className="text-sm text-gray-600 line-clamp-3 italic">"{a.cover_letter}"</p>
+                      <p className="text-sm text-gray-600 line-clamp-3 italic">&ldquo;{a.cover_letter}&rdquo;</p>
                     </div>
                   )}
                 </div>

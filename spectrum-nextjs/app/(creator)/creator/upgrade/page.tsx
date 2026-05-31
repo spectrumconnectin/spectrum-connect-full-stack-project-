@@ -77,9 +77,9 @@ function UpgradePageInner() {
         <div className={`w-20 h-20 bg-gradient-to-br ${plan.gradient} rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg`}>
           <i className={`fa-solid ${plan.icon} text-white text-3xl`}></i>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-3">You're all set!</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">You&apos;re all set!</h1>
         <p className="text-gray-500 mb-2"><strong>{plan.name}</strong> is now active on your account.</p>
-        {plan.recurring && <p className="text-gray-400 text-sm mb-8">You'll be billed ${plan.price}/month. Cancel any time from Settings.</p>}
+        {plan.recurring && <p className="text-gray-400 text-sm mb-8">You&apos;ll be billed ${plan.price}/month. Cancel any time from Settings.</p>}
         {!plan.recurring && <p className="text-gray-400 text-sm mb-8">This is a one-time payment of ${plan.price}. No future charges.</p>}
         <div className="flex gap-3 justify-center">
           <Link href="/creator/dashboard" className="px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition">

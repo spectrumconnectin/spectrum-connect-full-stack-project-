@@ -124,6 +124,7 @@ export default function ReviewPage() {
       {/* Creator / Project card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 flex items-center gap-5 shadow-sm">
         {creator?.creator_avatar
+          // eslint-disable-next-line @next/next/no-img-element
           ? <img src={creator.creator_avatar} alt={creator.creator_name} className="w-16 h-16 rounded-2xl border-2 border-gray-200 object-cover flex-shrink-0" />
           : <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center text-cobalt font-bold text-2xl border-2 border-gray-200 flex-shrink-0">
               {creator ? creator.creator_name[0]?.toUpperCase() : '?'}

@@ -156,7 +156,7 @@ export default function FindProjectsPage() {
           ) : (
             <>
               <span className="font-semibold text-gray-900">{sorted.length}</span> projects found
-              {search && <span> for <span className="font-semibold text-cobalt">"{search}"</span></span>}
+              {search && <span> for <span className="font-semibold text-cobalt">&ldquo;{search}&rdquo;</span></span>}
             </>
           )}
         </p>

@@ -31,6 +31,7 @@ function displayName(p?: ConversationItem['participants'][number]): string {
 
 function Avatar({ url, name, size = 10 }: { url?: string; name: string; size?: number }) {
   const px = size * 4;
+  // eslint-disable-next-line @next/next/no-img-element
   if (url) return <img src={url} alt={name} style={{ width: px, height: px }} className="rounded-full object-cover flex-shrink-0" />;
   return (
     <div style={{ width: px, height: px, fontSize: Math.max(px * 0.38, 11) }}

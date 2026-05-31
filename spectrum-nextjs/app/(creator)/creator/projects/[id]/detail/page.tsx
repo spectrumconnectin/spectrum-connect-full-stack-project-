@@ -123,6 +123,7 @@ export default function CreatorProjectDetailPage() {
                 {project.team_members.map(m => (
                   <div key={m.user_id} className="flex items-center gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
                     {m.avatar_url
+                      // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={m.avatar_url} alt={m.username} className="w-10 h-10 rounded-full object-cover border-2 border-gray-200" />
                       : <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-cobalt font-bold text-sm border-2 border-gray-200">
                           {m.username[0]?.toUpperCase()}

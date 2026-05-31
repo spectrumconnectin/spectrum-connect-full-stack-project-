@@ -125,8 +125,8 @@ export default function ClientAiAssistantPage() {
                 <span className="text-white text-2xl">✦</span>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I'm Miya!</h2>
-                <p className="text-gray-500 text-sm max-w-sm">I'm here to help you run better projects — from writing briefs to evaluating proposals and managing your creative team.</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I&apos;m Miya!</h2>
+                <p className="text-gray-500 text-sm max-w-sm">I&apos;m here to help you run better projects — from writing briefs to evaluating proposals and managing your creative team.</p>
               </div>
               <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
                 {suggestedPrompts.map(prompt => (

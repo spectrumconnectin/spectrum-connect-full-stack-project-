@@ -32,6 +32,7 @@ function displayName(p?: ConversationItem['participants'][number]): string {
 function Avatar({ url, name, size = 'md' }: { url?: string; name: string; size?: 'sm' | 'md' | 'lg' }) {
   const sz = size === 'lg' ? 'w-10 h-10' : size === 'md' ? 'w-11 h-11' : 'w-8 h-8';
   const txt = size === 'lg' ? 'text-base' : size === 'md' ? 'text-base' : 'text-xs';
+  // eslint-disable-next-line @next/next/no-img-element
   if (url) return <img src={url} alt={name} className={`${sz} rounded-full object-cover border-2 border-gray-200 flex-shrink-0`} />;
   return (
     <div className={`${sz} rounded-full bg-blue-100 flex items-center justify-center text-cobalt font-bold flex-shrink-0 border-2 border-gray-200 ${txt}`}>

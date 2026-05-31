@@ -1066,67 +1066,6 @@ export const disputes = {
     request('/disputes', { method: 'POST', body: JSON.stringify(data) }),
 };
 
-// ── ETF Trust Fund ────────────────────────────────────────────────────────────
-
-export interface EtfVaultSummary {
-  vault_id: string;
-  status: string;
-  total_balance: number;
-  currency: string;
-  contribution_count: number;
-  claimed_amount: number;
-  forfeited_amount: number;
-  maturity_date: string;
-  days_until_maturity: number;
-  is_matured: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface EtfContribution {
-  id: string;
-  amount: number;
-  currency: string;
-  source_type: string;
-  source_id?: string;
-  description?: string;
-  created_at: string;
-}
-
-export interface EtfContributionListResponse {
-  contributions: EtfContribution[];
-  total: number;
-  page: number;
-  page_size: number;
-  has_more: boolean;
-}
-
-export interface EtfProjection {
-  current_balance: number;
-  currency: string;
-  avg_monthly_contribution: number;
-  projected_balance_at_maturity: number;
-  maturity_date: string;
-  months_remaining: number;
-  projection_basis: string;
-}
-
-export const etf = {
-  getVault: (): Promise<EtfVaultSummary | { has_vault: false; message: string }> =>
-    request('/etf/vault'),
-
-  getContributions: (params?: { page?: number; page_size?: number }): Promise<EtfContributionListResponse> =>
-    request<EtfContributionListResponse>(`/etf/contributions${buildQS(params as Record<string, string | number | undefined> || {})}`),
-
-  getProjections: (): Promise<EtfProjection> =>
-    request<EtfProjection>('/etf/projections'),
-
-  claim: (payout_method: string, amount?: number): Promise<{ success: boolean; claimed_amount: number; remaining_balance: number; currency: string; message: string }> =>
-    request('/etf/claim', { method: 'POST', body: JSON.stringify({ payout_method, amount }) }),
-
-  reinvest: (amount: number, target: string): Promise<{ success: boolean; reinvested_amount: number; remaining_balance: number; message: string }> =>
-    request('/etf/reinvest', { method: 'POST', body: JSON.stringify({ amount, target }) }),
-};
 
 // ── Skill Challenges ──────────────────────────────────────────────────────────
 
@@ -1422,4 +1361,5 @@ export const smartConnect = {
     }),
 };
 
-export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };
+const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };
+export default api;

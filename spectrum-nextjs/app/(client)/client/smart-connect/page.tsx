@@ -231,6 +231,7 @@ export default function ClientSmartConnectPage() {
                     <div className="flex items-start gap-4">
                       <div className="relative flex-shrink-0">
                         {c.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={c.avatar} alt={c.name}
                             className="w-14 h-14 rounded-xl object-cover border border-gray-200" />
                         ) : (
