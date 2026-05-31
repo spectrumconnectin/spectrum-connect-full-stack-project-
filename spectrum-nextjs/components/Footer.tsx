@@ -1,4 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import { COOKIE_CONSENT_OPEN_EVENT } from '@/components/CookieBanner';
+
+function openCookieSettings(e: React.MouseEvent) {
+  e.preventDefault();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(COOKIE_CONSENT_OPEN_EVENT));
+  }
+}
 
 export default function Footer() {
   return (
@@ -40,12 +50,17 @@ export default function Footer() {
           </ul>
         </div>
         <div>
-          <h5>Support</h5>
+          <h5>Legal</h5>
           <ul>
-            <li><Link href="/help">Help Center</Link></li>
-            <li><a href="mailto:support@spectrumconnect.co">Contact Us</a></li>
+            <li><Link href="/legal">Legal Overview</Link></li>
             <li><Link href="/terms">Terms of Service</Link></li>
             <li><Link href="/privacy">Privacy Policy</Link></li>
+            <li><Link href="/cookies">Cookie Policy</Link></li>
+            <li><Link href="/refunds">Refund Policy</Link></li>
+            <li><Link href="/dmca">DMCA & Copyright</Link></li>
+            <li><Link href="/gdpr">GDPR & Data Rights</Link></li>
+            <li><Link href="/acceptable-use">Acceptable Use</Link></li>
+            <li><Link href="/help">Help Center</Link></li>
           </ul>
         </div>
       </div>
@@ -54,6 +69,11 @@ export default function Footer() {
         <div className="links">
           <Link href="/terms">Terms</Link>
           <Link href="/privacy">Privacy</Link>
+          <Link href="/cookies">Cookies</Link>
+          {/* Re-opens the cookie consent banner without a page navigation */}
+          <a href="/cookies" onClick={openCookieSettings} style={{ cursor: 'pointer' }}>
+            Cookie settings
+          </a>
           <Link href="/help">Help</Link>
         </div>
       </div>

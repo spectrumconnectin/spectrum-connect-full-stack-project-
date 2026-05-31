@@ -1,89 +1,206 @@
-import Nav from '@/components/Nav';
-import Footer from '@/components/Footer';
+import LegalPage from '@/components/LegalPage';
 
 export const metadata = {
   title: 'Privacy Policy — Spectrum Connect',
-  description: 'Learn how Spectrum Connect collects, uses, and protects your data.',
+  description: 'How Spectrum Connect collects, uses, and protects your personal data.',
 };
-
-const sections = [
-  {
-    title: '1. Information We Collect',
-    body: `We collect information you provide directly (name, email, password, profile details, portfolio content, billing information), information generated through platform use (project history, messages, reviews, payment transactions), and technical information (IP address, browser type, device identifiers, cookies, and usage analytics). We do not sell your personal information to third parties.`,
-  },
-  {
-    title: '2. How We Use Your Information',
-    body: `We use your information to: operate and improve the Platform; match creators with relevant projects; process payments and prevent fraud; communicate with you about your account and projects; personalise your experience; comply with legal obligations; and enforce our Terms of Service. We may also use aggregated, anonymised data for research and product development.`,
-  },
-  {
-    title: '3. Sharing Your Information',
-    body: `We share your information with: other users as necessary for project collaboration (e.g. your profile is visible to clients reviewing applications); payment processors to handle transactions; cloud service providers that host our infrastructure; analytics providers (only anonymised or aggregated data); and law enforcement when required by law. We do not share your personal information with advertisers.`,
-  },
-  {
-    title: '4. Cookies and Tracking',
-    body: `We use cookies and similar tracking technologies to maintain your session, remember your preferences, and measure how the Platform is used. Essential cookies are required for the Platform to function. You can disable non-essential cookies in your browser settings, though this may affect Platform functionality. We do not use cookies to serve third-party advertising.`,
-  },
-  {
-    title: '5. Data Retention',
-    body: `We retain your account data for as long as your account is active. After account deletion, we may retain certain records for up to 7 years for fraud prevention, legal compliance, and dispute resolution purposes. Backups may persist for up to 90 days after deletion. You may request a copy of your data at any time by contacting privacy@spectrumconnect.co.`,
-  },
-  {
-    title: '6. Data Security',
-    body: `We implement industry-standard security measures including TLS encryption in transit, AES-256 encryption at rest for sensitive data, access controls and least-privilege principles for our team, regular security audits, and intrusion detection systems. However, no system is 100% secure. We encourage you to use a strong, unique password and enable two-factor authentication when available.`,
-  },
-  {
-    title: '7. Your Rights',
-    body: `Depending on your location, you may have the right to: access the personal information we hold about you; correct inaccurate information; request deletion of your information ("right to be forgotten"); object to or restrict certain processing; receive your data in a portable format; and withdraw consent where processing is based on consent. To exercise any of these rights, email privacy@spectrumconnect.co. We will respond within 30 days.`,
-  },
-  {
-    title: '8. Children\'s Privacy',
-    body: `Spectrum Connect is not directed at children under 18. We do not knowingly collect personal information from anyone under 18. If you believe a minor has created an account, please contact us immediately and we will delete the account and associated data.`,
-  },
-  {
-    title: '9. International Transfers',
-    body: `Spectrum Connect is based in the United States. If you access the Platform from outside the US, your information may be transferred to and processed in the US, where data protection laws may differ from those in your country. By using the Platform, you consent to this transfer. Where required, we implement appropriate safeguards such as standard contractual clauses.`,
-  },
-  {
-    title: '10. Changes to This Policy',
-    body: `We may update this Privacy Policy from time to time. We will notify you of material changes by email or by a prominent notice on the Platform at least 14 days before changes take effect. Continued use of the Platform after changes become effective constitutes acceptance of the revised policy.`,
-  },
-  {
-    title: '11. Contact Us',
-    body: `If you have questions, concerns, or requests regarding this Privacy Policy, contact our Data Privacy team at: privacy@spectrumconnect.co, or by post at: Spectrum Connect, Inc., Data Privacy Officer, 340 Pine Street, Suite 800, San Francisco, CA 94104, United States.`,
-  },
-];
 
 export default function PrivacyPage() {
   return (
-    <div style={{ background: '#fff', color: '#1f2937', fontFamily: "'Inter',system-ui,sans-serif" }}>
-      <Nav />
+    <LegalPage
+      title="Privacy Policy"
+      lastUpdated="May 31, 2026"
+      effectiveDate="May 31, 2026"
+      highlightColor="blue"
+      tldr={
+        <>
+          <strong>The short version.</strong> We collect what we need to run the platform and
+          to keep it safe. We don&apos;t sell your data, ever. You can read your data, export
+          it, or ask us to delete it from the settings page.
+        </>
+      }
+    >
+      <h2>1. Who&apos;s responsible for your data</h2>
+      <p>
+        Spectrum Connect, Inc. is the &ldquo;controller&rdquo; of your personal data for the
+        purposes of GDPR, UK GDPR, and similar laws. We&apos;re based at 340 Pine Street, Suite
+        800, San Francisco, CA 94104, USA. If you&apos;d rather talk to someone specifically
+        about data protection, our Data Protection contact is{' '}
+        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.
+      </p>
 
-      {/* Header */}
-      <section style={{ borderBottom: '1px solid #eef0f3', padding: '60px 24px 40px', background: '#f9fafb' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#195ad7', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Legal</p>
-          <h1 style={{ fontSize: 42, fontWeight: 700, letterSpacing: '-0.025em', margin: '0 0 14px', color: '#111827' }}>Privacy Policy</h1>
-          <p style={{ fontSize: 15, color: '#6b7280', margin: 0 }}>Last updated: May 1, 2026 · Effective: May 1, 2026</p>
-        </div>
-      </section>
+      <h2>2. What we collect</h2>
+      <p>Three buckets, roughly:</p>
+      <h3>What you give us</h3>
+      <ul>
+        <li>Account basics: name, email, password (we never store this in plain text), and the username you pick.</li>
+        <li>Profile content: bio, location, skills, portfolio links, profile photo, hourly rate, work history.</li>
+        <li>Identity and payment: phone number, ID documents you upload for verification, and the billing or payout details our payment processors need.</li>
+        <li>Communications: messages you send to other users, proposals, project briefs, deliverables, and any support tickets.</li>
+      </ul>
+      <h3>What we collect from using the product</h3>
+      <ul>
+        <li>Activity: projects you post or apply to, milestones, reviews, ETF Points events.</li>
+        <li>Device and network: IP address, browser type, operating system, screen size, timezone, and language.</li>
+        <li>Logs: which pages you loaded and when, what API calls your client made, what errors fired.</li>
+      </ul>
+      <h3>What we get from third parties</h3>
+      <ul>
+        <li>If you sign in with Google, we get the email address and basic profile data Google shares with us. Same for any other social login we add later.</li>
+        <li>Payment processors (Stripe and similar) tell us whether a charge succeeded or failed, plus risk signals to fight fraud, but we don&apos;t see full card numbers.</li>
+      </ul>
 
-      {/* Body */}
-      <section style={{ padding: '60px 24px 80px' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 36 }}>
-          <p style={{ fontSize: 15, color: '#4b5563', lineHeight: 1.75, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '16px 20px' }}>
-            <strong>The short version:</strong> We collect what we need to run the platform, we don&apos;t sell your data, and you can ask us to delete it at any time.
-          </p>
+      <h2>3. Why we collect it (legal bases for EU/UK users)</h2>
+      <p>If you&apos;re in the EU, UK, or EEA, here&apos;s the legal basis we rely on for each kind of processing:</p>
+      <ul>
+        <li><strong>Contract</strong> — running your account, processing payments, delivering the features you signed up for.</li>
+        <li><strong>Legitimate interest</strong> — keeping the Platform secure, preventing fraud, improving the product, analytics on aggregate usage.</li>
+        <li><strong>Consent</strong> — non-essential cookies, marketing emails, sharing your work in featured collections.</li>
+        <li><strong>Legal obligation</strong> — tax, accounting, anti-money-laundering and sanctions checks, responding to court orders.</li>
+      </ul>
+      <p>You can withdraw any consent at any time. See section 8 for how.</p>
 
-          {sections.map(s => (
-            <div key={s.title}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#111827', margin: '0 0 10px' }}>{s.title}</h2>
-              <p style={{ fontSize: 15, color: '#4b5563', lineHeight: 1.75, margin: 0 }}>{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <h2>4. How we use it</h2>
+      <p>
+        To match creators with projects (Smart Connect uses your skills, history, and ETF level
+        as ranking inputs). To process payments and hold funds in escrow. To surface trust
+        signals other users see when deciding to work with you. To answer your support
+        questions. To investigate complaints and disputes. To build better features (we look at
+        what people actually use and where they get stuck). To meet our own legal obligations.
+      </p>
+      <p>
+        We do <strong>not</strong> sell your personal data, full stop. We don&apos;t use your
+        messages or project content to train large language models. If we ever wanted to do
+        either of those things, we&apos;d ask for separate, explicit consent and we&apos;d let
+        you say no without breaking your account.
+      </p>
 
-      <Footer />
-    </div>
+      <h2>5. Who we share it with</h2>
+      <p>We share data with the following kinds of recipients, only for the purposes described:</p>
+      <ul>
+        <li>
+          <strong>Other users</strong>, when you choose to be visible to them. Your profile,
+          portfolio, and trust signals are visible to clients reviewing proposals; your name
+          and avatar show up in conversation threads.
+        </li>
+        <li>
+          <strong>Payment processors</strong> like Stripe, who handle card data, escrow holding
+          accounts, and payouts. Their privacy notices govern what they do with that data.
+        </li>
+        <li>
+          <strong>Cloud infrastructure providers</strong> who host our servers and databases
+          (AWS in the Mumbai region, plus MongoDB Atlas). They&apos;re under contractual data
+          protection obligations.
+        </li>
+        <li>
+          <strong>Communication tools</strong> for transactional email (currently Brevo) and
+          customer support.
+        </li>
+        <li>
+          <strong>Analytics</strong>, in aggregated or anonymised form only. We don&apos;t hand
+          identifiable user data to ad networks.
+        </li>
+        <li>
+          <strong>Law enforcement and courts</strong>, when we receive a valid legal demand. We
+          push back on overbroad requests and tell you about it where the law allows.
+        </li>
+        <li>
+          <strong>A successor company</strong> if Spectrum Connect is ever acquired or merged.
+          You&apos;d be told before that transfer takes effect.
+        </li>
+      </ul>
+
+      <h2>6. International transfers</h2>
+      <p>
+        Spectrum Connect is a US company with infrastructure in India (ap-south-1). If you
+        upload data from the EU, UK, or anywhere else, that data may travel to the US or
+        India for processing. We rely on the European Commission&apos;s Standard Contractual
+        Clauses and similar mechanisms to make those transfers lawful, and we apply the
+        protections in this policy regardless of where the data ends up sitting.
+      </p>
+
+      <h2>7. How long we keep it</h2>
+      <p>
+        While your account is open, we keep your data so the Platform works. When you close
+        your account:
+      </p>
+      <ul>
+        <li>Most of your profile data is deleted within 30 days.</li>
+        <li>Things tied to financial records (transactions, tax forms, invoices) are kept for up to 7 years to satisfy tax and anti-fraud law.</li>
+        <li>Audit logs of suspended or banned accounts may be kept longer for repeat-offender prevention.</li>
+        <li>Encrypted backups roll off on a 90-day cycle.</li>
+      </ul>
+      <p>
+        If you want everything gone faster than this schedule allows, ask us and we&apos;ll
+        tell you exactly what we can and can&apos;t delete, and why.
+      </p>
+
+      <h2>8. Your rights</h2>
+      <p>Depending on where you live, you have some or all of the following rights. EU/UK/EEA users have all of them. California users have most of them under the CCPA/CPRA.</p>
+      <ul>
+        <li><strong>Access</strong> the data we hold about you.</li>
+        <li><strong>Correct</strong> data that&apos;s inaccurate.</li>
+        <li><strong>Delete</strong> your data (subject to the legal-retention bits above).</li>
+        <li><strong>Export</strong> your data in a portable format.</li>
+        <li><strong>Object</strong> to processing based on legitimate interest.</li>
+        <li><strong>Restrict</strong> processing while we work out a dispute.</li>
+        <li><strong>Withdraw consent</strong> for anything based on consent (marketing emails, non-essential cookies).</li>
+        <li><strong>Complain</strong> to your local data protection authority. EU/UK users can lodge a complaint with their national regulator. We&apos;d like the chance to fix it first, but you don&apos;t have to ask us first.</li>
+      </ul>
+      <p>
+        To exercise any of these rights, email{' '}
+        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a> from the
+        address linked to your account, or use the in-product Data Rights tools (see our{' '}
+        <a href="/gdpr">GDPR &amp; Data Rights</a> page). We respond within 30 days, faster
+        when we can.
+      </p>
+
+      <h2>9. How we protect your data</h2>
+      <p>
+        TLS for all traffic between your browser and our servers. AES-256 at rest for sensitive
+        data. Access to production systems is on a need-to-know basis with logging. Passwords
+        are hashed with bcrypt. We run regular dependency scans, security reviews, and we
+        publish a responsible-disclosure address at{' '}
+        <a href="mailto:security@spectrumconnect.co">security@spectrumconnect.co</a> for
+        researchers.
+      </p>
+      <p>
+        No system is bulletproof. If we have a breach affecting your data we&apos;ll notify you
+        and (where required) the regulator within the timeframes the law sets, including the 72
+        hours required by GDPR.
+      </p>
+
+      <h2>10. Cookies and similar tech</h2>
+      <p>
+        We use a small set of cookies. Essential ones keep you logged in and keep the site
+        working. Optional ones help us understand how people use the product. There&apos;s a
+        consent banner at the bottom of the screen the first time you visit, and you can change
+        your choices any time at <a href="/cookies">/cookies</a>.
+      </p>
+
+      <h2>11. Children</h2>
+      <p>
+        Spectrum Connect is for adults (18+). We don&apos;t knowingly collect data from
+        children under 18. If you&apos;re a parent or guardian who&apos;s found an account that
+        you think belongs to a minor, please email us and we&apos;ll close it and delete
+        the data.
+      </p>
+
+      <h2>12. Changes to this policy</h2>
+      <p>
+        We&apos;ll post any material change here at least 14 days before it takes effect, and
+        we&apos;ll email you if the change affects your rights or our use of your data. Small
+        clarifications might land without notice, but we date this page so you can see when it
+        moved.
+      </p>
+
+      <h2>13. Contact</h2>
+      <p>
+        For privacy questions: <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.<br />
+        For everything else: <a href="mailto:support@spectrumconnect.co">support@spectrumconnect.co</a>.<br />
+        By post: Spectrum Connect, Inc., Data Privacy Officer, 340 Pine Street, Suite 800, San
+        Francisco, CA 94104, USA.
+      </p>
+    </LegalPage>
   );
 }

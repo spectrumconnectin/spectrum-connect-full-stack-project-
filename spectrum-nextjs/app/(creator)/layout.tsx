@@ -199,10 +199,13 @@ function CreatorFooter() {
         </div>
         <div className="border-t border-gray-100 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-xs text-gray-500">© 2026 Spectrum Connect. All rights reserved.</p>
-          <div className="flex items-center gap-4 text-gray-400">
-            <a href="#" aria-label="Twitter" className="hover:text-cobalt transition"><i className="fa-brands fa-twitter"></i></a>
-            <a href="#" aria-label="LinkedIn" className="hover:text-cobalt transition"><i className="fa-brands fa-linkedin"></i></a>
-            <a href="#" aria-label="Instagram" className="hover:text-cobalt transition"><i className="fa-brands fa-instagram"></i></a>
+          <div className="flex items-center gap-4 text-xs text-gray-400 flex-wrap">
+            <Link href="/terms" className="hover:text-cobalt transition">Terms</Link>
+            <Link href="/privacy" className="hover:text-cobalt transition">Privacy</Link>
+            <Link href="/refunds" className="hover:text-cobalt transition">Refunds</Link>
+            <Link href="/dmca" className="hover:text-cobalt transition">DMCA</Link>
+            <Link href="/acceptable-use" className="hover:text-cobalt transition">Acceptable Use</Link>
+            <Link href="/legal" className="hover:text-cobalt transition">All Legal</Link>
           </div>
         </div>
       </div>

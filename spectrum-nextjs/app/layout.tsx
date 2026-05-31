@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import CookieBanner from "@/components/CookieBanner";
 
 export const metadata: Metadata = {
   title: "Spectrum Connect",
@@ -20,7 +21,13 @@ export default function RootLayout({
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Cookie consent banner — shows once on first visit, dismissable
+            anywhere on the site. Re-openable via the footer "Cookie settings"
+            link or the /cookies page. */}
+        <CookieBanner />
+      </body>
     </html>
   );
 }
