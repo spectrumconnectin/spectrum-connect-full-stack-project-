@@ -6,15 +6,23 @@ import { useRouter } from 'next/navigation';
 import { jobs, JobCreatePayload } from '@/lib/api';
 
 const DEPARTMENTS = [
-  'Camera', 'Cinematography', 'Directing', 'Editing', 'Post-Production',
-  'Sound', 'Sound Design', 'Motion Graphics', 'Animation', 'VFX',
-  'Production Design', 'Lighting', 'Script & Writing', 'Photography', 'Other',
+  'Design', 'Film & Video', 'Writing & Content', 'Marketing & Strategy',
+  'Music & Audio', 'Digital & Interactive', 'Other',
 ];
 
 const SKILLS_SUGGESTIONS = [
-  'Director', 'Videographer', 'Editor', 'Animator', 'Graphic Designer',
-  'Photographer', 'Copywriter', 'Sound Designer', 'Motion Designer',
-  'Colorist', 'VFX Artist', 'Cinematographer', 'Gaffer', 'Grip',
+  // Design
+  'Graphic Designer', 'UI/UX Designer', 'Product Designer', 'Motion Designer', '3D Designer', 'Brand Identity Designer',
+  // Film & Video
+  'Video Editor', 'Videographer', 'Animator', 'VFX Artist', 'Film Director', 'Sound Designer',
+  // Writing & Content
+  'Copywriter', 'Scriptwriter / Screenwriter', 'Content Writer', 'Editor',
+  // Marketing & Strategy
+  'Creative Director', 'Art Director', 'Brand Strategist', 'Social Media Manager',
+  // Music & Audio
+  'Music Producer', 'Voice Actor', 'Composer',
+  // Digital & Interactive
+  'Game Designer', '3D Modeler', 'AR/VR Designer',
 ];
 
 const EXPERIENCE_LEVELS = [

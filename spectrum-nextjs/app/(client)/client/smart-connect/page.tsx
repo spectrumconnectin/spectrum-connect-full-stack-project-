@@ -6,9 +6,18 @@ import { smartConnect, SmartCreativeProfile } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
 const ROLE_OPTIONS = [
-  'Cinematographer', 'Director of Photography', 'Video Editor', 'Sound Designer',
-  'Motion Designer', 'Graphic Designer', 'Photographer', 'Producer', 'Scriptwriter',
-  'Colorist', 'Gaffer', 'Art Director',
+  // Design
+  'Graphic Designer', 'UI/UX Designer', 'Product Designer', 'Motion Designer', '3D Designer', 'Brand Identity Designer',
+  // Film & Video
+  'Video Editor', 'Videographer', 'Animator', 'VFX Artist', 'Film Director', 'Sound Designer',
+  // Writing & Content
+  'Copywriter', 'Scriptwriter / Screenwriter', 'Content Writer', 'Editor',
+  // Marketing & Strategy
+  'Creative Director', 'Art Director', 'Brand Strategist', 'Social Media Manager',
+  // Music & Audio
+  'Music Producer', 'Voice Actor', 'Composer',
+  // Digital & Interactive
+  'Game Designer', '3D Modeler', 'AR/VR Designer',
 ];
 
 const TRUST_COLORS: Record<string, string> = {

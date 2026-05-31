@@ -4,8 +4,21 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { talent, TalentItem } from '@/lib/api';
 
-const ROLES = ['All Roles', 'Cinematographer', 'Editor', 'Sound Designer', 'Motion Designer',
-  'Director', 'Photographer', 'Animator', 'VFX Artist', 'Colorist'];
+const ROLES = [
+  'All Roles',
+  // Design
+  'Graphic Designer', 'UI/UX Designer', 'Product Designer', 'Motion Designer', '3D Designer', 'Brand Identity Designer',
+  // Film & Video
+  'Video Editor', 'Videographer', 'Animator', 'VFX Artist', 'Film Director', 'Sound Designer',
+  // Writing & Content
+  'Copywriter', 'Scriptwriter / Screenwriter', 'Content Writer', 'Editor',
+  // Marketing & Strategy
+  'Creative Director', 'Art Director', 'Brand Strategist', 'Social Media Manager',
+  // Music & Audio
+  'Music Producer', 'Voice Actor', 'Composer',
+  // Digital & Interactive
+  'Game Designer', '3D Modeler', 'AR/VR Designer',
+];
 
 const SORT_OPTIONS = ['Best Match', 'Highest Rated', 'Most Projects', 'Lowest Rate'];
 

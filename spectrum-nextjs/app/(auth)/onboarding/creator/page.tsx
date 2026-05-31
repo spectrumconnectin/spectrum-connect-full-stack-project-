@@ -6,7 +6,20 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { profile } from '@/lib/api';
 
-const SKILLS = ['Video Editing', 'Photography', 'Graphic Design', 'Motion Graphics', 'Copywriting', 'Social Media', 'Music Production', 'Voiceover', 'Animation', 'Web Design', 'Brand Strategy', 'Illustration'];
+const SKILLS = [
+  // Design
+  'Graphic Design', 'UI/UX Design', 'Product Design', 'Motion Graphics', '3D Design', 'Brand Identity Design',
+  // Film & Video
+  'Video Editing', 'Videography', 'Animation', 'VFX', 'Film Direction', 'Sound Design',
+  // Writing & Content
+  'Copywriting', 'Scriptwriting', 'Content Writing', 'Editing',
+  // Marketing & Strategy
+  'Creative Direction', 'Art Direction', 'Brand Strategy', 'Social Media',
+  // Music & Audio
+  'Music Production', 'Voice Acting', 'Composing',
+  // Digital & Interactive
+  'Game Design', '3D Modeling', 'AR/VR Design',
+];
 const RATES = ['< $25/hr', '$25–$50/hr', '$50–$100/hr', '$100–$150/hr', '$150+/hr'];
 const AVAILABILITY = ['Full-time (40+ hrs/week)', 'Part-time (20–40 hrs/week)', 'Flexible (10–20 hrs/week)', 'Project-based only'];
 
