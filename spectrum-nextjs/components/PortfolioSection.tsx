@@ -11,7 +11,7 @@
  *   max 2 videos, max 3 images
  */
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { portfolio, PortfolioItem, PortfolioResponse } from '@/lib/api';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -422,12 +422,16 @@ export default function PortfolioSection({
   const [modal, setModal] = useState<{ mode: 'add' | 'edit'; item?: PortfolioItem } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // Fetch on mount if no initialData
-  useState(() => {
-    if (initialData) return;
+  // Fetch on mount if no initialData was passed in
+  useEffect(() => {
+    if (initialData) { setLoading(false); return; }
     const fetcher = editable ? portfolio.getMe : () => portfolio.getPublic(userId!);
-    fetcher().then(setData).catch(() => {}).finally(() => setLoading(false));
-  });
+    fetcher()
+      .then(setData)
+      .catch(() => setData({ items: [], video_count: 0, image_count: 0, max_videos: 2, max_images: 3 }))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this portfolio item?')) return;
