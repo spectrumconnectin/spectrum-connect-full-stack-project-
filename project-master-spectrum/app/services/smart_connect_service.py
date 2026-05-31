@@ -218,6 +218,18 @@ class SmartConnectService:
                 score += etf_bonus
                 score_breakdown["etf_level"] = etf_bonus
 
+                # 9. Portfolio completeness bonus (max 5 pts).
+                # +2 for any portfolio item, +3 for both videos and images present.
+                portfolio_bonus = 0
+                items = user.profile.portfolio_items if user.profile.portfolio_items else []
+                if items:
+                    has_video = any(i.type == "video" for i in items)
+                    has_image = any(i.type == "image" for i in items)
+                    portfolio_bonus = 5 if (has_video and has_image) else 2
+                    reasons.append("Portfolio showcased")
+                score += portfolio_bonus
+                score_breakdown["portfolio"] = portfolio_bonus
+
                 # Threshold and match level
                 if score < 20:
                     continue
@@ -264,6 +276,9 @@ class SmartConnectService:
                         ),
                         # ETF level for the card badge — never exposes USD value.
                         "etf_level": etf_level_name,
+                        # Portfolio summary for the card (first item of each type).
+                        "portfolio_item_count": len(items),
+                        "portfolio_has_video": any(i.type == "video" for i in items),
                     },
                     "match_score": min(100, score),
                     "match_level": match_level,

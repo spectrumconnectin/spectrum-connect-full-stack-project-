@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from beanie import Document, PydanticObjectId
+import uuid
 
 # ============================================================================
 # USER & AUTHENTICATION
@@ -98,6 +99,25 @@ class Certification(BaseModel):
     credential_id: Optional[str] = None
     credential_url: Optional[str] = None
 
+# ── Portfolio ─────────────────────────────────────────────────────────────────
+
+class PortfolioItemEmbed(BaseModel):
+    """A single portfolio item embedded in the user's Profile.
+    Supports uploaded images (S3 URL), uploaded MP4 videos (S3 URL),
+    and YouTube / Vimeo embed links.
+    Limits: max 2 videos, max 3 images — enforced by the portfolio router.
+    """
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    type: str                       # "video" | "image"
+    media_type: str                 # "youtube" | "vimeo" | "mp4" | "jpg" | "png" | "webp"
+    url: str                        # S3 URL or YouTube/Vimeo link
+    thumbnail: Optional[str] = None # optional thumbnail for videos
+    title: str
+    description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# ── Profile ───────────────────────────────────────────────────────────────────
+
 class Profile(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -121,6 +141,8 @@ class Profile(BaseModel):
     hourly_rate_max: Optional[float] = None
     rating: Optional[float] = None
     review_count: Optional[int] = None
+    # Portfolio items — up to 2 videos + 3 images
+    portfolio_items: Optional[List[PortfolioItemEmbed]] = Field(default_factory=list)
 
     # Convenience property for frontend (alias for profile_picture)
     @property

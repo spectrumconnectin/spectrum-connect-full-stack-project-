@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { profile as profileApi, PublicProfile } from '@/lib/api';
+import PortfolioSection from '@/components/PortfolioSection';
 
 function formatRate(min?: number, max?: number): string {
   if (!min && !max) return 'Rate TBD';
@@ -240,6 +241,11 @@ export default function CollaboratorProfilePage() {
               </div>
             </div>
           )}
+
+          {/* Portfolio */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <PortfolioSection editable={false} userId={id as string} />
+          </div>
 
           {/* Empty state when no content */}
           {!pr?.bio && skills.length === 0 && experience.length === 0 && education.length === 0 && (

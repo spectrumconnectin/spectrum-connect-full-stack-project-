@@ -59,6 +59,7 @@ from app.api.routers.skill_challenge_router import router as skill_challenge_rou
 from app.api.routers.upload_router import router as upload_router
 from app.api.routers.proposals_router import router as proposals_router
 from app.api.routers.earnings_router import router as earnings_router
+from app.api.routers.portfolio_router import router as portfolio_router
 
 load_dotenv()
 
@@ -159,6 +160,7 @@ app.include_router(skill_challenge_router, tags=["Skill Verification Challenges"
 app.include_router(upload_router, prefix="/upload", tags=["File Upload"])
 app.include_router(proposals_router, tags=["Proposals"])
 app.include_router(earnings_router, tags=["Earnings"])
+app.include_router(portfolio_router, tags=["Portfolio"])
 
 
 @app.get("/health")

@@ -964,6 +964,63 @@ export const commission = {
     }, false),
 };
 
+// ── Portfolio ─────────────────────────────────────────────────────────────────
+
+export interface PortfolioItem {
+  id: string;
+  type: 'video' | 'image';
+  media_type: 'youtube' | 'vimeo' | 'mp4' | 'jpg' | 'png' | 'webp';
+  url: string;
+  thumbnail?: string;
+  title: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface PortfolioResponse {
+  items: PortfolioItem[];
+  video_count: number;
+  image_count: number;
+  max_videos: number;
+  max_images: number;
+}
+
+export interface PortfolioItemCreate {
+  url: string;
+  title: string;
+  description?: string;
+  thumbnail?: string;
+}
+
+export interface PortfolioItemUpdate {
+  title?: string;
+  description?: string;
+  thumbnail?: string;
+}
+
+export const portfolio = {
+  getMe: (): Promise<PortfolioResponse> =>
+    request<PortfolioResponse>('/portfolio/me'),
+
+  getPublic: (userId: string): Promise<PortfolioResponse> =>
+    request<PortfolioResponse>(`/portfolio/${userId}`, {}, false),
+
+  addItem: (data: PortfolioItemCreate): Promise<PortfolioItem> =>
+    request<PortfolioItem>('/portfolio/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateItem: (itemId: string, data: PortfolioItemUpdate): Promise<PortfolioItem> =>
+    request<PortfolioItem>(`/portfolio/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteItem: (itemId: string): Promise<void> =>
+    request<void>(`/portfolio/items/${itemId}`, { method: 'DELETE' }),
+};
+
 // ── ETF Points (Earn Trust Framework) ────────────────────────────────────────
 // All units are POINTS. The internal USD value of points is intentionally
 // never returned by the backend and must never be inferred client-side.
@@ -1362,5 +1419,5 @@ export const smartConnect = {
     }),
 };
 
-const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };
+const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio };
 export default api;

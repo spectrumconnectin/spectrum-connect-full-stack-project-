@@ -11,6 +11,7 @@ import {
   type EducationCreate,
   type CertificationCreate,
 } from '@/lib/api';
+import PortfolioSection from '@/components/PortfolioSection';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function fmt(date?: string) {
@@ -18,7 +19,7 @@ function fmt(date?: string) {
   try { return new Date(date).toISOString().split('T')[0]; } catch { return ''; }
 }
 
-type Tab = 'profile' | 'experience' | 'education' | 'security' | 'notifications';
+type Tab = 'profile' | 'experience' | 'education' | 'portfolio' | 'security' | 'notifications';
 
 interface ExpEntry { title: string; company?: string; location?: string; start_date: string; end_date?: string; current: boolean; description?: string; }
 interface EduEntry { degree: string; institution: string; field_of_study?: string; start_date: string; end_date?: string; description?: string; }
@@ -416,6 +417,7 @@ export default function ProfilePage() {
     { key: 'profile', label: 'Profile' },
     { key: 'experience', label: 'Experience' },
     { key: 'education', label: 'Education' },
+    { key: 'portfolio', label: 'Portfolio' },
     { key: 'security', label: 'Security' },
     { key: 'notifications', label: 'Notifications' },
   ];
@@ -735,6 +737,13 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Portfolio tab */}
+        {tab === 'portfolio' && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <PortfolioSection editable={true} />
           </div>
         )}
 
