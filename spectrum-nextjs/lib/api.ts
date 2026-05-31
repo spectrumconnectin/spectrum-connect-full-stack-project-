@@ -963,6 +963,78 @@ export const commission = {
     }, false),
 };
 
+// ── ETF Points (Earn Trust Framework) ────────────────────────────────────────
+// All units are POINTS. The internal USD value of points is intentionally
+// never returned by the backend and must never be inferred client-side.
+
+export type EtfLevelName = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+export interface EtfLevelInfo {
+  name: EtfLevelName;
+  label: string;
+  icon: string;            // Font Awesome class hint, e.g. "fa-medal"
+  color: string;           // Hex color hint
+  min_points: number;
+  next_min_points: number | null;
+  progress_pct: number;    // 0–100 distance to the next level
+}
+
+export interface EtfBalance {
+  user_id: string;
+  balance: number;
+  lifetime_points: number;
+  redeemed_points: number;
+  level: EtfLevelInfo;
+  updated_at?: string;
+}
+
+export interface EtfEvent {
+  id: string;
+  action: string;          // e.g. "milestone.released.creator"
+  points: number;          // positive = earned, negative = spent
+  balance_after: number;
+  source_type?: string;
+  source_id?: string;
+  description: string;
+  created_at: string;
+}
+
+export interface EtfEventsResponse {
+  events: EtfEvent[];
+  skip: number;
+  limit: number;
+}
+
+export interface EtfCashoutEligibility {
+  eligible: boolean;
+  reasons: string[];
+  balance: number;
+  min_points: number;
+  account_age_days: number;
+  min_account_age_days: number;
+}
+
+export const etfPoints = {
+  /** Authenticated read: my current balance, level, badge, progress. */
+  me: (): Promise<EtfBalance> => request<EtfBalance>('/etf/me'),
+
+  /** Authenticated read: paginated activity feed. */
+  events: (params?: { limit?: number; skip?: number }): Promise<EtfEventsResponse> =>
+    request<EtfEventsResponse>(`/etf/me/events${buildQS(params as Record<string, string | number | undefined> || {})}`),
+
+  /** Public read: just the level info for a user — used by cards and chips. */
+  badge: (userId: string): Promise<EtfLevelInfo> =>
+    request<EtfLevelInfo>(`/etf/badge/${userId}`, {}, false),
+
+  /** Authenticated read: cash-out eligibility report. */
+  cashoutEligibility: (): Promise<EtfCashoutEligibility> =>
+    request<EtfCashoutEligibility>('/etf/me/cashout'),
+
+  /** Authenticated write: request a cash-out (admin reviews; Phase 1 stub). */
+  requestCashout: (points: number): Promise<{ success: boolean; requested_points: number; message: string }> =>
+    request('/etf/me/cashout', { method: 'POST', body: JSON.stringify({ points }) }),
+};
+
 // ── Disputes ──────────────────────────────────────────────────────────────────
 
 export interface DisputeListItem {
@@ -1267,6 +1339,9 @@ export interface SmartCreativeProfile {
   trust_tier: string;
   workload_score: number;
   trust_score: number;
+  /** ETF Points level — bronze/silver/gold/platinum. Inline so cards
+   *  don't need an N+1 fetch to render the badge. */
+  etf_level?: EtfLevelName;
 }
 
 export interface SmartMatchResultItem {
@@ -1347,4 +1422,4 @@ export const smartConnect = {
     }),
 };
 
-export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };
+export default { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etf, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore };

@@ -455,7 +455,23 @@ class ReviewQueueService:
 
             # ── Email notification (Phase 2) ──────────────────────────────
             # TODO: send_review_approved_email(user.email, user.username, verification_type)
-            print(f"[ReviewQueue] Approved: {user.email} — email deferred to Phase 2")
+            import logging as _l
+            _l.getLogger(__name__).info(
+                "[ReviewQueue] Approved: %s — email deferred to Phase 2", user.email
+            )
+
+            # ── ETF Points: one-shot verification bonus ───────────────────
+            try:
+                from app.services.etf_points_service import EtfPointsService
+                await EtfPointsService.award_points(
+                    user_id=user.id,
+                    action="profile.verified",
+                    source_type="review_queue",
+                    source_id=str(rev.id),
+                    description="Profile verified by Quality Review Team",
+                )
+            except Exception:
+                pass
 
         return {
             "success": True,

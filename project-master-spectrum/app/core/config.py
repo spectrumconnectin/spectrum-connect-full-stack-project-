@@ -70,6 +70,34 @@ class Settings(BaseSettings):
     COMM_MICRO_CAP: str = "2.00"
     COMM_VERSION: str = "v1.split.8_4"
 
+    # ── ETF Points (Earn Trust Framework) ────────────────────────────────
+    # See app/services/etf_points_service.py and ETF_FRAMEWORK.md.
+    # Internal point-to-USD conversion. NEVER expose this in any user-facing
+    # response — only used by backend cash-out calculations.
+    ETF_POINTS_PER_USD: int = 100                   # 100 points = $1.00
+
+    # Per-action point awards. Tunable without code changes.
+    ETF_POINTS_PROJECT_POSTED: int = 5              # client posts a job
+    ETF_POINTS_PROJECT_HIRED: int = 20              # client hires (proposal accepted)
+    ETF_POINTS_MILESTONE_FUNDED: int = 10           # client funds a milestone
+    ETF_POINTS_MILESTONE_RELEASED_CLIENT: int = 15  # client releases on time
+    ETF_POINTS_MILESTONE_RELEASED_CREATOR: int = 50 # creator gets paid out
+    ETF_POINTS_PROJECT_COMPLETED_CLIENT: int = 50   # whole project wraps
+    ETF_POINTS_PROJECT_COMPLETED_CREATOR: int = 100 # whole project wraps
+    ETF_POINTS_REVIEW_SUBMITTED: int = 15           # leaving a review
+    ETF_POINTS_REPEAT_CLIENT_BONUS: int = 25        # creator rewarded for repeat hire
+    ETF_POINTS_PROFILE_VERIFIED: int = 100          # one-shot on first verification
+
+    # Level thresholds (in lifetime points). Crossing these flips the badge.
+    ETF_LEVEL_SILVER: int = 250
+    ETF_LEVEL_GOLD: int = 1000
+    ETF_LEVEL_PLATINUM: int = 5000
+
+    # Cash-out gating. All can be flipped via env without redeploy.
+    ETF_CASHOUT_ENABLED: bool = False               # master kill switch
+    ETF_CASHOUT_MIN_POINTS: int = 1000              # = $10.00 internally
+    ETF_CASHOUT_MIN_ACCOUNT_AGE_DAYS: int = 365     # 12 months per spec
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

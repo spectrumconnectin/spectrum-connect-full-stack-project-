@@ -153,6 +153,21 @@ class EscrowService:
         escrow.updated_at = datetime.utcnow()
         await escrow.save()
 
+        # ETF Points — client funded a milestone (engagement signal).
+        # Blocked when client and creator are the same account (self-job).
+        try:
+            from app.services.etf_points_service import EtfPointsService
+            await EtfPointsService.award_points(
+                user_id=escrow.client_id,
+                action="milestone.funded",
+                source_type="escrow_milestone",
+                source_id=f"{escrow_id}:{milestone_id}",
+                counterparty_id=escrow.creator_id,
+                description=f"Funded milestone: {milestone.title}",
+            )
+        except Exception:
+            pass
+
         # Compute the v1 8/4 commission so the client UI can show what they
         # were actually charged (subtotal + client_fee). No Transaction is
         # written at the funding step — funds are only held in escrow here;
@@ -263,6 +278,48 @@ class EscrowService:
             escrow.completed_at = now
 
         await escrow.save()
+
+        # ETF Points — milestone release awards both parties (client for
+        # paying on time, creator for delivering). Blocked on self-deal.
+        try:
+            from app.services.etf_points_service import EtfPointsService
+            await EtfPointsService.award_points(
+                user_id=escrow.client_id,
+                action="milestone.released.client",
+                source_type="escrow_milestone",
+                source_id=f"{escrow_id}:{milestone_id}",
+                counterparty_id=escrow.creator_id,
+                description=f"Released milestone: {milestone.title}",
+            )
+            await EtfPointsService.award_points(
+                user_id=escrow.creator_id,
+                action="milestone.released.creator",
+                source_type="escrow_milestone",
+                source_id=f"{escrow_id}:{milestone_id}",
+                counterparty_id=escrow.client_id,
+                description=f"Delivered milestone: {milestone.title}",
+            )
+            # If the whole escrow just completed, award both sides the
+            # project-completion bonus once (escrow_id is the dedup source).
+            if escrow.status == "completed":
+                await EtfPointsService.award_points(
+                    user_id=escrow.client_id,
+                    action="project.completed.client",
+                    source_type="escrow",
+                    source_id=str(escrow_id),
+                    counterparty_id=escrow.creator_id,
+                    description="Completed project on Spectrum Connect",
+                )
+                await EtfPointsService.award_points(
+                    user_id=escrow.creator_id,
+                    action="project.completed.creator",
+                    source_type="escrow",
+                    source_id=str(escrow_id),
+                    counterparty_id=escrow.client_id,
+                    description="Completed project on Spectrum Connect",
+                )
+        except Exception:
+            pass
 
         return {
             "success": True,

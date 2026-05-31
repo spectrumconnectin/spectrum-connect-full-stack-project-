@@ -245,7 +245,9 @@ class ProjectService:
                 metadata={"progress": progress_percentage}
             )
 
-            # ETF contribution on project completion
+            # ETF (legacy vault) contribution on project completion. The
+            # vault stays for the future cash-out reserve but is hidden
+            # from the user UI — the points system is the only ETF surface.
             from app.services.etf_service import ETFService
             try:
                 project_value = project.budget_max or project.budget_min or 500.0
@@ -265,7 +267,31 @@ class ProjectService:
                             description=f"Project completed: {project.title}",
                         )
             except Exception as e:
-                print(f"ETF contribution failed: {e}")
+                import logging
+                logging.getLogger(__name__).warning("ETF vault contribution failed: %s", e)
+
+            # ETF Points — award completion bonus to every accepted team
+            # member. Idempotent on (action, project) so repeated updates
+            # can't double-award.
+            try:
+                from app.services.etf_points_service import EtfPointsService
+                from beanie import PydanticObjectId as _PID
+                # Action varies by side: creators (any non-client team member)
+                # vs the client themselves. Use creator action for everyone
+                # in team_members; clients are awarded via the escrow path.
+                for member in project.team_members:
+                    if getattr(member, "invitation_status", "accepted") != "accepted":
+                        continue
+                    await EtfPointsService.award_points(
+                        user_id=_PID(member.user_id),
+                        action="project.completed.creator",
+                        source_type="project",
+                        source_id=str(project.id),
+                        counterparty_id=_PID(project.client_id) if project.client_id else None,
+                        description=f"Completed project: {project.title}",
+                    )
+            except Exception:
+                pass
 
         return project
 

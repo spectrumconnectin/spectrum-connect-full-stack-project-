@@ -25,6 +25,7 @@ from app.models.community import (
     CollabCall, CommunityGuideline, FeaturedCreator
 )
 from app.models.etf import ETFVault, ETFContribution, ETFLedger
+from app.models.etf_points import EtfPoints, EtfEvent
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
@@ -188,6 +189,7 @@ async def startup_db_client():
                 CollabCall, CommunityGuideline, FeaturedCreator,
                 Transaction, Notification, Workspace, MiyaInteraction, Service,
                 ETFVault, ETFContribution, ETFLedger,
+                EtfPoints, EtfEvent,
                 ReviewQueue,
                 Escrow, Dispute, GuaranteeFund,
                 SkillChallenge, ChallengeSubmission, SkillBadge,

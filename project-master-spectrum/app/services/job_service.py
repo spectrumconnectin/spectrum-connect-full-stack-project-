@@ -91,6 +91,23 @@ class JobService:
         )
 
         await job_post.insert()
+
+        # ETF Points — reward client for posting (draft posts excluded so we
+        # don't farm points from incomplete drafts).
+        if job_post.status and job_post.status != "draft":
+            try:
+                from app.services.etf_points_service import EtfPointsService
+                await EtfPointsService.award_points(
+                    user_id=user.id,
+                    action="project.posted",
+                    source_type="job_post",
+                    source_id=str(job_post.id),
+                    description=f"Posted project: {job_post.title}",
+                )
+            except Exception:
+                # Auditing must never block the request path.
+                pass
+
         return job_post
 
     @staticmethod

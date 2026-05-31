@@ -6,10 +6,14 @@ and claiming or reinvesting matured funds.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from typing import Dict, Any
+from pydantic import BaseModel, Field
+from typing import Dict, Any, List
+
+from beanie import PydanticObjectId
 
 from app.models.schema import User
 from app.services.etf_service import ETFService
+from app.services.etf_points_service import EtfPointsService
 from app.auth.auth import get_current_user
 from app.api.schemas.etf_schemas import (
     VaultSummaryResponse,
@@ -156,3 +160,72 @@ async def reinvest_funds(
         )
 
     return result
+
+# ============================================================================
+# ETF POINTS — Earn Trust Framework
+# ============================================================================
+# Points-based loyalty surface. Internal USD value of points is NEVER
+# returned by any of these endpoints — clients only see points, level,
+# progress, and badge.
+# ============================================================================
+
+
+@router.get("/me", summary="My ETF Points balance + level")
+async def get_my_etf_balance(current_user: User = Depends(get_current_user)):
+    """Return the authenticated user's ETF Points balance, lifetime total,
+    current level (bronze / silver / gold / platinum), and progress toward
+    the next level. The dashboard and ETF page both consume this.
+    """
+    balance = await EtfPointsService.get_balance(current_user.id)
+    return balance.model_dump()
+
+
+@router.get("/me/events", summary="My recent ETF Points activity")
+async def get_my_etf_events(
+    limit: int = Query(50, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+):
+    """Paginated activity feed for the ETF page."""
+    events = await EtfPointsService.get_events(current_user.id, limit=limit, skip=skip)
+    return {"events": [e.model_dump() for e in events], "skip": skip, "limit": limit}
+
+
+@router.get("/badge/{user_id}", summary="Public ETF badge for a user")
+async def get_etf_badge(user_id: str):
+    """Lightweight public read for cards / search results / profile chips.
+    Returns only the level info — no balance numbers are leaked.
+    """
+    try:
+        PydanticObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user id")
+    level = await EtfPointsService.badge_for(user_id)
+    return level.model_dump()
+
+
+# ─── Cash-out (Phase 1: eligibility check + request only) ────────────────────
+
+
+class CashoutRequestBody(BaseModel):
+    points: int = Field(..., gt=0, description="Number of ETF Points to cash out")
+
+
+@router.get("/me/cashout", summary="Check my cash-out eligibility")
+async def get_cashout_eligibility(current_user: User = Depends(get_current_user)):
+    """Return a structured eligibility report. Always callable so the UI
+    can show 'Eligible in N days' / 'Need M more points' etc.
+    """
+    return await EtfPointsService.check_cashout_eligibility(current_user)
+
+
+@router.post("/me/cashout", summary="Request a cash-out")
+async def request_cashout(
+    body: CashoutRequestBody,
+    current_user: User = Depends(get_current_user),
+):
+    """Record a cash-out request. Phase 1 only debits the balance and queues
+    the request for admin review — the actual payout integration ships
+    in Phase 2 alongside the payment processor.
+    """
+    return await EtfPointsService.request_cashout(current_user, body.points)

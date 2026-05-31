@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { smartConnect, SmartCreativeProfile } from '@/lib/api';
+import EtfBadge from '@/components/EtfBadge';
 
 const ROLE_OPTIONS = [
   'Cinematographer', 'Director of Photography', 'Video Editor', 'Sound Designer',
@@ -240,6 +241,23 @@ export default function ClientSmartConnectPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="font-bold text-gray-900">{c.name}</h3>
                               <TrustBadge tier={c.trust_tier} />
+                              {/* ETF level chip. Smart Connect surfaces
+                                  etf_level inline so the badge renders
+                                  without an extra request. Falls back to a
+                                  userId lookup for any payload that omits it. */}
+                              {c.etf_level ? (
+                                <EtfBadge
+                                  level={{
+                                    name: c.etf_level,
+                                    label: c.etf_level.charAt(0).toUpperCase() + c.etf_level.slice(1),
+                                    icon: '', color: '',
+                                    min_points: 0, next_min_points: null, progress_pct: 0,
+                                  }}
+                                  size="xs"
+                                />
+                              ) : (
+                                <EtfBadge userId={c.user_id} size="xs" />
+                              )}
                             </div>
                             <p className="text-sm text-cobalt font-medium">{c.title || c.role}</p>
                             {loc && (

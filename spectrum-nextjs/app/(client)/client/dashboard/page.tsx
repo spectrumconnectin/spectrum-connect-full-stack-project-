@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { dashboard, profile as profileApi, type ClientDashboardResponse } from '@/lib/api';
+import EtfWidget from '@/components/EtfWidget';
 
 const statusColors: Record<string, string> = {
   open: 'bg-green-100 text-green-700',
@@ -79,6 +80,11 @@ export default function ClientDashboardPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ETF Points widget — loyalty + trust signal */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        <EtfWidget href="/client/etf" />
       </section>
 
       {/* Stats */}

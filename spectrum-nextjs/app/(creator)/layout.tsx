@@ -129,6 +129,9 @@ function CreatorHeader() {
                   <Link href="/creator/earnings" onClick={() => setMenuOpen(false)} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                     <i className="fa-solid fa-wallet w-5 text-gray-400 mr-2.5"></i>Earnings
                   </Link>
+                  <Link href="/creator/etf" onClick={() => setMenuOpen(false)} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                    <i className="fa-solid fa-medal w-5 text-gray-400 mr-2.5"></i>ETF — Earn Trust
+                  </Link>
                   <button onClick={() => { setMenuOpen(false); window.location.href = '/creator/profile#settings'; }}
                     className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                     <i className="fa-solid fa-gear w-5 text-gray-400 mr-2.5"></i>Settings

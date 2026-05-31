@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { dashboard, auth, type CreatorDashboardResponse } from '@/lib/api';
+import EtfWidget from '@/components/EtfWidget';
 
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-green-50 text-green-700 border-green-200',
@@ -56,6 +57,11 @@ export default function CreatorDashboardPage() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* ETF Points widget — loyalty + trust signal */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        <EtfWidget href="/creator/etf" />
       </section>
 
       {/* Stats strip */}

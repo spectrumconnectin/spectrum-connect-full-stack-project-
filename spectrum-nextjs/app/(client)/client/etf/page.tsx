@@ -1,13 +1,13 @@
 'use client';
 
+// Client-side ETF page. Identical structure to the creator page (same
+// /etf/me endpoint, same widgets) — kept as a separate route so future
+// client-specific copy or rewards can diverge without affecting creators.
+
 import { useEffect, useState } from 'react';
 import { etfPoints, type EtfBalance, type EtfEvent, type EtfCashoutEligibility } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
-// ── Friendly labels for the activity feed ────────────────────────────────────
-// Backend actions are dotted strings (e.g. "milestone.released.creator").
-// We map known ones to a short verb + icon for the UI; unknowns fall back
-// to a generic chip so the feed stays readable even as we add actions.
 const ACTION_META: Record<string, { label: string; icon: string }> = {
   'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn' },
   'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake' },
@@ -17,7 +17,7 @@ const ACTION_META: Record<string, { label: string; icon: string }> = {
   'project.completed.client':       { label: 'Completed a project',        icon: 'fa-check-double' },
   'project.completed.creator':      { label: 'Completed a project',        icon: 'fa-trophy' },
   'review.submitted':               { label: 'Left a review',              icon: 'fa-star' },
-  'repeat_client.bonus':            { label: 'Repeat client bonus',        icon: 'fa-rotate-right' },
+  'repeat_client.bonus':            { label: 'Repeat creator bonus',       icon: 'fa-rotate-right' },
   'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved' },
   'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket' },
 };
@@ -39,7 +39,7 @@ function formatDate(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function CreatorEtfPage() {
+export default function ClientEtfPage() {
   const [balance, setBalance] = useState<EtfBalance | null>(null);
   const [events, setEvents] = useState<EtfEvent[]>([]);
   const [cashout, setCashout] = useState<EtfCashoutEligibility | null>(null);
@@ -76,21 +76,19 @@ export default function CreatorEtfPage() {
 
   return (
     <>
-      {/* Header */}
       <section className="mb-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
           <h1 className="text-4xl font-bold text-gray-900">ETF — Earn Trust</h1>
           {level && <EtfBadge level={level} size="md" />}
         </div>
         <p className="text-gray-600">
-          You earn ETF Points by being active and reliable on Spectrum Connect — completing projects,
-          delivering milestones, and keeping your work inside the platform.
+          You earn ETF Points for posting projects, hiring creators, releasing milestones, and
+          completing work on Spectrum Connect — the more you collaborate inside the platform,
+          the higher your trust level.
         </p>
       </section>
 
-      {/* Hero stats */}
       <section className="grid lg:grid-cols-3 gap-5 mb-8">
-        {/* Balance */}
         <div className="bg-gradient-to-br from-cobalt via-blue-600 to-blue-500 text-white rounded-3xl p-8 shadow-xl">
           <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-3">
             Current balance
@@ -106,7 +104,6 @@ export default function CreatorEtfPage() {
           </p>
         </div>
 
-        {/* Level */}
         <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-3">
             Current level
@@ -132,7 +129,6 @@ export default function CreatorEtfPage() {
           )}
         </div>
 
-        {/* Cash-out eligibility (no $ shown) */}
         <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-3">
             Cash-out
@@ -163,7 +159,6 @@ export default function CreatorEtfPage() {
         </div>
       </section>
 
-      {/* How you earn */}
       <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-2">How you earn ETF Points</h2>
         <p className="text-sm text-gray-600 mb-6">
@@ -172,12 +167,12 @@ export default function CreatorEtfPage() {
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { icon: 'fa-flag-checkered', label: 'Deliver a milestone' },
-            { icon: 'fa-trophy',         label: 'Complete a project' },
-            { icon: 'fa-handshake',      label: 'Get hired' },
-            { icon: 'fa-shield-halved',  label: 'Get verified' },
+            { icon: 'fa-bullhorn',       label: 'Post a project' },
+            { icon: 'fa-handshake',      label: 'Hire a creator' },
+            { icon: 'fa-lock',           label: 'Fund a milestone' },
+            { icon: 'fa-unlock',         label: 'Release on time' },
+            { icon: 'fa-check-double',   label: 'Complete a project' },
             { icon: 'fa-star',           label: 'Leave a review' },
-            { icon: 'fa-rotate-right',   label: 'Repeat client' },
           ].map(it => (
             <div key={it.label} className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
               <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center">
@@ -189,7 +184,6 @@ export default function CreatorEtfPage() {
         </div>
       </section>
 
-      {/* Activity feed */}
       <section className="bg-white rounded-3xl border border-gray-200 overflow-hidden">
         <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Recent activity</h2>
@@ -200,7 +194,7 @@ export default function CreatorEtfPage() {
             <i className="fa-solid fa-medal text-4xl text-gray-300 mb-4 block"></i>
             <h3 className="font-semibold text-gray-600 mb-1">No activity yet</h3>
             <p className="text-sm text-gray-400">
-              Your first ETF Points will appear here once you complete an action on the platform.
+              Your first ETF Points will appear here once you take an action on Spectrum Connect.
             </p>
           </div>
         ) : (

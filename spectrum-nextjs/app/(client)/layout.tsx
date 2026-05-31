@@ -136,6 +136,9 @@ function ClientHeader() {
                   <Link href="/client/payments" onClick={() => setMenuOpen(false)} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                     <i className="fa-solid fa-wallet w-5 text-gray-400 mr-2.5"></i>Payments
                   </Link>
+                  <Link href="/client/etf" onClick={() => setMenuOpen(false)} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                    <i className="fa-solid fa-medal w-5 text-gray-400 mr-2.5"></i>ETF — Earn Trust
+                  </Link>
                   <Link href="/creator/dashboard" onClick={() => setMenuOpen(false)} className="flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                     <i className="fa-solid fa-arrow-right-arrow-left w-5 text-gray-400 mr-2.5"></i>Switch to Creator
                   </Link>

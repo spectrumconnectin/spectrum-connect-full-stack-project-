@@ -200,6 +200,24 @@ class SmartConnectService:
                 score += trust_score_bonus
                 score_breakdown["trust_tier"] = trust_score_bonus
 
+                # 8. ETF Points level bonus (max 8 pts) — earned loyalty.
+                # Bronze 0 / Silver 3 / Gold 5 / Platinum 8.
+                etf_bonus = 0
+                etf_level_name = "bronze"
+                try:
+                    from app.services.etf_points_service import EtfPointsService
+                    etf_level = await EtfPointsService.badge_for(user.id)
+                    etf_level_name = etf_level.name
+                    etf_bonus = {"bronze": 0, "silver": 3, "gold": 5, "platinum": 8}.get(
+                        etf_level_name, 0
+                    )
+                    if etf_bonus >= 3:
+                        reasons.append(f"ETF: {etf_level.label}")
+                except Exception:
+                    pass
+                score += etf_bonus
+                score_breakdown["etf_level"] = etf_bonus
+
                 # Threshold and match level
                 if score < 20:
                     continue
@@ -244,6 +262,8 @@ class SmartConnectService:
                         "trust_score": (
                             user.spectrum_id.trust_score if user.spectrum_id else 0.0
                         ),
+                        # ETF level for the card badge — never exposes USD value.
+                        "etf_level": etf_level_name,
                     },
                     "match_score": min(100, score),
                     "match_level": match_level,
