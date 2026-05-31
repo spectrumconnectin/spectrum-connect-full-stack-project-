@@ -70,9 +70,8 @@ function NewDisputeModal({ onClose, onCreated }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="sc-modal-backdrop">
+      <div className="sc-modal-panel max-h-[90vh] overflow-y-auto" style={{padding: 0}}>
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Open a Dispute</h2>

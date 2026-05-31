@@ -238,9 +238,8 @@ export default function EarningsPage() {
 
       {/* Withdraw modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white rounded-3xl w-full shadow-2xl overflow-hidden" style={{ maxWidth: 420 }}>
+        <div className="sc-modal-backdrop">
+          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 420, padding: 0 }}>
             <div className="px-7 pt-7 pb-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

@@ -184,7 +184,7 @@ function ImageCard({ item, editable, onEdit, onDelete }: {
       {/* Lightbox */}
       {lightbox && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          className="sc-lightbox-backdrop"
           onClick={() => setLightbox(false)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -301,9 +301,9 @@ function PortfolioModal({ mode, item, data, onClose, onSaved }: ModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="sc-modal-backdrop" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6"
+        className="sc-modal-panel"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">

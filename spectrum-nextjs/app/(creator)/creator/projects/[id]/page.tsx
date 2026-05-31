@@ -79,9 +79,8 @@ function ProgressModal({ current, onClose, onSave }: {
   const [saving, setSaving] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7" onClick={e => e.stopPropagation()}>
+    <div className="sc-modal-backdrop">
+      <div className="sc-modal-panel" style={{maxWidth: 420}} onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-gray-900 mb-1">Update Progress</h3>
         <p className="text-sm text-gray-500 mb-5">Drag to set the current completion percentage.</p>
         <div className="flex items-center gap-4 mb-5">
