@@ -1213,8 +1213,8 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  /* Light dim + very subtle blur — background stays recognisable */
-  background: rgba(15, 23, 42, 0.40);
+  /* Very light dim — background stays fully visible */
+  background: rgba(15, 23, 42, 0.25);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   animation: scBackdropIn 0.2s ease forwards;
