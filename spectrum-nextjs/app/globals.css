@@ -1213,10 +1213,10 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  /* Dark + frosted — enough contrast to make panel pop */
-  background: rgba(4, 10, 28, 0.72);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  /* Light dim + very subtle blur — background stays recognisable */
+  background: rgba(15, 23, 42, 0.40);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   animation: scBackdropIn 0.2s ease forwards;
 }
 
