@@ -1204,7 +1204,7 @@ header nav a.active::after {
    MODAL SYSTEM — Unified overlay + panel design
    ============================================================ */
 
-/* Backdrop: frosted glass blur + dark scrim */
+/* ── Backdrop ─────────────────────────────────────────────────────────────── */
 .sc-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1213,39 +1213,42 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(10, 18, 40, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  animation: scModalBackdropIn 0.18s ease forwards;
+  /* Dark + frosted — enough contrast to make panel pop */
+  background: rgba(4, 10, 28, 0.72);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  animation: scBackdropIn 0.2s ease forwards;
 }
 
-/* Panel */
+/* ── Panel ────────────────────────────────────────────────────────────────── */
 .sc-modal-panel {
   position: relative;
-  background: #fff;
-  border-radius: 20px;
+  background: #ffffff;
+  border-radius: 22px;
   width: 100%;
   max-width: 520px;
   padding: 28px;
+  /* Outer glow ring + deep elevation shadow */
   box-shadow:
-    0 0 0 1px rgba(15, 23, 42, 0.06),
-    0 8px 24px -4px rgba(15, 23, 42, 0.12),
-    0 24px 64px -12px rgba(15, 23, 42, 0.22);
-  animation: scModalPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    0 0 0 1.5px rgba(255, 255, 255, 0.18),   /* bright ring — lifts it off dark bg */
+    0 2px 8px  rgba(0, 0, 0, 0.08),
+    0 12px 32px rgba(0, 0, 0, 0.18),
+    0 40px 80px rgba(0, 0, 0, 0.28);          /* deep ambient shadow */
+  animation: scPanelIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* Animations */
-@keyframes scModalBackdropIn {
+/* ── Keyframes ────────────────────────────────────────────────────────────── */
+@keyframes scBackdropIn {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-@keyframes scModalPanelIn {
-  from { opacity: 0; transform: scale(0.94) translateY(10px); }
-  to   { opacity: 1; transform: scale(1)    translateY(0); }
+@keyframes scPanelIn {
+  from { opacity: 0; transform: scale(0.92) translateY(16px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
 }
 
-/* Lightbox backdrop (darker) */
+/* ── Lightbox (darker, stronger blur) ────────────────────────────────────── */
 .sc-lightbox-backdrop {
   position: fixed;
   inset: 0;
@@ -1254,8 +1257,8 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  animation: scModalBackdropIn 0.18s ease forwards;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  animation: scBackdropIn 0.2s ease forwards;
 }
