@@ -1213,28 +1213,26 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  /* Very light dim — background stays fully visible */
-  background: rgba(15, 23, 42, 0.25);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  animation: scBackdropIn 0.2s ease forwards;
+  /* Solid dark scrim — no blur, clean like FB/Apple modals */
+  background: rgba(0, 0, 0, 0.60);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: scBackdropIn 0.15s ease forwards;
 }
 
 /* ── Panel ────────────────────────────────────────────────────────────────── */
 .sc-modal-panel {
   position: relative;
   background: #ffffff;
-  border-radius: 22px;
+  border-radius: 16px;
   width: 100%;
   max-width: 520px;
   padding: 28px;
-  /* Outer glow ring + deep elevation shadow */
   box-shadow:
-    0 0 0 1.5px rgba(255, 255, 255, 0.18),   /* bright ring — lifts it off dark bg */
-    0 2px 8px  rgba(0, 0, 0, 0.08),
-    0 12px 32px rgba(0, 0, 0, 0.18),
-    0 40px 80px rgba(0, 0, 0, 0.28);          /* deep ambient shadow */
-  animation: scPanelIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 20px 48px rgba(0, 0, 0, 0.24);
+  animation: scPanelIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* ── Keyframes ────────────────────────────────────────────────────────────── */
