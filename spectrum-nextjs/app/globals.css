@@ -1246,7 +1246,7 @@ header nav a.active::after {
   to   { opacity: 1; transform: scale(1)    translateY(0);    }
 }
 
-/* ── Lightbox (darker, stronger blur) ────────────────────────────────────── */
+/* ── Lightbox (transparent, same as modals) ───────────────────────────────── */
 .sc-lightbox-backdrop {
   position: fixed;
   inset: 0;
@@ -1255,8 +1255,8 @@ header nav a.active::after {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(20px) saturate(120%);
-  -webkit-backdrop-filter: blur(20px) saturate(120%);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   animation: scBackdropIn 0.2s ease forwards;
 }

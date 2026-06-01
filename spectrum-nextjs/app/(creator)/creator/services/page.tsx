@@ -208,7 +208,7 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
 
   return (
     /* Backdrop */
-    <div className="fixed inset-0 z-50 flex" style={{background:'rgba(10,18,40,0.55)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',animation:'scModalBackdropIn 0.18s ease forwards'}} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex" style={{background:'transparent',animation:'scBackdropIn 0.15s ease forwards'}} onClick={onClose}>
       {/* Spacer */}
       <div className="flex-1" />
 
