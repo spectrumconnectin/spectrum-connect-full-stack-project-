@@ -208,14 +208,14 @@ function ServiceModal({ initial, loading: modalLoading, onClose, onSave }: {
 
   return (
     /* Backdrop */
-    <div className="fixed inset-0 z-50 flex" style={{background:'transparent',animation:'scBackdropIn 0.15s ease forwards'}} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex" style={{background:'transparent'}} onClick={onClose}>
       {/* Spacer */}
       <div className="flex-1" />
 
       {/* Drawer panel */}
       <div
         className="relative w-full max-w-md bg-white flex flex-col"
-        style={{boxShadow:'-8px 0 40px rgba(15,23,42,0.18)',animation:'scModalPanelIn 0.22s cubic-bezier(0.22,1,0.36,1) forwards'}}
+        style={{boxShadow:'-2px 0 12px rgba(15,23,42,0.10)',borderLeft:'1px solid #e5e7eb'}}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
