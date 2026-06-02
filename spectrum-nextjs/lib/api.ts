@@ -1419,5 +1419,57 @@ export const smartConnect = {
     }),
 };
 
-const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio };
+// ── Admin Panel ───────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  users: { total: number; creators: number; clients: number; admins: number; verified: number; suspended: number; new_last_30_days: number };
+  escrow: { total_volume_usd: number; platform_fees_usd: number; active_count: number; completed_count: number; disputed_count: number };
+  etf: { total_points_awarded: number; platinum_users: number; gold_users: number };
+}
+
+export interface AdminUser {
+  id: string; email: string; username: string; account_type: string; user_role: string;
+  is_verified: boolean; is_active: boolean; created_at: string;
+  display_name: string; profile_picture: string; trust_score: number; trust_tier: string;
+  profile?: { bio?: string; tagline?: string; location?: string; skills?: string[]; hourly_rate_min?: number; hourly_rate_max?: number; portfolio_item_count?: number };
+}
+
+export interface AdminUsersResponse { total: number; page: number; page_size: number; has_more: boolean; users: AdminUser[] }
+
+export interface AdminJob { id: string; title: string; status: string; client_id: string; department: string; proposal_count: number; created_at: string }
+export interface AdminJobsResponse { total: number; page: number; page_size: number; has_more: boolean; jobs: AdminJob[] }
+
+export interface AdminDispute { id: string; escrow_id?: string; status: string; reason?: string; opened_by?: string; created_at: string }
+export interface AdminDisputesResponse { total: number; page: number; page_size: number; has_more: boolean; disputes: AdminDispute[] }
+
+export interface AdminTransaction { id: string; status: string; amount: number; currency: string; platform_fee: number; client_id?: string; creator_id?: string; created_at: string }
+export interface AdminTransactionsResponse { total: number; page: number; page_size: number; has_more: boolean; transactions: AdminTransaction[] }
+
+export interface AdminEtfStats { total_accounts: number; total_lifetime_points: number; total_redeemed_points: number; level_breakdown: Record<string, number> }
+
+export const adminApi = {
+  getStats: (): Promise<AdminStats> => request<AdminStats>('/admin/stats'),
+  getUsers: (params?: { page?: number; page_size?: number; search?: string; account_type?: string; user_role?: string; is_verified?: boolean; is_active?: boolean }): Promise<AdminUsersResponse> =>
+    request<AdminUsersResponse>(`/admin/users${buildQS(params as Record<string, string | number | undefined> || {})}`),
+  getUser: (id: string): Promise<AdminUser> => request<AdminUser>(`/admin/users/${id}`),
+  updateRole: (id: string, user_role: string): Promise<{id: string; user_role: string}> =>
+    request(`/admin/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ user_role }) }),
+  suspendUser: (id: string): Promise<{id: string; is_active: boolean}> =>
+    request(`/admin/users/${id}/suspend`, { method: 'PATCH' }),
+  activateUser: (id: string): Promise<{id: string; is_active: boolean}> =>
+    request(`/admin/users/${id}/activate`, { method: 'PATCH' }),
+  toggleVerify: (id: string): Promise<{id: string; is_verified: boolean}> =>
+    request(`/admin/users/${id}/verify`, { method: 'PATCH' }),
+  getJobs: (params?: { page?: number; page_size?: number; search?: string; status?: string }): Promise<AdminJobsResponse> =>
+    request<AdminJobsResponse>(`/admin/jobs${buildQS(params as Record<string, string | number | undefined> || {})}`),
+  updateJobStatus: (id: string, status: string): Promise<{id: string; status: string}> =>
+    request(`/admin/jobs/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  getDisputes: (params?: { page?: number; page_size?: number; status?: string }): Promise<AdminDisputesResponse> =>
+    request<AdminDisputesResponse>(`/admin/disputes${buildQS(params as Record<string, string | number | undefined> || {})}`),
+  getTransactions: (params?: { page?: number; page_size?: number; status?: string }): Promise<AdminTransactionsResponse> =>
+    request<AdminTransactionsResponse>(`/admin/transactions${buildQS(params as Record<string, string | number | undefined> || {})}`),
+  getEtfStats: (): Promise<AdminEtfStats> => request<AdminEtfStats>('/admin/etf/stats'),
+};
+
+const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi };
 export default api;
