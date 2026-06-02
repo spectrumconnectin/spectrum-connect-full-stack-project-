@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
 import NotificationBell from '@/components/NotificationBell';
 import { profile as profileApi, auth, tokenStore } from '@/lib/api';
+import { usePresence } from '@/hooks/usePresence';
 
 const navLinks = [
   { href: '/creator/dashboard',    label: 'Dashboard',     icon: 'fa-gauge-high' },

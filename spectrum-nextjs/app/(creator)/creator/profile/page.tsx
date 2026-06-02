@@ -1,4 +1,5 @@
 'use client';
+import OnlineStatusBadge from '@/components/OnlineStatusBadge';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -505,9 +506,15 @@ export default function ProfilePage() {
                 <p className="font-bold text-gray-900 capitalize">{user?.account_type}</p>
                 <p className="text-xs text-gray-500">Role</p>
               </div>
+              <div className="text-center flex flex-col items-center">
+                <div className="mb-1">
+                  <OnlineStatusBadge isOnline={user?.is_online ?? false} size="md" />
+                </div>
+                <p className="text-xs text-gray-500">{user?.is_online ? 'Online' : 'Offline'}</p>
+              </div>
               <div className="text-center">
                 <p className="font-bold text-gray-900">{user?.is_verified ? '✓ Verified' : 'Unverified'}</p>
-                <p className="text-xs text-gray-500">Status</p>
+                <p className="text-xs text-gray-500">Verification</p>
               </div>
             </div>
           </div>

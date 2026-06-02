@@ -163,6 +163,16 @@ class ProfileService:
     @staticmethod
     async def get_public_profile(user: User) -> dict:
         """Get public profile data (respecting privacy settings)"""
+        from app.models.message import UserPresence
+
+        # Get user's online status
+        is_online = False
+        try:
+            presence = await UserPresence.find_one({"user_id": str(user.id)})
+            if presence:
+                is_online = presence.is_online
+        except Exception:
+            is_online = False
 
         public_data = {
             "id": str(user.id),
@@ -170,6 +180,7 @@ class ProfileService:
             "account_type": user.account_type,
             "is_verified": user.is_verified,
             "verification_badge": user.verification_badge,
+            "is_online": is_online,
         }
 
         # Check privacy settings

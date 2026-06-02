@@ -61,6 +61,7 @@ from app.api.routers.proposals_router import router as proposals_router
 from app.api.routers.earnings_router import router as earnings_router
 from app.api.routers.portfolio_router import router as portfolio_router
 from app.api.routers.admin_router import router as admin_router
+from app.api.routers.presence_router import router as presence_router
 
 load_dotenv()
 
@@ -161,6 +162,7 @@ app.include_router(skill_challenge_router, tags=["Skill Verification Challenges"
 app.include_router(upload_router, prefix="/upload", tags=["File Upload"])
 app.include_router(proposals_router, tags=["Proposals"])
 app.include_router(earnings_router, tags=["Earnings"])
+app.include_router(presence_router, tags=["User Presence"])
 app.include_router(portfolio_router, tags=["Portfolio"])
 app.include_router(admin_router, tags=["Admin Panel"])
 

@@ -121,6 +121,8 @@ export interface MeResponse {
   account_type: string;
   user_role: string;
   is_verified: boolean;
+  is_online?: boolean;
+  last_seen?: string;
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -1484,5 +1486,17 @@ export const adminApi = {
   getEtfStats: (): Promise<AdminEtfStats> => request<AdminEtfStats>('/admin/etf/stats'),
 };
 
-const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi };
+// ── User Presence ────────────────────────────────────────────────────────────
+export const presence = {
+  setOnline: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/online`, { method: 'POST' }),
+  setOffline: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/offline`, { method: 'POST' }),
+  updateActivity: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/activity`, { method: 'POST' }),
+  getPresence: (userId: string): Promise<{ user_id: string; is_online: boolean; last_seen: string | null }> =>
+    request(`/presence/${userId}`),
+};
+
+const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi, presence };
 export default api;

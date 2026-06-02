@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import OnlineStatusBadge from '@/components/OnlineStatusBadge';
 import { useRouter } from 'next/navigation';
 import {
   profile as profileApi,
@@ -313,10 +314,15 @@ export default function ClientProfilePage() {
                 <h2 className="text-xl font-bold text-gray-900">{nameDisplay}</h2>
                 <p className="text-sm text-gray-600 capitalize">{user?.account_type ?? 'Client'}</p>
               </div>
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">
-                <i className="fa-solid fa-circle text-[8px] mr-1" />
-                {user?.is_verified ? 'Verified' : 'Online'}
-              </span>
+              <div className="flex items-center gap-2">
+                <OnlineStatusBadge isOnline={user?.is_online ?? false} showLabel />
+                {user?.is_verified && (
+                  <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">
+                    <i className="fa-solid fa-circle text-[8px] mr-1" />
+                    Verified
+                  </span>
+                )}
+              </div>
             </div>
 
             <p className="text-sm text-gray-400 mt-1">@{user?.username}</p>
