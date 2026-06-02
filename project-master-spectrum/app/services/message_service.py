@@ -151,6 +151,44 @@ class MessageService:
 
         await conversation.save()
 
+        # Create in-app notifications for all other participants
+        try:
+            from app.models.schema import Notification, NotificationChannels
+            from beanie import PydanticObjectId as _ObjId
+
+            sender = await User.get(_ObjId(sender_id))
+            sender_name = "Someone"
+            sender_avatar = None
+            if sender and sender.profile:
+                sender_name = (
+                    sender.profile.display_name
+                    or f"{sender.profile.first_name or ''} {sender.profile.last_name or ''}".strip()
+                    or sender.username
+                )
+                sender_avatar = sender.profile.profile_picture
+
+            preview = content[:80] + ("…" if len(content) > 80 else "")
+
+            for participant_id in conversation.participants:
+                if participant_id != sender_id:
+                    notif = Notification(
+                        user_id=_ObjId(participant_id),
+                        type="message",
+                        category="info",
+                        title=f"New message from {sender_name}",
+                        message=preview,
+                        action_url=f"/client/messaging?conversation={conversation_id}",
+                        action_text="Open chat",
+                        actor_id=_ObjId(sender_id),
+                        actor_name=sender_name,
+                        actor_image=sender_avatar,
+                        is_read=False,
+                        channels=NotificationChannels(in_app=True),
+                    )
+                    await notif.insert()
+        except Exception:
+            pass  # Notification failure must never block message delivery
+
         return message
 
     @staticmethod

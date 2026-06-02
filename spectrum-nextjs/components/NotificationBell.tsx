@@ -37,8 +37,8 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
+  const [prevUnread, setPrevUnread] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -52,31 +52,45 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Poll unread count every 30s
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await notifApi.getAll(1);
-        setUnread(res.unread_count);
-      } catch { /* silent */ }
-    };
-    poll();
-    const t = setInterval(poll, 30000);
-    return () => clearInterval(t);
-  }, []);
-
+  // Fetch the full notification list
   const fetchNotifications = useCallback(async () => {
-    if (fetched) return;
     setLoading(true);
     try {
       const res = await notifApi.getAll(20);
       setItems(res.notifications);
       setUnread(res.unread_count);
-      setFetched(true);
+      setPrevUnread(res.unread_count);
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [fetched]);
+  }, []);
 
+  // Poll unread count every 15s — re-fetch full list if new unread arrived
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await notifApi.getAll(1);
+        const newCount = res.unread_count;
+        setUnread(newCount);
+        // If new notifications arrived since last fetch, invalidate the list
+        if (newCount > prevUnread) {
+          setPrevUnread(newCount);
+          // If dropdown is open, refresh immediately; otherwise mark stale
+          if (open) {
+            fetchNotifications();
+          } else {
+            // Will re-fetch next time dropdown opens
+            setItems([]);
+          }
+        }
+      } catch { /* silent */ }
+    };
+    poll(); // initial load
+    const t = setInterval(poll, 15000); // poll every 15s
+    return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prevUnread]);
+
+  // When dropdown opens, always fetch fresh data
   const handleOpen = () => {
     const next = !open;
     setOpen(next);
@@ -88,6 +102,7 @@ export default function NotificationBell() {
       await notifApi.markAllRead();
       setItems(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnread(0);
+      setPrevUnread(0);
     } catch { /* silent */ }
   };
 
@@ -115,7 +130,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-96 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2">
@@ -124,21 +139,23 @@ export default function NotificationBell() {
                 <span className="text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">{unread}</span>
               )}
             </div>
-            {unread > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                className="text-xs text-cobalt font-semibold hover:underline"
-              >
-                Mark all read
+            <div className="flex items-center gap-3">
+              {unread > 0 && (
+                <button onClick={handleMarkAllRead} className="text-xs text-cobalt font-semibold hover:underline">
+                  Mark all read
+                </button>
+              )}
+              <button onClick={() => fetchNotifications()} className="text-gray-400 hover:text-gray-600 transition" title="Refresh">
+                <i className={`fa-solid fa-rotate-right text-xs ${loading ? 'animate-spin' : ''}`} />
               </button>
-            )}
+            </div>
           </div>
 
           {/* Body */}
           <div className="max-h-[420px] overflow-y-auto">
             {loading ? (
               <div className="flex justify-center py-10">
-                <div className="w-6 h-6 border-3 border-cobalt border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-cobalt border-t-transparent rounded-full animate-spin" />
               </div>
             ) : items.length === 0 ? (
               <div className="py-12 text-center">
@@ -153,7 +170,7 @@ export default function NotificationBell() {
                 {items.map(n => (
                   <div
                     key={n.id}
-                    className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 ${n.is_read ? 'opacity-70' : ''}`}
+                    className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 ${n.is_read ? 'opacity-60' : 'bg-blue-50/30'}`}
                   >
                     {/* Icon */}
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${CATEGORY_COLOR[n.category] ?? 'bg-blue-100 text-cobalt'}`}>
@@ -162,7 +179,7 @@ export default function NotificationBell() {
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm leading-snug ${n.is_read ? 'text-gray-600' : 'text-gray-900 font-medium'}`}>
+                      <p className={`text-sm leading-snug ${n.is_read ? 'text-gray-500' : 'text-gray-900 font-semibold'}`}>
                         {n.title}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
@@ -180,11 +197,11 @@ export default function NotificationBell() {
                       </div>
                     </div>
 
-                    {/* Unread dot */}
+                    {/* Unread dot — tap to mark read */}
                     {!n.is_read && (
                       <button
                         onClick={() => handleMarkOne(n.id)}
-                        className="w-2 h-2 bg-cobalt rounded-full flex-shrink-0 mt-2 hover:bg-blue-700 transition"
+                        className="w-2.5 h-2.5 bg-cobalt rounded-full flex-shrink-0 mt-1.5 hover:bg-blue-700 transition"
                         title="Mark as read"
                       />
                     )}
@@ -195,16 +212,11 @@ export default function NotificationBell() {
           </div>
 
           {/* Footer */}
-          {items.length > 0 && (
-            <div className="px-5 py-3 border-t border-gray-100 text-center">
-              <button
-                onClick={() => setOpen(false)}
-                className="text-xs text-gray-500 hover:text-cobalt font-semibold transition"
-              >
-                Close
-              </button>
-            </div>
-          )}
+          <div className="px-5 py-3 border-t border-gray-100 text-center">
+            <button onClick={() => setOpen(false)} className="text-xs text-gray-500 hover:text-cobalt font-semibold transition">
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
