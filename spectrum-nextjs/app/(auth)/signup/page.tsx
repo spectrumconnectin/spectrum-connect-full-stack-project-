@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { auth } from '@/lib/api';
+import PhoneInput from '@/components/PhoneInput';
 
 const IconGoogle = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -367,11 +368,13 @@ export default function SignUpPage() {
               </div>
 
               <div className="field">
-                <label htmlFor="phone">Phone number <span style={{ color: '#9ca3af', fontWeight: 400 }}>(E.164 format)</span></label>
-                <input id="phone" className={`input${errors.phone ? ' invalid' : ''}`}
-                  type="tel" placeholder="+12025551234" value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  onBlur={() => setTouched(t => ({ ...t, phone: true }))} />
+                <label htmlFor="phone">Phone number</label>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  onBlur={() => setTouched(t => ({ ...t, phone: true }))}
+                  error={errors.phone}
+                />
                 {errors.phone && <div className="help error">{errors.phone}</div>}
               </div>
 
