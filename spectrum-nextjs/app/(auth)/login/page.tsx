@@ -77,7 +77,7 @@ export default function LoginPage() {
     if (!formValid) return;
     setSubmitting(true);
     try {
-      await auth.login(email, password);
+      await auth.login(email, password, remember);
       // Fetch actual account_type from server — don't rely on the UI toggle
       const me = await auth.me();
       // Map backend values: producer/both → client, crew → creator

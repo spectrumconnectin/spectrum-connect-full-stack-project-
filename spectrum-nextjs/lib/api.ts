@@ -2,9 +2,12 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
 // ── Token helpers ────────────────────────────────────────────────────────────
 const COOKIE_NAME = 'spectrum_token';
+const REMEMBER_ME_KEY = 'spectrum_remember_me';
 
-function setCookie(token: string) {
-  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+function setCookie(token: string, rememberMe: boolean = false) {
+  // 30 days if "Remember me" is checked, otherwise 7 days
+  const daysToExpire = rememberMe ? 30 : 7;
+  const expires = new Date(Date.now() + daysToExpire * 24 * 60 * 60 * 1000).toUTCString();
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
@@ -23,12 +26,22 @@ export const tokenStore = {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(COOKIE_NAME) || getCookie();
   },
-  set: (token: string) => {
+  set: (token: string, rememberMe: boolean = false) => {
     localStorage.setItem(COOKIE_NAME, token);
-    setCookie(token);
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_ME_KEY, 'true');
+    } else {
+      localStorage.removeItem(REMEMBER_ME_KEY);
+    }
+    setCookie(token, rememberMe);
+  },
+  isRemembered: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
   },
   clear: () => {
     localStorage.removeItem(COOKIE_NAME);
+    localStorage.removeItem(REMEMBER_ME_KEY);
     clearCookie();
   },
 };
@@ -142,7 +155,7 @@ export interface MeResponse {
 
 // ── Authentication ───────────────────────────────────────────────────────────
 export const auth = {
-  login: async (email: string, password: string): Promise<LoginResponse> => {
+  login: async (email: string, password: string, rememberMe: boolean = false): Promise<LoginResponse> => {
     const form = new URLSearchParams();
     form.append('username', email);
     form.append('password', password);
@@ -151,7 +164,7 @@ export const auth = {
       body: form.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     }, false);
-    tokenStore.set(data.access_token);
+    tokenStore.set(data.access_token, rememberMe);
     return data;
   },
 
