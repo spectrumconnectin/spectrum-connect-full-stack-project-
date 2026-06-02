@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import CookieBanner from "@/components/CookieBanner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Spectrum Connect",
@@ -27,6 +28,8 @@ export default function RootLayout({
             anywhere on the site. Re-openable via the footer "Cookie settings"
             link or the /cookies page. */}
         <CookieBanner />
+        {/* Vercel Speed Insights — collects Web Vitals metrics for performance monitoring */}
+        <SpeedInsights />
       </body>
     </html>
   );
