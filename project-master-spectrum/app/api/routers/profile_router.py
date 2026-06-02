@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from typing import Optional
 
 from app.models.schema import User
+from app.models.message import UserPresence
 from app.auth.auth import get_current_user
 from app.services.profile_service import ProfileService
 from app.api.schemas.profile_schemas import (
@@ -47,8 +48,6 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     Returns:
         - Full user profile including settings, stats, and all personal information
     """
-    from app.models.message import UserPresence
-
     user_dict = current_user.model_dump()
     user_dict['id'] = str(current_user.id)
 
