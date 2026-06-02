@@ -10,8 +10,8 @@ Endpoints:
 - GET /presence/{user_id} — Get presence info for a specific user
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from app.core.security import get_current_user
+from fastapi import APIRouter, Depends
+from app.auth.auth import get_current_user
 from app.models.schema import User
 from app.services.presence_service import PresenceService
 
