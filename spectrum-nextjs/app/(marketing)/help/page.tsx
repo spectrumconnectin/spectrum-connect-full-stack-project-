@@ -115,7 +115,7 @@ export default function HelpPage() {
           <h2 style={{ fontSize: 28, fontWeight: 700, color: '#111827', margin: '0 0 12px' }}>Still have questions?</h2>
           <p style={{ fontSize: 15, color: '#6b7280', marginBottom: 28, lineHeight: 1.6 }}>Our support team is available Monday–Friday, 9am–6pm EST. We typically reply within a few hours.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="mailto:support@spectrumconnect.co" style={{ padding: '12px 24px', background: '#195ad7', color: '#fff', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+            <a href="mailto:team.spectrumstudios@gmail.com" style={{ padding: '12px 24px', background: '#195ad7', color: '#fff', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
               <i className="fa-solid fa-envelope mr-2"></i>Email Support
             </a>
             <a href="#" style={{ padding: '12px 24px', background: '#fff', color: '#195ad7', border: '1px solid #195ad7', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>

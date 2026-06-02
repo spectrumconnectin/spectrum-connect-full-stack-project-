@@ -307,7 +307,7 @@ export default function ClientDisputesPage() {
                       {d.resolved_at && <p><span className="font-semibold">Resolved:</span> {formatDate(d.resolved_at)}</p>}
                       <p className="pt-2 text-gray-400 text-xs">
                         For urgent escalation contact{' '}
-                        <a href="mailto:disputes@spectrumconnect.com" className="text-cobalt underline">disputes@spectrumconnect.com</a>
+                        <a href="mailto:team.spectrumstudios@gmail.com" className="text-cobalt underline">team.spectrumstudios@gmail.com</a>
                       </p>
                     </div>
                   )}

@@ -19,7 +19,7 @@ export default function GdprPage() {
           correct it, ask us to delete it, or tell us to stop using it for certain things.
           Most of this is one click from your settings page. If something doesn&apos;t fit in
           the product, email{' '}
-          <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>{' '}
+          <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>{' '}
           and we&apos;ll handle the rest within 30 days.
         </>
       }
@@ -50,7 +50,7 @@ export default function GdprPage() {
         You can ask for a copy of the personal data we hold about you. The fastest way is the
         &ldquo;Download my data&rdquo; button in your account settings. It produces a JSON or
         CSV export. If you need a different format or there&apos;s data you can&apos;t see in
-        the export, email <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.
+        the export, email <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.
       </p>
 
       <h3>Right to rectification</h3>
@@ -146,7 +146,7 @@ export default function GdprPage() {
         We&apos;re a US company with infrastructure in India. We use the European
         Commission&apos;s Standard Contractual Clauses and equivalent UK mechanisms to make
         cross-border transfers lawful. If you&apos;d like a copy of the SCCs, email{' '}
-        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.
       </p>
 
       <h2>6. Our Data Protection Officer</h2>
@@ -164,9 +164,9 @@ export default function GdprPage() {
       <h2>8. Contact summary</h2>
       <p>
         For any data-rights request:{' '}
-        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.<br />
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.<br />
         For a security or breach disclosure:{' '}
-        <a href="mailto:security@spectrumconnect.co">security@spectrumconnect.co</a>.
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.
       </p>
     </LegalPage>
   );

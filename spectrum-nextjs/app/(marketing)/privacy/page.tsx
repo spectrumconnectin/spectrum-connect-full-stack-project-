@@ -26,7 +26,7 @@ export default function PrivacyPage() {
         purposes of GDPR, UK GDPR, and similar laws. We&apos;re based at 340 Pine Street, Suite
         800, San Francisco, CA 94104, USA. If you&apos;d rather talk to someone specifically
         about data protection, our Data Protection contact is{' '}
-        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.
       </p>
 
       <h2>2. What we collect</h2>
@@ -149,7 +149,7 @@ export default function PrivacyPage() {
       </ul>
       <p>
         To exercise any of these rights, email{' '}
-        <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a> from the
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a> from the
         address linked to your account, or use the in-product Data Rights tools (see our{' '}
         <a href="/gdpr">GDPR &amp; Data Rights</a> page). We respond within 30 days, faster
         when we can.
@@ -161,7 +161,7 @@ export default function PrivacyPage() {
         data. Access to production systems is on a need-to-know basis with logging. Passwords
         are hashed with bcrypt. We run regular dependency scans, security reviews, and we
         publish a responsible-disclosure address at{' '}
-        <a href="mailto:security@spectrumconnect.co">security@spectrumconnect.co</a> for
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a> for
         researchers.
       </p>
       <p>
@@ -196,8 +196,8 @@ export default function PrivacyPage() {
 
       <h2>13. Contact</h2>
       <p>
-        For privacy questions: <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a>.<br />
-        For everything else: <a href="mailto:support@spectrumconnect.co">support@spectrumconnect.co</a>.<br />
+        For privacy questions: <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.<br />
+        For everything else: <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.<br />
         By post: Spectrum Connect, Inc., Data Privacy Officer, 340 Pine Street, Suite 800, San
         Francisco, CA 94104, USA.
       </p>

@@ -108,7 +108,7 @@ export default function CookiesPage() {
 
       <h2>7. Questions</h2>
       <p>
-        Email <a href="mailto:privacy@spectrumconnect.co">privacy@spectrumconnect.co</a> and
+        Email <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a> and
         we&apos;ll get back to you.
       </p>
     </LegalPage>
