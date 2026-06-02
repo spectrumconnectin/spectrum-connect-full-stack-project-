@@ -47,8 +47,20 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     Returns:
         - Full user profile including settings, stats, and all personal information
     """
+    from app.models.message import UserPresence
+
     user_dict = current_user.model_dump()
     user_dict['id'] = str(current_user.id)
+
+    # Add online status
+    try:
+        presence = await UserPresence.find_one({"user_id": str(current_user.id)})
+        if presence:
+            user_dict['is_online'] = presence.is_online
+            user_dict['last_seen'] = presence.last_seen.isoformat() if presence.last_seen else None
+    except Exception:
+        user_dict['is_online'] = False
+
     return user_dict
 
 
