@@ -133,11 +133,19 @@ async def verify_otp(
 async def google_login():
     """
     Redirects to Google's authorization page.
+    Constructs URL directly to avoid httpx_oauth making blocking outbound calls.
     """
-    authorize_request_url = await google_oauth_client.get_authorization_url(
-        redirect_uri=google_oauth_client.redirect_uri
-    )
-    return RedirectResponse(authorize_request_url)
+    from urllib.parse import urlencode
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+    return RedirectResponse(url)
 
 @router.post("/register", response_model=UserRead, summary="Register new user")
 async def register_user(
