@@ -215,13 +215,27 @@ class EtfPointsService:
                 balance_doc = EtfPoints(user_id=uid)
                 await balance_doc.insert()
 
+            old_level = balance_doc.level or "bronze"
             balance_doc.balance += amount
             balance_doc.lifetime_points += amount
 
             # Recompute cached level.
-            balance_doc.level = level_for(balance_doc.lifetime_points).name
+            new_level = level_for(balance_doc.lifetime_points).name
+            balance_doc.level = new_level
             balance_doc.updated_at = datetime.utcnow()
             await balance_doc.save()
+
+            # Notify user if they leveled up
+            if new_level != old_level and new_level != "bronze":
+                try:
+                    from app.services.notification_service import NotificationService
+                    await NotificationService.etf_level_up(
+                        user_id=str(uid),
+                        old_level=old_level,
+                        new_level=new_level,
+                    )
+                except Exception:
+                    pass
 
             # Append the event.
             event = EtfEvent(

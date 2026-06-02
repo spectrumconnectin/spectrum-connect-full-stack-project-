@@ -92,6 +92,18 @@ async def submit_proposal(
     job.proposal_count = (job.proposal_count or 0) + 1
     await job.save()
 
+    # Notify the client that a new application arrived
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.proposal_received(
+            client_id=str(job.client_id),
+            creator_id=str(current_user.id),
+            job_title=job.title,
+            job_id=job_id,
+        )
+    except Exception:
+        pass
+
     return {"id": str(app.id), "status": app.status, "job_id": job_id}
 
 
@@ -209,6 +221,25 @@ async def update_proposal_status(
     app.status = data.status
     await app.save()
 
+    # Notify creator of the decision
+    try:
+        from app.services.notification_service import NotificationService
+        if data.status == "accepted":
+            await NotificationService.proposal_accepted(
+                creator_id=str(app.crew_id),
+                client_id=str(current_user.id),
+                job_title=job.title,
+                job_id=str(job.id),
+            )
+        elif data.status == "rejected":
+            await NotificationService.proposal_rejected(
+                creator_id=str(app.crew_id),
+                client_id=str(current_user.id),
+                job_title=job.title,
+            )
+    except Exception:
+        pass
+
     return {"id": str(app.id), "status": app.status}
 
 
@@ -281,5 +312,17 @@ async def rate_proposal(
         new_count = old_count + 1
         new_rating = round((old_rating * old_count + overall) / new_count, 2)
         await creator.update({"$set": {"rating": new_rating, "review_count": new_count}})
+
+    # Notify creator they received a review
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.review_received(
+            user_id=str(app.crew_id),
+            reviewer_id=str(current_user.id),
+            rating=overall,
+            job_title=job.title,
+        )
+    except Exception:
+        pass
 
     return {"success": True, "message": "Review submitted successfully", "overall": overall}

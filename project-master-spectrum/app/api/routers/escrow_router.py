@@ -159,6 +159,24 @@ async def fund_milestone(
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
     )
+    # Notify creator that milestone funds are ready
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.escrow import EscrowTransaction
+        escrow = await EscrowTransaction.get(escrow_id)
+        if escrow:
+            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
+            m_title = milestone.title if milestone else "Milestone"
+            m_amount = float(milestone.amount) if milestone else 0.0
+            await NotificationService.milestone_funded(
+                creator_id=str(escrow.creator_id),
+                client_id=str(current_user.id),
+                milestone_title=m_title,
+                amount=m_amount,
+                escrow_id=escrow_id,
+            )
+    except Exception:
+        pass
     return result
 
 
@@ -185,6 +203,29 @@ async def release_milestone(
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
     )
+    # Notify creator of released payment + confirm to client
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.escrow import EscrowTransaction
+        escrow = await EscrowTransaction.get(escrow_id)
+        if escrow:
+            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
+            m_title = milestone.title if milestone else "Milestone"
+            m_amount = float(milestone.amount) if milestone else 0.0
+            await NotificationService.milestone_released(
+                creator_id=str(escrow.creator_id),
+                client_id=str(current_user.id),
+                milestone_title=m_title,
+                amount=m_amount,
+            )
+            await NotificationService.payment_released_client(
+                client_id=str(current_user.id),
+                creator_id=str(escrow.creator_id),
+                milestone_title=m_title,
+                amount=m_amount,
+            )
+    except Exception:
+        pass
     return result
 
 
@@ -237,6 +278,21 @@ async def create_dispute(
         details=request.details,
         milestone_id=request.milestone_id,
     )
+    # Notify the other party
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.escrow import EscrowTransaction
+        escrow = await EscrowTransaction.get(request.escrow_id)
+        if escrow:
+            other_id = str(escrow.creator_id) if str(escrow.client_id) == str(current_user.id) else str(escrow.client_id)
+            await NotificationService.dispute_opened(
+                other_user_id=other_id,
+                opener_id=str(current_user.id),
+                reason=request.reason or "No reason provided",
+                escrow_id=request.escrow_id,
+            )
+    except Exception:
+        pass
     return result
 
 
@@ -396,4 +452,21 @@ async def resolve_dispute(
         resolution_notes=request.resolution_notes,
         resolution_amount=request.resolution_amount,
     )
+    # Notify both parties of the resolution
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.escrow import DisputeCase, EscrowTransaction
+        dispute = await DisputeCase.get(dispute_id)
+        if dispute:
+            escrow = await EscrowTransaction.get(str(dispute.escrow_id))
+            outcome = request.resolution_type.replace("_", " ").title()
+            if escrow:
+                for uid in [str(escrow.client_id), str(escrow.creator_id)]:
+                    await NotificationService.dispute_resolved(
+                        user_id=uid,
+                        outcome=outcome,
+                        escrow_id=str(escrow.id),
+                    )
+    except Exception:
+        pass
     return result
