@@ -18,7 +18,7 @@ from app.models.message import UserPresence
 class PresenceService:
     """Manage user presence (online/offline status)"""
 
-    OFFLINE_TIMEOUT = 5  # Minutes - mark user as offline if no activity for 5 minutes
+    OFFLINE_TIMEOUT = 2  # Minutes - mark user as offline if no activity for 2 minutes
 
     @staticmethod
     async def set_online(user_id: str) -> None:

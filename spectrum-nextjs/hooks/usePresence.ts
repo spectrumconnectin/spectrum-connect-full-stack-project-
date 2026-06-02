@@ -26,12 +26,12 @@ export function usePresence() {
       // Silently fail - presence tracking is not critical
     });
 
-    // Update activity every 2 minutes to keep user marked as online
+    // Update activity every 1 minute to keep user marked as online
     const activityInterval = setInterval(() => {
       presence.updateActivity().catch(() => {
         // Silently fail
       });
-    }, 2 * 60 * 1000);
+    }, 60 * 1000);
 
     // Mark user as offline when leaving the page or tab is hidden
     const handleBeforeUnload = () => {
