@@ -416,27 +416,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ COMMUNITY STATS ═══ */}
-      <section style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #7c3aed 100%)', padding: '70px 24px', color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <h2 className="mk-reveal" style={{ fontSize: 32, fontWeight: 800, textAlign: 'center', margin: '0 0 48px', letterSpacing: '-0.02em' }}>Join a Thriving Creative Community</h2>
-          <div className="mk-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 32, textAlign: 'center' }}>
-            {[
-              { v: '15K+', l: 'Active Creators' },
-              { v: '12K+', l: 'Projects Posted' },
-              { v: '8K+', l: 'Teams Formed' },
-              { v: '6K+', l: 'Clients Hiring' },
-            ].map(s => (
-              <div key={s.l}>
-                <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>{s.v}</div>
-                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', marginTop: 8, fontWeight: 500 }}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ EVERYTHING IN ONE PLACE ═══ */}
+{/* ═══ EVERYTHING IN ONE PLACE ═══ */}
       <section style={{ padding: '90px 24px', background: '#f8fafc' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div className="mk-reveal" style={{ textAlign: 'center', marginBottom: 56 }}>
