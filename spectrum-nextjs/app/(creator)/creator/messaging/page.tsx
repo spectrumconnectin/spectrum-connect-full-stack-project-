@@ -192,9 +192,9 @@ function CreatorMessagingPageInner() {
   const other = selectedConvo && myId ? otherOf(selectedConvo, myId) : selectedConvo?.participants[0];
 
   return (
-    <div className="h-[calc(100vh-64px-2rem)] flex -m-8 overflow-hidden">
-      {/* Conversations list */}
-      <section className="w-80 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+    <div className="msg-layout h-[calc(100vh-64px-2rem)] flex -m-8 overflow-hidden">
+      {/* Conversations list — hidden on mobile when chat open */}
+      <section className={`msg-sidebar w-80 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col ${selectedConvo ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Messaging</h1>
           <div className="relative mb-3">
@@ -259,8 +259,8 @@ function CreatorMessagingPageInner() {
         </div>
       </section>
 
-      {/* Chat area */}
-      <section className="flex-1 flex flex-col min-w-0">
+      {/* Chat area — hidden on mobile when no convo selected */}
+      <section className={`msg-chat flex-1 flex flex-col min-w-0 ${!selectedConvo ? 'hidden md:flex' : 'flex'}`}>
         {!selectedConvo ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-gray-50">
             <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
@@ -271,9 +271,13 @@ function CreatorMessagingPageInner() {
           </div>
         ) : (
           <>
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 p-5 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+            {/* Header — back button on mobile */}
+            <div className="bg-white border-b border-gray-200 p-4 md:p-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSelectedId(null)}
+                  className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:bg-gray-100 transition -ml-1">
+                  <i className="fa-solid fa-arrow-left" />
+                </button>
                 <div className="relative">
                   <Avatar url={other?.avatar_url} name={displayName(other)} size={12} />
                   {other?.is_online && (
@@ -364,7 +368,7 @@ function CreatorMessagingPageInner() {
       </section>
 
       {/* Context panel */}
-      <section className="w-72 bg-white border-l border-gray-200 p-6 flex-shrink-0 overflow-y-auto">
+      <section className="msg-info w-72 bg-white border-l border-gray-200 p-6 flex-shrink-0 overflow-y-auto hidden lg:block">
         {selectedConvo ? (
           <div className="space-y-6">
             {selectedConvo.job_title && (

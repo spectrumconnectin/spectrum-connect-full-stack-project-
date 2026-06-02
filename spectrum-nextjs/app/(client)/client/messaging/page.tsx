@@ -188,9 +188,9 @@ function ClientMessagingPageInner() {
     : convos;
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
-      {/* Conversation list */}
-      <div className="w-80 border-r border-gray-200 flex flex-col flex-shrink-0">
+    <div className="msg-layout h-[calc(100vh-8rem)] flex rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+      {/* Conversation list — hidden on mobile when a chat is open */}
+      <div className={`msg-sidebar w-80 border-r border-gray-200 flex flex-col flex-shrink-0 ${selectedId ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900 mb-3">Messages</h2>
           <div className="relative">
@@ -246,8 +246,8 @@ function ClientMessagingPageInner() {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Chat area — hidden on mobile when no convo selected */}
+      <div className={`msg-chat flex-1 flex flex-col min-w-0 ${!selectedId ? 'hidden md:flex' : 'flex'}`}>
         {!selectedConvo ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-gray-50">
             <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
@@ -258,8 +258,12 @@ function ClientMessagingPageInner() {
           </div>
         ) : (
           <>
-            {/* Chat header */}
-            <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white">
+            {/* Chat header — back button on mobile */}
+            <div className="flex items-center gap-3 px-4 md:px-6 py-4 border-b border-gray-200 bg-white">
+              <button onClick={() => setSelectedId(null)}
+                className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl text-gray-500 hover:bg-gray-100 transition -ml-1">
+                <i className="fa-solid fa-arrow-left" />
+              </button>
               <div className="relative">
                 <Avatar url={other?.avatar_url} name={displayName(other)} size="lg" />
                 {other?.is_online && (

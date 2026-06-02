@@ -412,17 +412,17 @@ export default function CreateProjectPage() {
         )}
 
         {/* ── Submit ── */}
-        <div className="flex items-center justify-between pt-4 pb-8">
+        <div className="project-submit-row flex flex-wrap items-center justify-between gap-3 pt-4 pb-8">
           <Link href="/client/projects" className="px-6 py-3 text-gray-600 font-semibold hover:text-gray-900 transition">
             Cancel
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'draft'; setPublishDraft('draft'); }}
               className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
               {submitting && publishDraft === 'draft' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Saving…</> : 'Save as Draft'}
             </button>
             <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'open'; setPublishDraft('open'); }}
-              className="bg-cobalt text-white px-10 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
+              className="bg-cobalt text-white px-8 py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 transition shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
               {submitting && publishDraft === 'open' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Publishing…</> : 'Publish Project'}
             </button>
           </div>

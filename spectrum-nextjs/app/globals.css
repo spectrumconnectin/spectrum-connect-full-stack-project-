@@ -1287,3 +1287,243 @@ body { overflow-x: hidden; }
     padding: 0;
   }
 }
+
+/* ── Marketing Nav — Mobile ───────────────────────────────────────────────── */
+
+/* Hide desktop links/CTA on mobile */
+@media (max-width: 767px) {
+  .nav-links { display: none !important; }
+  .nav-cta   { display: none !important; }
+}
+
+/* Hamburger button — visible only on mobile */
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.nav-hamburger:hover { background: rgba(0,0,0,0.06); }
+@media (max-width: 767px) { .nav-hamburger { display: flex; } }
+
+.nav-ham-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #1f2937;
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.nav-ham-bar.open:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-ham-bar.open:nth-child(2) { opacity: 0; }
+.nav-ham-bar.open:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile overlay */
+.nav-mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0,0,0,0.45);
+  animation: scBackdropIn 0.15s ease forwards;
+}
+
+/* Mobile drawer */
+.nav-mobile-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(320px, 88vw);
+  height: 100%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  animation: navDrawerIn 0.22s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+@keyframes navDrawerIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.nav-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.nav-mobile-close {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: #6b7280;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-mobile-close:hover { background: #f3f4f6; color: #111827; }
+
+.nav-mobile-links {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-mobile-link {
+  display: block;
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #374151;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-mobile-link:hover, .nav-mobile-link.active {
+  background: #eff6ff;
+  color: #195ad7;
+}
+
+.nav-mobile-cta {
+  padding: 16px 20px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nav-mobile-login {
+  display: block;
+  text-align: center;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.nav-mobile-login:hover { background: #f9fafb; }
+
+/* ── Homepage — Mobile Responsive Overrides ───────────────────────────────── */
+
+/* Hero: stack to single column on mobile */
+@media (max-width: 767px) {
+  .hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+  /* Hide the floating hero cards on mobile — they overflow at fixed positions */
+  .hero-stage { display: none !important; }
+
+  /* Hero section padding */
+  section:has(.hero-grid) {
+    padding: 48px 20px 56px !important;
+  }
+}
+
+/* All mk-stagger grids: 1 col mobile → 2 col tablet → original on desktop */
+@media (max-width: 639px) {
+  .mk-stagger {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .mk-stagger {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Trust/feature section inline grid overrides */
+@media (max-width: 639px) {
+  .home-card {
+    padding: 20px !important;
+  }
+}
+
+/* ── Auth pages — Mobile ──────────────────────────────────────────────────── */
+
+/* Hide the brand panel on mobile, show full-width form */
+@media (max-width: 767px) {
+  .brand { display: none !important; }
+  .right { width: 100% !important; min-height: 100vh; }
+  .page  { flex-direction: column !important; }
+  .main  { width: 100% !important; padding: 24px 20px !important; }
+}
+
+/* ── Messaging — Mobile split-panel fix ───────────────────────────────────── */
+
+/* On mobile: hide the conversation list when a chat is open,
+   show it when no chat is selected. Controlled via data attribute. */
+@media (max-width: 767px) {
+  .msg-layout {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: calc(100vh - 140px);
+  }
+  /* Conversation sidebar: full width, fixed height on mobile */
+  .msg-sidebar {
+    width: 100% !important;
+    min-width: unset !important;
+    max-width: unset !important;
+    height: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  /* Chat panel */
+  .msg-chat {
+    flex: 1;
+    width: 100% !important;
+  }
+  /* Right info panel — hide on mobile */
+  .msg-info { display: none !important; }
+}
+
+/* ── Create Project form — mobile submit row ──────────────────────────────── */
+@media (max-width: 639px) {
+  .project-submit-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .project-submit-row a,
+  .project-submit-row button {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* ── Smart Connect sidebar fix on mobile ──────────────────────────────────── */
+@media (max-width: 1023px) {
+  /* Smart connect sidebar should not be sticky on mobile */
+  .sc-sidebar-sticky {
+    position: static !important;
+  }
+}
+
+/* ── General mobile quality-of-life ──────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Minimum touch target size */
+  button, a[href], [role="button"] {
+    min-height: 44px;
+  }
+  /* Prevent text overflow in cards */
+  .home-card h3, .home-card p {
+    word-break: break-word;
+  }
+  /* Section padding on mobile */
+  section {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+}
