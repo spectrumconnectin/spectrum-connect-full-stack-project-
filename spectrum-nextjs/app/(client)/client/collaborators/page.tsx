@@ -91,12 +91,24 @@ export default function CollaboratorsPage() {
             </button>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {ROLES.map(r => (
+            {/* Top 6 popular roles as quick chips */}
+            {['All Roles', 'Video Editor', 'Graphic Designer', 'Motion Designer', 'Copywriter', 'Animator'].map(r => (
               <button key={r} onClick={() => setRoleFilter(r)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${roleFilter === r ? 'bg-cobalt text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${roleFilter === r ? 'bg-cobalt text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                 {r}
               </button>
             ))}
+            {/* Dropdown for all other roles */}
+            <select
+              value={ROLES.slice(7).includes(roleFilter) ? roleFilter : ''}
+              onChange={e => e.target.value && setRoleFilter(e.target.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium border transition cursor-pointer ${ROLES.slice(7).includes(roleFilter) ? 'bg-cobalt text-white border-cobalt' : 'bg-gray-100 text-gray-600 border-gray-100 hover:bg-gray-200'}`}
+            >
+              <option value="">More roles…</option>
+              {ROLES.slice(7).map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
