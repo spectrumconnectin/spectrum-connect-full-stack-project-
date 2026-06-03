@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { aiChat } from '@/lib/api';
 
 type Message = {
   id: number;

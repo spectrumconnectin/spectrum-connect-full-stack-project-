@@ -1451,13 +1451,13 @@ export interface AdminUser {
 
 export interface AdminUsersResponse { total: number; page: number; page_size: number; has_more: boolean; users: AdminUser[] }
 
-export interface AdminJob { id: string; title: string; status: string; client_id: string; department: string; proposal_count: number; created_at: string }
+export interface AdminJob { id: string; title: string; status: string; client_id: string; department: string; proposal_count: number; created_at: string; published_at?: string }
 export interface AdminJobsResponse { total: number; page: number; page_size: number; has_more: boolean; jobs: AdminJob[] }
 
 export interface AdminDispute { id: string; escrow_id?: string; status: string; reason?: string; opened_by?: string; created_at: string }
 export interface AdminDisputesResponse { total: number; page: number; page_size: number; has_more: boolean; disputes: AdminDispute[] }
 
-export interface AdminTransaction { id: string; status: string; amount: number; currency: string; platform_fee: number; client_id?: string; creator_id?: string; created_at: string }
+export interface AdminTransaction { id: string; status: string; type?: string; amount: number; currency: string; platform_fee: number; client_id?: string; creator_id?: string; created_at: string }
 export interface AdminTransactionsResponse { total: number; page: number; page_size: number; has_more: boolean; transactions: AdminTransaction[] }
 
 export interface AdminEtfStats { total_accounts: number; total_lifetime_points: number; total_redeemed_points: number; level_breakdown: Record<string, number> }
@@ -1500,3 +1500,9 @@ export const presence = {
 
 const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi, presence };
 export default api;
+
+// ── AI Assistant ─────────────────────────────────────────────────────────────
+export const aiChat = {
+  send: (messages: Array<{ role: string; content: string }>): Promise<{ response: string }> =>
+    request('/ai/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
+};

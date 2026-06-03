@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { aiChat } from '@/lib/api';
 
 type Message = {
   id: string;
@@ -63,17 +64,28 @@ export default function AIAssistantPage() {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
-    // TODO: POST /ai/chat { message: content, conversation_history: messages }
-    await new Promise(r => setTimeout(r, 1200 + Math.random() * 600));
-
-    const aiMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: getMockResponse(content),
-      timestamp: new Date(),
-    };
-    setMessages(prev => [...prev, aiMsg]);
-    setLoading(false);
+    try {
+      const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+      const res = await aiChat.send(history);
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: res.response,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch {
+      // Fallback to local response if API unavailable
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: getMockResponse(content),
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMsg]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
