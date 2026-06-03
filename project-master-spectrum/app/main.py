@@ -29,6 +29,7 @@ from app.models.etf_points import EtfPoints, EtfEvent
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
+from app.models.smart_connect_history import SmartConnectHistory
 from app.auth.router import router as auth_router
 from app.api.routers.job_router import router as job_router
 from app.api.routers.client_dashboard import router as client_dashboard_router
@@ -199,6 +200,7 @@ async def startup_db_client():
                 ReviewQueue,
                 Escrow, Dispute, GuaranteeFund,
                 SkillChallenge, ChallengeSubmission, SkillBadge,
+                SmartConnectHistory,
             ],
         )
         logger.info("Beanie initialized successfully")

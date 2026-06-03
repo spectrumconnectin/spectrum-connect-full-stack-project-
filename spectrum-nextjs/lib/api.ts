@@ -1432,7 +1432,33 @@ export const smartConnect = {
       method: 'PATCH',
       body: JSON.stringify({ capacity }),
     }),
+
+  recordHistory: (data: {
+    match_title: string;
+    match_subtitle?: string;
+    match_avatar?: string;
+    match_score?: number;
+    match_user_id?: string;
+    match_job_id?: string;
+    action: 'applied' | 'invited' | 'saved' | 'messaged';
+  }): Promise<{ success: boolean }> =>
+    request('/smart-connect/history/record', { method: 'POST', body: JSON.stringify(data) }),
+
+  getHistory: (): Promise<{ history: MatchHistoryItem[] }> =>
+    request('/smart-connect/history'),
 };
+
+export interface MatchHistoryItem {
+  id: string;
+  match_title: string;
+  match_subtitle?: string;
+  match_avatar?: string;
+  match_score?: number;
+  match_user_id?: string;
+  match_job_id?: string;
+  action: string;
+  created_at: string;
+}
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 

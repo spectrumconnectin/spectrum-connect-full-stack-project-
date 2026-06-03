@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { smartConnect, CreatorSmartMatch } from '@/lib/api';
+import { smartConnect, CreatorSmartMatch, MatchHistoryItem } from '@/lib/api';
 
 function formatBudget(type?: string, min?: number, max?: number): string | null {
   if (!type) return null;
@@ -39,7 +39,9 @@ export default function CreatorSmartConnectPage() {
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [capacitySaved, setCapacitySaved] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<'all' | 'saved'>('all');
+  const [filter, setFilter] = useState<'all' | 'saved' | 'history'>('all');
+  const [history, setHistory] = useState<MatchHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -55,10 +57,33 @@ export default function CreatorSmartConnectPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (filter === 'history' && history.length === 0) {
+      setHistoryLoading(true);
+      smartConnect.getHistory()
+        .then(res => setHistory(res.history))
+        .catch(() => {})
+        .finally(() => setHistoryLoading(false));
+    }
+  }, [filter, history.length]);
+
   const toggleSave = (id: string) => {
     setSavedIds(prev => {
       const next = new Set(prev);
+      const isNowSaving = !next.has(id);
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      if (isNowSaving) {
+        const m = matches.find(x => x.id === id);
+        if (m) {
+          smartConnect.recordHistory({
+            match_title: m.title,
+            match_subtitle: m.tags?.[0],
+            match_score: m.match_percent,
+            match_job_id: m.id,
+            action: 'saved',
+          }).catch(() => {});
+        }
+      }
       return next;
     });
     smartConnect.save(id).catch(() => {});
@@ -145,12 +170,19 @@ export default function CreatorSmartConnectPage() {
               )}
             </div>
             <div className="flex gap-2">
-              {(['all', 'saved'] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)}
+              {([
+                { key: 'all', label: 'All Matches' },
+                { key: 'saved', label: 'Saved' },
+                { key: 'history', label: 'History' },
+              ] as const).map(({ key, label }) => (
+                <button key={key} onClick={() => setFilter(key)}
                   className={`px-4 py-2 text-sm font-semibold rounded-xl transition ${
-                    filter === f ? 'bg-cobalt text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    filter === key ? 'bg-cobalt text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}>
-                  {f === 'all' ? 'All Matches' : 'Saved'}
+                  {label}
+                  {key === 'history' && history.length > 0 && (
+                    <span className="ml-1.5 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">{history.length}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -170,6 +202,82 @@ export default function CreatorSmartConnectPage() {
                 Try Again
               </button>
             </div>
+          ) : filter === 'history' ? (
+            /* ── History Tab ── */
+            historyLoading ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+                <p className="text-gray-500 text-sm">Loading history…</p>
+              </div>
+            ) : history.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
+                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <i className="fa-solid fa-clock-rotate-left text-gray-400 text-2xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">No history yet</h3>
+                <p className="text-gray-500 text-sm">When you apply to a matched project, it will appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history.map(h => {
+                  const actionColor: Record<string, string> = {
+                    applied: 'bg-green-100 text-green-700',
+                    saved: 'bg-blue-100 text-blue-700',
+                    messaged: 'bg-purple-100 text-purple-700',
+                    invited: 'bg-amber-100 text-amber-700',
+                  };
+                  const actionIcon: Record<string, string> = {
+                    applied: 'fa-paper-plane',
+                    saved: 'fa-bookmark',
+                    messaged: 'fa-comment',
+                    invited: 'fa-user-plus',
+                  };
+                  const timeAgoStr = (() => {
+                    const ms = Date.now() - new Date(h.created_at).getTime();
+                    const m = Math.floor(ms / 60000);
+                    if (m < 60) return `${m}m ago`;
+                    const hr = Math.floor(m / 60);
+                    if (hr < 24) return `${hr}h ago`;
+                    return `${Math.floor(hr / 24)}d ago`;
+                  })();
+                  return (
+                    <div key={h.id} className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center gap-4 hover:border-gray-300 transition">
+                      {/* Avatar / icon */}
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {h.match_avatar
+                          ? <img src={h.match_avatar} alt="" className="w-full h-full object-cover" />
+                          : <i className="fa-solid fa-briefcase text-cobalt text-lg"></i>}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{h.match_title}</p>
+                        {h.match_subtitle && <p className="text-sm text-gray-500 truncate">{h.match_subtitle}</p>}
+                      </div>
+                      {/* Match score */}
+                      {h.match_score && (
+                        <span className="hidden sm:inline text-xs font-bold px-2 py-1 rounded-full bg-blue-50 text-cobalt flex-shrink-0">
+                          {h.match_score}% match
+                        </span>
+                      )}
+                      {/* Action badge */}
+                      <span className={`text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1 flex-shrink-0 ${actionColor[h.action] ?? 'bg-gray-100 text-gray-600'}`}>
+                        <i className={`fa-solid ${actionIcon[h.action] ?? 'fa-circle'} text-xs`}></i>
+                        {h.action}
+                      </span>
+                      {/* Time */}
+                      <span className="text-xs text-gray-400 flex-shrink-0 hidden sm:inline">{timeAgoStr}</span>
+                      {/* Link to job if available */}
+                      {h.match_job_id && (
+                        <a href={`/creator/projects/${h.match_job_id}`}
+                          className="flex-shrink-0 text-cobalt hover:text-blue-700 transition">
+                          <i className="fa-solid fa-arrow-right text-sm"></i>
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
           ) : displayed.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -243,7 +351,17 @@ export default function CreatorSmartConnectPage() {
                     </div>
 
                     <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                      <Link href={`/creator/projects/${m.id}/apply`}
+                      <Link
+                        href={`/creator/projects/${m.id}/apply`}
+                        onClick={() => {
+                          smartConnect.recordHistory({
+                            match_title: m.title,
+                            match_subtitle: m.tags?.[0],
+                            match_score: m.match_percent,
+                            match_job_id: m.id,
+                            action: 'applied',
+                          }).catch(() => {});
+                        }}
                         className="flex-1 px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition text-center">
                         <i className="fa-solid fa-paper-plane mr-2"></i>Apply Now
                       </Link>

@@ -280,3 +280,73 @@ async def get_stats():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch stats: {str(e)}",
         )
+
+# ── Match History ──────────────────────────────────────────────────────────────
+
+from app.models.smart_connect_history import SmartConnectHistory
+from datetime import datetime
+from pydantic import BaseModel as PydanticBase
+from typing import Optional as Opt
+
+class HistoryRecordRequest(PydanticBase):
+    match_title: str
+    match_subtitle: Opt[str] = None
+    match_avatar: Opt[str] = None
+    match_score: Opt[int] = None
+    match_user_id: Opt[str] = None
+    match_job_id: Opt[str] = None
+    action: str  # "applied" | "invited" | "saved" | "messaged"
+
+
+@router.post("/history/record")
+async def record_match_action(
+    payload: HistoryRecordRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Record when a user acts on a Smart Connect match recommendation."""
+    try:
+        entry = SmartConnectHistory(
+            user_id=str(current_user.id),
+            match_title=payload.match_title,
+            match_subtitle=payload.match_subtitle,
+            match_avatar=payload.match_avatar,
+            match_score=payload.match_score,
+            match_user_id=payload.match_user_id,
+            match_job_id=payload.match_job_id,
+            action=payload.action,
+        )
+        await entry.insert()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history")
+async def get_match_history(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """Get the current user's Smart Connect match history (most recent first)."""
+    try:
+        entries = await SmartConnectHistory.find(
+            SmartConnectHistory.user_id == str(current_user.id)
+        ).sort(-SmartConnectHistory.created_at).limit(limit).to_list()
+
+        return {
+            "history": [
+                {
+                    "id": str(e.id),
+                    "match_title": e.match_title,
+                    "match_subtitle": e.match_subtitle,
+                    "match_avatar": e.match_avatar,
+                    "match_score": e.match_score,
+                    "match_user_id": e.match_user_id,
+                    "match_job_id": e.match_job_id,
+                    "action": e.action,
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in entries
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
