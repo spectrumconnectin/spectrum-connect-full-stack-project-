@@ -32,22 +32,31 @@ function OAuthCallbackInner() {
     tokenStore.set(token);
 
     // Fetch profile to determine account type → redirect to correct dashboard
+    // Backend stores: 'crew' (creator), 'producer' (client), 'both'
     setMessage('Almost there…');
     profileApi.getMe()
       .then(user => {
         const accountType = user.account_type;
-        if (accountType === 'creator') {
-          router.replace('/creator/dashboard');
-        } else if (accountType === 'client') {
+        const hasProfile = !!(user.profile?.first_name || user.profile?.display_name);
+
+        if (accountType === 'producer' || accountType === 'both') {
+          // Client account
           router.replace('/client/dashboard');
+        } else if (accountType === 'crew') {
+          if (hasProfile) {
+            // Returning creator
+            router.replace('/creator/dashboard');
+          } else {
+            // Brand new Google signup — send to onboarding
+            router.replace('/onboarding/creator');
+          }
         } else {
-          // First time — go to onboarding
-          router.replace('/onboarding/client');
+          // Fallback — onboarding
+          router.replace('/onboarding/creator');
         }
       })
       .catch(() => {
-        // Token stored but profile fetch failed — still go to a safe page
-        router.replace('/client/dashboard');
+        router.replace('/creator/dashboard');
       });
   }, [params, router]);
 
