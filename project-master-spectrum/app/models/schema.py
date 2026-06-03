@@ -266,7 +266,7 @@ class User(Document):
     email: str  # Required - users must provide both email and phone
     username: str
     password_hash: str
-    phone_number: str  # Required - E.164 format (e.g., +1234567890)
+    phone_number: Optional[str] = None  # E.164 format (e.g., +1234567890) — optional for OAuth signups
     phone_country_code: Optional[str] = None  # E.g., "US", "IN", "GB"
     phone_verified: bool = False  # Phone verification status (WhatsApp OTP)
     oauth: Optional[OAuth] = None
