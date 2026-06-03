@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, messaging, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
 
 const STATUS_STYLE: Record<string, string> = {
   open:        'bg-green-100 text-green-700',
@@ -42,11 +42,25 @@ export default function ClientProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
+  const [showFutureWorkModal, setShowFutureWorkModal] = useState(false);
+  const [futureWorkMessage, setFutureWorkMessage] = useState('');
+  const [sendingFutureWork, setSendingFutureWork] = useState(false);
+  const [futureWorkSent, setFutureWorkSent] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     jobs.getById(id)
-      .then(data => setJob(data))
+      .then(data => {
+        setJob(data);
+        if (data.status === 'completed') {
+          proposals.getForJob(data.id)
+            .then(res => {
+              const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
+              if (accepted) setHiredCreator(accepted);
+            }).catch(() => {});
+        }
+      })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -254,10 +268,27 @@ export default function ClientProjectDetailPage() {
                 </button>
               )}
               {job.status === 'completed' && (
-                <Link href={`/client/projects/${id}/review`}
-                  className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
-                  <i className="fa-solid fa-star"></i>Leave a Review
-                </Link>
+                <>
+                  <Link href={`/client/projects/${id}/review`}
+                    className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
+                    <i className="fa-solid fa-star"></i>Leave a Review
+                  </Link>
+                  {hiredCreator && !futureWorkSent && (
+                    <button
+                      onClick={() => {
+                        setFutureWorkMessage(`Hi ${hiredCreator.creator_name},\n\nI really enjoyed working with you on "${job.title}". I\'d love to collaborate again on an upcoming project — would you be available?`);
+                        setShowFutureWorkModal(true);
+                      }}
+                      className="flex items-center gap-3 w-full bg-blue-50 text-cobalt px-4 py-3 rounded-xl font-semibold hover:bg-blue-100 transition text-sm border border-blue-200">
+                      <i className="fa-solid fa-rotate-right"></i>Request Future Work
+                    </button>
+                  )}
+                  {futureWorkSent && (
+                    <div className="flex items-center gap-2 w-full bg-green-50 text-green-700 px-4 py-3 rounded-xl text-sm border border-green-200 font-semibold">
+                      <i className="fa-solid fa-check"></i>Message sent!
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -286,6 +317,61 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Future Work Modal ── */}
+      {showFutureWorkModal && hiredCreator && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowFutureWorkModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i className="fa-solid fa-rotate-right text-cobalt"></i>
+                Request Future Work
+              </h3>
+              <button onClick={() => setShowFutureWorkModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 rounded-full bg-cobalt flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {(hiredCreator.creator_name || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{hiredCreator.creator_name}</p>
+                <p className="text-xs text-gray-500">Previously hired for: {job?.title}</p>
+              </div>
+            </div>
+            <textarea
+              value={futureWorkMessage}
+              onChange={e => setFutureWorkMessage(e.target.value)}
+              rows={6}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 resize-none leading-relaxed mb-4"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowFutureWorkModal(false)}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!hiredCreator.creator_id || !futureWorkMessage.trim()) return;
+                  setSendingFutureWork(true);
+                  try {
+                    await messaging.createConversation([hiredCreator.creator_id], id, futureWorkMessage.trim());
+                    setFutureWorkSent(true);
+                    setShowFutureWorkModal(false);
+                  } catch { /* ignore */ } finally {
+                    setSendingFutureWork(false);
+                  }
+                }}
+                disabled={!futureWorkMessage.trim() || sendingFutureWork}
+                className="flex-1 bg-cobalt text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2"
+              >
+                {sendingFutureWork
+                  ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                  : <><i className="fa-solid fa-paper-plane"></i> Send Message</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

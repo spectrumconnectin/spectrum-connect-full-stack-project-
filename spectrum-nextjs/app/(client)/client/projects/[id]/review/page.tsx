@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { jobs, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
+import { useParams, useRouter } from 'next/navigation';
+import { jobs, proposals, messaging, JobPostItem, JobProposalItem } from '@/lib/api';
 
 const categories = [
   { key: 'quality',       label: 'Quality of Work',     icon: 'fa-star',          desc: 'How good was the final deliverable?' },
@@ -31,6 +31,11 @@ export default function ReviewPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [showFutureWork, setShowFutureWork] = useState(false);
+  const [futureMessage, setFutureMessage] = useState('');
+  const [sendingFutureWork, setSendingFutureWork] = useState(false);
+  const [futureWorkSent, setFutureWorkSent] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!id) return;
@@ -98,9 +103,93 @@ export default function ReviewPage() {
             <span className="ml-2 text-xl font-bold text-gray-900">{avgRating}</span>
           </div>
         )}
+        {/* Request Future Work CTA */}
+        {!futureWorkSent ? (
+          !showFutureWork ? (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 bg-cobalt rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-rotate-right text-white text-sm"></i>
+                </div>
+                <div className="text-left">
+                  <p className="font-bold text-gray-900">Enjoyed working together?</p>
+                  <p className="text-sm text-gray-600">Send {creator?.creator_name || 'this creator'} a message to request future work.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setFutureMessage(`Hi ${creator?.creator_name || 'there'},
+
+I really enjoyed working with you on "${job?.title || 'our project'}". I'd love to work together again on an upcoming project. Would you be available?
+
+Looking forward to hearing from you!`);
+                  setShowFutureWork(true);
+                }}
+                className="w-full bg-cobalt text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+              >
+                <i className="fa-solid fa-paper-plane"></i>
+                Request Future Work
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white border border-blue-200 rounded-2xl p-6 mb-6 text-left shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <i className="fa-solid fa-envelope text-cobalt"></i>
+                  Message to {creator?.creator_name || 'Creator'}
+                </h3>
+                <button onClick={() => setShowFutureWork(false)} className="text-gray-400 hover:text-gray-600 text-sm">
+                  Cancel
+                </button>
+              </div>
+              <textarea
+                value={futureMessage}
+                onChange={e => setFutureMessage(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 resize-none leading-relaxed mb-4"
+              />
+              <button
+                onClick={async () => {
+                  if (!creator?.creator_id || !futureMessage.trim()) return;
+                  setSendingFutureWork(true);
+                  try {
+                    await messaging.createConversation(
+                      [creator.creator_id],
+                      id,
+                      futureMessage.trim()
+                    );
+                    setFutureWorkSent(true);
+                    setShowFutureWork(false);
+                  } catch { /* ignore */ } finally {
+                    setSendingFutureWork(false);
+                  }
+                }}
+                disabled={!futureMessage.trim() || sendingFutureWork}
+                className="w-full bg-cobalt text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                {sendingFutureWork ? (
+                  <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                ) : (
+                  <><i className="fa-solid fa-paper-plane"></i> Send Message</>
+                )}
+              </button>
+            </div>
+          )
+        ) : (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-6 flex items-center gap-3">
+            <div className="w-9 h-9 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <i className="fa-solid fa-check text-white text-sm"></i>
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-green-800">Message sent to {creator?.creator_name || 'creator'}!</p>
+              <p className="text-sm text-green-600">They&apos;ll be notified and can respond in Messages.</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3 justify-center">
-          <Link href={`/client/projects/${id}`} className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition">
-            Back to Project
+          <Link href="/client/messaging" className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition">
+            Go to Messages
           </Link>
           <Link href="/client/projects" className="px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition">
             My Projects
