@@ -4,28 +4,30 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { jobs, JobPostItem } from '@/lib/api';
 
-const STATUS_FILTERS = ['All', 'open', 'in_progress', 'completed', 'draft'];
+const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'completed', 'draft'];
 
 // Map raw status → display label
-function statusLabel(status: string, proposalCount = 0): string {
-  if (status === 'open' && proposalCount > 0) return 'In Review';
+function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    open: 'Open',
-    in_progress: 'Active',
-    completed: 'Completed',
-    draft: 'Draft',
-    closed: 'Active',  // legacy
+    open:            'Open',
+    in_review:       'In Review',
+    pending_funding: 'Pending Funding',
+    in_progress:     'Active',
+    completed:       'Completed',
+    draft:           'Draft',
+    closed:          'Active',  // legacy
   };
   return labels[status] ?? status;
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  open: 'bg-green-100 text-green-700',
-  'in_review': 'bg-amber-100 text-amber-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  draft: 'bg-gray-100 text-gray-500',
-  closed: 'bg-blue-100 text-blue-700',
+  open:            'bg-green-100 text-green-700',
+  in_review:       'bg-amber-100 text-amber-700',
+  pending_funding: 'bg-orange-100 text-orange-700',
+  in_progress:     'bg-blue-100 text-blue-700',
+  completed:       'bg-emerald-100 text-emerald-700',
+  draft:           'bg-gray-100 text-gray-500',
+  closed:          'bg-blue-100 text-blue-700',
 };
 
 function formatBudget(p: JobPostItem): string {
@@ -98,7 +100,7 @@ export default function ClientProjectsPage() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2 flex-wrap">
               {STATUS_FILTERS.map(f => {
-                const label = f === 'All' ? 'All' : f === 'in_progress' ? 'Active' : f === 'open' ? 'Open / In Review' : f.charAt(0).toUpperCase() + f.slice(1);
+                const label = f === 'All' ? 'All' : statusLabel(f);
                 return (
                   <button key={f} onClick={() => setActiveFilter(f)}
                     className={`px-4 py-2.5 text-sm rounded-lg font-medium transition ${activeFilter === f ? 'font-semibold text-cobalt bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
@@ -146,7 +148,7 @@ export default function ClientProjectsPage() {
                     ? 'bg-amber-100 text-amber-700'
                     : STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-600'
                 }`}>
-                  {statusLabel(p.status, p.proposal_count)}
+                  {statusLabel(p.status)}
                 </span>
               </div>
 

@@ -167,11 +167,11 @@ class JobService:
         # Build query
         query = {}
 
-        # Only show open jobs for public search (unless specific status requested)
+        # Show open + in_review jobs for public search (both accept proposals)
         if filters.status:
             query["status"] = filters.status
         else:
-            query["status"] = "open"  # Default to open jobs
+            query["status"] = {"$in": ["open", "in_review"]}  # default: jobs accepting proposals
 
         # Department filter
         if filters.department:

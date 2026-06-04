@@ -6,18 +6,22 @@ import { dashboard, jobs as jobsApi, profile as profileApi, escrow as escrowApi,
 import EtfWidget from '@/components/EtfWidget';
 
 const STATUS_LABEL: Record<string, string> = {
-  open:        'Open',
-  in_progress: 'Active',
-  closed:      'Active',
-  completed:   'Completed',
-  draft:       'Draft',
+  open:            'Open',
+  in_review:       'In Review',
+  pending_funding: 'Pending Funding',
+  in_progress:     'Active',
+  closed:          'Active',
+  completed:       'Completed',
+  draft:           'Draft',
 };
 const STATUS_COLOR: Record<string, string> = {
-  open:        'bg-green-100 text-green-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  closed:      'bg-blue-100 text-blue-700',
-  completed:   'bg-emerald-100 text-emerald-700',
-  draft:       'bg-gray-100 text-gray-500',
+  open:            'bg-green-100 text-green-700',
+  in_review:       'bg-amber-100 text-amber-700',
+  pending_funding: 'bg-orange-100 text-orange-700',
+  in_progress:     'bg-blue-100 text-blue-700',
+  closed:          'bg-blue-100 text-blue-700',
+  completed:       'bg-emerald-100 text-emerald-700',
+  draft:           'bg-gray-100 text-gray-500',
 };
 
 export default function ClientDashboardPage() {

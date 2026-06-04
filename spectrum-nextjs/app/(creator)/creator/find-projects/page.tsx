@@ -72,7 +72,8 @@ export default function FindProjectsPage() {
       setLoading(true);
       setError(null);
       try {
-        const params: Record<string, string | number | undefined> = { status: 'open', limit: 40 };
+        // No status filter — backend defaults to open + in_review (both accept proposals)
+        const params: Record<string, string | number | undefined> = { limit: 40 };
         if (search.trim()) params.search = search.trim();
         if (department !== 'All Departments') params.department = department;
         if (budget === 'Under $1,000') { params.max_budget = 1000; }

@@ -67,7 +67,7 @@ async def submit_proposal(
     job = await JobPost.get(_oid(job_id))
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    if job.status != "open":
+    if job.status not in ("open", "in_review"):
         raise HTTPException(status_code=400, detail="This job is not accepting proposals")
 
     # Prevent self-hire: creator cannot apply to their own job post
@@ -92,8 +92,10 @@ async def submit_proposal(
     )
     await app.insert()
 
-    # increment proposal count
+    # increment proposal count and move job to in_review
     job.proposal_count = (job.proposal_count or 0) + 1
+    if job.status == "open":
+        job.status = "in_review"
     await job.save()
 
     # Notify the client that a new application arrived
@@ -230,6 +232,21 @@ async def update_proposal_status(
     app.status = data.status
     await app.save()
 
+    # Update job status based on accepted / rejected decision
+    if data.status == "accepted":
+        job.status = "pending_funding"
+        await job.save()
+    elif data.status == "rejected" and job.status in ("in_review", "pending_funding"):
+        # If all proposals are now rejected/withdrawn, reopen the job
+        from app.models.schema import Application
+        remaining = await Application.find(
+            Application.project_id == job.id,
+            Application.status.in_(["submitted", "shortlisted", "interviewing", "accepted"]),
+        ).count()
+        if remaining == 0:
+            job.status = "open"
+            await job.save()
+
     # Notify creator of the decision
     try:
         from app.services.notification_service import NotificationService
@@ -249,7 +266,7 @@ async def update_proposal_status(
     except Exception:
         pass
 
-    return {"id": str(app.id), "status": app.status}
+    return {"id": str(app.id), "status": app.status, "job_status": job.status}
 
 
 @router.delete(
@@ -396,6 +413,7 @@ async def direct_hire(
     await app.insert()
 
     job.proposal_count = (job.proposal_count or 0) + 1
+    job.status = "pending_funding"
     await job.save()
 
     # Notify creator

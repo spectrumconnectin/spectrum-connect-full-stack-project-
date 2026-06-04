@@ -8,17 +8,24 @@ import ProjectTracker from './tracker';
 import FileShare from './files';
 
 const STATUS_STYLE: Record<string, string> = {
-  open:        'bg-green-100 text-green-700',
-  draft:       'bg-gray-100 text-gray-600',
-  in_progress: 'bg-blue-100 text-blue-700',
-  closed:      'bg-blue-100 text-blue-700',  // legacy, show same as active
-  completed:   'bg-emerald-100 text-emerald-700',
+  open:            'bg-green-100 text-green-700',
+  in_review:       'bg-amber-100 text-amber-700',
+  pending_funding: 'bg-orange-100 text-orange-700',
+  draft:           'bg-gray-100 text-gray-600',
+  in_progress:     'bg-blue-100 text-blue-700',
+  closed:          'bg-blue-100 text-blue-700',
+  completed:       'bg-emerald-100 text-emerald-700',
 };
 
-function jobStatusLabel(status: string, proposalCount = 0): string {
-  if (status === 'open' && proposalCount > 0) return 'In Review';
+function jobStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    open: 'Open', in_progress: 'Active', closed: 'Active', completed: 'Completed', draft: 'Draft',
+    open:            'Open',
+    in_review:       'In Review',
+    pending_funding: 'Pending Funding',
+    in_progress:     'Active',
+    closed:          'Active',
+    completed:       'Completed',
+    draft:           'Draft',
   };
   return map[status] ?? status;
 }
@@ -133,7 +140,8 @@ export default function ClientProjectDetailPage() {
 
   const budget = formatBudget(job);
   const canPublish  = job.status === 'draft';
-  const canStart    = (job.status === 'open' || job.status === 'closed') && !!hiredCreator;
+  // Can start once escrow is funded (pending_funding → in_progress)
+  const canStart    = (job.status === 'open' || job.status === 'closed' || job.status === 'pending_funding') && !!hiredCreator && (!!(projectEscrow && projectEscrow.funded_amount > 0) || job.status !== 'pending_funding');
   const canComplete = job.status === 'in_progress';
   const canDelete   = job.status === 'draft';
 
@@ -152,7 +160,7 @@ export default function ClientProjectDetailPage() {
               <span className={`text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0 ${
                 job.status === 'open' && (job.proposal_count ?? 0) > 0 ? 'bg-amber-100 text-amber-700' : STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'
               }`}>
-                {jobStatusLabel(job.status, job.proposal_count)}
+                {jobStatusLabel(job.status)}
               </span>
             </div>
             <p className="text-gray-500 mt-1 text-sm">
@@ -260,28 +268,30 @@ export default function ClientProjectDetailPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="font-bold text-gray-900 mb-4">Manage Job</h2>
 
-            {/* Escrow / payment status */}
-            {hiredCreator && (
-              <div className={`flex items-center gap-3 p-3 rounded-xl mb-4 text-sm font-semibold ${
-                projectEscrow && projectEscrow.funded_amount > 0
-                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                  : 'bg-amber-50 border border-amber-200 text-amber-700'
-              }`}>
-                <i className={`fa-solid ${projectEscrow && projectEscrow.funded_amount > 0 ? 'fa-lock' : 'fa-hourglass-half'}`}></i>
+            {/* Pending Funding CTA — shown when creator is hired but escrow unfunded */}
+            {job.status === 'pending_funding' && (!projectEscrow || projectEscrow.funded_amount === 0) && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <i className="fa-solid fa-hourglass-half text-orange-600"></i>
+                  <span className="font-bold text-orange-800 text-sm">Pending Funding</span>
+                </div>
+                <p className="text-xs text-orange-700 mb-3 leading-relaxed">
+                  A creator has been accepted. Fund the escrow to secure their work and allow them to begin.
+                </p>
+                <Link href="/client/payments"
+                  className="block text-center py-2 px-4 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 transition">
+                  <i className="fa-solid fa-lock mr-1.5"></i>Fund Escrow Now
+                </Link>
+              </div>
+            )}
+
+            {/* Escrow funded status (shown once funded) */}
+            {hiredCreator && projectEscrow && projectEscrow.funded_amount > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl mb-4 text-sm font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                <i className="fa-solid fa-lock"></i>
                 <div>
-                  {projectEscrow && projectEscrow.funded_amount > 0 ? (
-                    <>
-                      <div>Funded — In Escrow</div>
-                      <div className="text-xs font-normal opacity-80">${projectEscrow.funded_amount.toLocaleString()} secured</div>
-                    </>
-                  ) : (
-                    <>
-                      <div>Not Yet Funded</div>
-                      <div className="text-xs font-normal opacity-80">
-                        <Link href="/client/payments" className="underline">Fund escrow →</Link>
-                      </div>
-                    </>
-                  )}
+                  <div>Funded — In Escrow</div>
+                  <div className="text-xs font-normal opacity-80">${projectEscrow.funded_amount.toLocaleString()} secured</div>
                 </div>
               </div>
             )}
