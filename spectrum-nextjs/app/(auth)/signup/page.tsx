@@ -156,7 +156,8 @@ export default function SignUpPage() {
   const [step, setStep] = useState<'form' | 'otp' | 'done'>('form');
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const phoneValid = /^\+[1-9]\d{6,14}$/.test(phone);
+  // Phone is optional — only validate format if user has typed beyond the default prefix
+  const phoneValid = phone === '+1' || phone === '+' || phone.length <= 2 || /^\+[1-9]\d{6,14}$/.test(phone);
 
   const pwScore = useMemo(() => {
     let s = 0;
@@ -174,12 +175,13 @@ export default function SignUpPage() {
     last: touched.last && !last.trim() ? 'Required' : '',
     username: touched.username && !username.trim() ? 'Required' : '',
     email: touched.email && email && !emailValid ? 'Enter a valid email' : (touched.email && !email ? 'Required' : ''),
-    phone: touched.phone && !phoneValid ? 'Use E.164 format e.g. +12025551234' : '',
+    phone: touched.phone && phone.length > 2 && !phoneValid ? 'Use international format e.g. +12025551234' : '',
     password: touched.password && password.length < 8 ? 'Must be at least 8 characters' : '',
     accountType: touched.accountType && !accountType ? 'Choose an account type' : '',
     agreed: touched.agreed && !agreed ? 'You must agree' : '',
   };
   const formValid = first.trim() && last.trim() && username.trim() && emailValid && phoneValid && password.length >= 8 && accountType && agreed;
+
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,7 +370,7 @@ export default function SignUpPage() {
               </div>
 
               <div className="field">
-                <label htmlFor="phone">Phone number</label>
+                <label htmlFor="phone">Phone number <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
                 <PhoneInput
                   value={phone}
                   onChange={setPhone}
