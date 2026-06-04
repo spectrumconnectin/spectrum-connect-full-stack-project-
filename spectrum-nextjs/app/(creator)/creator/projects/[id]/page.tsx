@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { creatorProjects, profile, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile } from '@/lib/api';
+import { creatorProjects, profile, escrow as escrowApi, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile, EscrowListItem } from '@/lib/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_STYLE: Record<string, string> = {
@@ -111,6 +111,7 @@ export default function CreatorProjectDetailPage() {
   const [project, setProject]   = useState<ProjectItem | null>(null);
   const [activities, setActivities] = useState<ActivityLogItem[]>([]);
   const [clientProfile, setClientProfile] = useState<PublicProfile | null>(null);
+  const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
@@ -126,8 +127,12 @@ export default function CreatorProjectDetailPage() {
       ]);
       setProject(proj);
       setActivities(acts);
-      // fetch client profile in background — don't block render
+      // Fetch client profile + escrow in background — don't block render
       profile.getPublic(proj.client_id).then(setClientProfile).catch(() => {});
+      escrowApi.list({ role: 'creator', limit: 50 }).then(res => {
+        const linked = res.escrows.find(e => e.job_post_id === id || e.project_id === proj.id);
+        if (linked) setProjectEscrow(linked);
+      }).catch(() => {});
     } catch (e) {
       const msg = (e as Error).message;
       // This ID is a job_id (e.g. from an old notification link) not a workspace
@@ -180,6 +185,24 @@ export default function CreatorProjectDetailPage() {
           <i className="fa-solid fa-arrow-left text-xs"></i> Back to Projects
         </Link>
       </div>
+
+      {/* Funds Secured banner — shown prominently at top when escrow is funded */}
+      {projectEscrow && projectEscrow.funded_amount > 0 && (
+        <div className="bg-emerald-50 border border-emerald-300 rounded-2xl px-6 py-4 mb-6 flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-shield-halved text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-emerald-900 text-base">
+              Funds Secured — ${projectEscrow.funded_amount.toLocaleString()} is held in escrow
+            </p>
+            <p className="text-emerald-700 text-sm mt-0.5">
+              Your payment is protected before you begin work. Funds will be released when the client approves your deliverables.
+            </p>
+          </div>
+          <i className="fa-solid fa-circle-check text-emerald-600 text-2xl flex-shrink-0"></i>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* ── Main column ── */}
@@ -316,6 +339,53 @@ export default function CreatorProjectDetailPage() {
 
         {/* ── Sidebar ── */}
         <div className="space-y-5">
+
+          {/* Payment / Escrow Status — the most important thing for creator */}
+          {projectEscrow ? (
+            projectEscrow.funded_amount > 0 ? (
+              <div className="bg-emerald-600 text-white rounded-2xl p-5 shadow-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i className="fa-solid fa-shield-halved text-xl"></i>
+                  </div>
+                  <div>
+                    <p className="font-bold text-base">Funds Secured</p>
+                    <p className="text-emerald-100 text-xs">Your payment is protected</p>
+                  </div>
+                </div>
+                <div className="bg-white/15 rounded-xl p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-emerald-100">In Escrow</span>
+                    <span className="font-bold">${projectEscrow.funded_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-emerald-100">Released</span>
+                    <span className="font-bold">${projectEscrow.released_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-emerald-100">Pending release</span>
+                    <span className="font-bold">${(projectEscrow.funded_amount - projectEscrow.released_amount).toLocaleString()}</span>
+                  </div>
+                </div>
+                <p className="text-emerald-100 text-xs mt-3 leading-relaxed">
+                  Payment is held in secure escrow. Funds are released when the client approves your deliverables.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                <div className="flex items-center gap-3 mb-2">
+                  <i className="fa-solid fa-hourglass-half text-amber-600 text-xl"></i>
+                  <div>
+                    <p className="font-bold text-amber-900">Awaiting Funding</p>
+                    <p className="text-amber-700 text-xs">Client has not yet funded escrow</p>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  The client has hired you but has not funded the escrow yet. Work can begin once funds are secured.
+                </p>
+              </div>
+            )
+          ) : null}
 
           {/* Tags */}
           {project.tags.length > 0 && (
