@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, messaging, proposals, escrow, JobPostItem, JobProposalItem, EscrowListItem } from '@/lib/api';
-import ProjectTracker from './tracker';
-import FileShare from './files';
+import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem, EscrowListItem } from '@/lib/api';
+import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 const STATUS_STYLE: Record<string, string> = {
   open:            'bg-green-100 text-green-700',
@@ -55,6 +54,9 @@ export default function ClientProjectDetailPage() {
 
   const [job, setJob] = useState<JobPostItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [myUserId, setMyUserId] = useState('');
+
+  useEffect(() => { auth.me().then(u => setMyUserId(u.id)).catch(() => {}); }, []);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
@@ -234,11 +236,8 @@ export default function ClientProjectDetailPage() {
             </div>
           )}
 
-          {/* Project Tracker — unified view of milestones, messages, files */}
-          <ProjectTracker projectId={id} />
-
-          {/* File Sharing — upload and organize project files */}
-          <FileShare projectId={id} />
+          {/* Project Workspace — Chat, Timeline, Milestones, Deliverables, Files, Progress */}
+          <ProjectWorkspace jobId={id} role="client" myUserId={myUserId} />
 
           {/* Stats */}
           <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">

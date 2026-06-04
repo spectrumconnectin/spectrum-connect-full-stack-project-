@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { creatorProjects, profile, escrow as escrowApi, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile, EscrowListItem } from '@/lib/api';
+import { creatorProjects, profile, escrow as escrowApi, auth, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile, EscrowListItem } from '@/lib/api';
+import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_STYLE: Record<string, string> = {
@@ -112,6 +113,7 @@ export default function CreatorProjectDetailPage() {
   const [activities, setActivities] = useState<ActivityLogItem[]>([]);
   const [clientProfile, setClientProfile] = useState<PublicProfile | null>(null);
   const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
+  const [myUserId, setMyUserId] = useState('');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
@@ -127,12 +129,13 @@ export default function CreatorProjectDetailPage() {
       ]);
       setProject(proj);
       setActivities(acts);
-      // Fetch client profile + escrow in background — don't block render
+      // Fetch client profile + escrow + current user in background
       profile.getPublic(proj.client_id).then(setClientProfile).catch(() => {});
       escrowApi.list({ role: 'creator', limit: 50 }).then(res => {
         const linked = res.escrows.find(e => e.job_post_id === id || e.project_id === proj.id);
         if (linked) setProjectEscrow(linked);
       }).catch(() => {});
+      auth.me().then(u => setMyUserId(u.id)).catch(() => {});
     } catch (e) {
       const msg = (e as Error).message;
       // This ID is a job_id (e.g. from an old notification link) not a workspace
@@ -313,28 +316,13 @@ export default function CreatorProjectDetailPage() {
             )}
           </div>
 
-          {/* Activity Feed */}
-          {activities.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-gray-900 mb-5">Recent Activity</h2>
-              <div className="space-y-4">
-                {activities.map(a => (
-                  <div key={a.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <i className={`fa-solid ${ACTIVITY_ICON[a.activity_type] ?? 'fa-circle-dot'} text-cobalt text-xs`}></i>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700">{a.message}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {a.actor_name && <><span className="font-medium text-gray-500">{a.actor_name}</span> · </>}
-                        {timeAgo(a.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Project Workspace — Chat, Timeline, Milestones, Deliverables, Files, Progress */}
+          <ProjectWorkspace
+            jobId={id}
+            role="creator"
+            projectId={project.id}
+            myUserId={myUserId}
+          />
         </div>
 
         {/* ── Sidebar ── */}
