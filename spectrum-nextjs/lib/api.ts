@@ -939,6 +939,13 @@ export const proposals = {
     private_note?: string;
   }): Promise<{ success: boolean; message: string }> =>
     request(`/proposals/${proposalId}/rate`, { method: 'POST', body: JSON.stringify(data) }),
+
+  directHire: (data: {
+    job_id: string;
+    creator_id: string;
+    note?: string;
+  }): Promise<{ id: string; status: string; job_id: string; already_hired?: boolean }> =>
+    request('/proposals/direct-hire', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Escrow & Payments ─────────────────────────────────────────────────────────

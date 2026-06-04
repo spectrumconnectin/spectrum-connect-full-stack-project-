@@ -192,7 +192,14 @@ function ClientMessagingPageInner() {
       {/* Conversation list — hidden on mobile when a chat is open */}
       <div className={`msg-sidebar w-80 border-r border-gray-200 flex flex-col flex-shrink-0 ${selectedId ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Messages</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-bold text-gray-900">Messages</h2>
+            <Link href="/client/collaborators"
+              className="flex items-center gap-1.5 text-xs font-semibold text-cobalt bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition"
+              title="Find a creator to message">
+              <i className="fa-solid fa-plus text-xs"></i>New
+            </Link>
+          </div>
           <div className="relative">
             <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
             <input type="text" placeholder="Search conversations…" value={search}

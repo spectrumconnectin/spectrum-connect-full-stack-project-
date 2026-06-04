@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { profile as profileApi, PublicProfile, jobs, messaging, JobPostItem } from '@/lib/api';
+import { profile as profileApi, PublicProfile, jobs, messaging, proposals, JobPostItem } from '@/lib/api';
 import PortfolioSection from '@/components/PortfolioSection';
 import EtfBadge from '@/components/EtfBadge';
 
@@ -41,6 +41,14 @@ export default function CollaboratorProfilePage() {
   const [sending, setSending] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
 
+  // Hire Directly modal
+  const [showHire, setShowHire] = useState(false);
+  const [hireProject, setHireProject] = useState('');
+  const [hireNote, setHireNote] = useState('');
+  const [hiring, setHiring] = useState(false);
+  const [hireDone, setHireDone] = useState(false);
+  const [hireError, setHireError] = useState('');
+
   useEffect(() => {
     if (!id) return;
     profileApi.getPublic(id)
@@ -49,14 +57,40 @@ export default function CollaboratorProfilePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const loadProjects = async () => {
+    if (myProjects.length > 0) return;
+    try {
+      const data = await jobs.getMe();
+      setMyProjects((data || []).filter((j: JobPostItem) => j.status === 'open'));
+    } catch { /* silent */ }
+  };
+
   const openInvite = async () => {
     setShowInvite(true); setInviteSent(false);
     setSelectedProject(''); setInviteNote('');
-    if (myProjects.length === 0) {
-      try {
-        const data = await jobs.getMe();
-        setMyProjects((data || []).filter((j: JobPostItem) => j.status === 'open'));
-      } catch { /* silent */ }
+    await loadProjects();
+  };
+
+  const openHire = async () => {
+    setShowHire(true); setHireDone(false);
+    setHireProject(''); setHireNote(''); setHireError('');
+    await loadProjects();
+  };
+
+  const doDirectHire = async () => {
+    if (!hireProject || !creator) return;
+    setHiring(true); setHireError('');
+    try {
+      await proposals.directHire({
+        job_id: hireProject,
+        creator_id: creator.id,
+        note: hireNote.trim() || undefined,
+      });
+      setHireDone(true);
+    } catch (e) {
+      setHireError((e as Error).message);
+    } finally {
+      setHiring(false);
     }
   };
 
@@ -207,8 +241,12 @@ export default function CollaboratorProfilePage() {
               <i className="fa-solid fa-comment mr-2"></i>Message
             </Link>
             <button onClick={openInvite}
-              className="bg-white/20 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/30 transition border border-white/30 text-sm">
+              className="bg-white/20 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/30 transition border border-white/30 text-sm">
               <i className="fa-solid fa-user-plus mr-2"></i>Invite to Project
+            </button>
+            <button onClick={openHire}
+              className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-600 transition shadow-md text-sm">
+              <i className="fa-solid fa-handshake mr-2"></i>Hire Directly
             </button>
           </div>
         </div>
@@ -340,9 +378,13 @@ export default function CollaboratorProfilePage() {
               <p className="text-blue-200 text-sm mb-4">Rate negotiable</p>
             )}
             <Link href={`/client/messaging?userId=${id}`}
-              className="block bg-white text-cobalt px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition mb-3 text-sm">
+              className="block bg-white text-cobalt px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition mb-3 text-sm text-center">
               <i className="fa-solid fa-comment mr-2"></i>Message {name.split(' ')[0]}
             </Link>
+            <button onClick={openHire}
+              className="block w-full bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-600 transition mb-2 text-sm">
+              <i className="fa-solid fa-handshake mr-2"></i>Hire Directly
+            </button>
             <button onClick={openInvite}
               className="block w-full bg-white/20 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/30 transition border border-white/30 text-sm">
               <i className="fa-solid fa-user-plus mr-2"></i>Invite to Project
@@ -476,6 +518,106 @@ export default function CollaboratorProfilePage() {
           )}
         </div>
       </div>
+
+      {/* ── Hire Directly Modal ── */}
+      {showHire && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowHire(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+            {hireDone ? (
+              <div className="text-center py-6">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="fa-solid fa-handshake text-emerald-600 text-2xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Hired!</h3>
+                <p className="text-gray-500 text-sm mb-2">
+                  {name} has been added to your project. They&apos;ll receive a notification and a welcome message.
+                </p>
+                <p className="text-xs text-gray-400 mb-5">Next: fund escrow so they can start work.</p>
+                <div className="flex gap-3">
+                  <Link href="/client/payments"
+                    className="flex-1 text-center px-4 py-2.5 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+                    Fund Escrow
+                  </Link>
+                  <button onClick={() => setShowHire(false)}
+                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Hire Directly</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Skip the proposal process and hire now</p>
+                  </div>
+                  <button onClick={() => setShowHire(false)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3 mb-5 p-3 bg-gray-50 rounded-xl">
+                  {pr?.profile_picture
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={pr.profile_picture} alt={name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                    : <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">{name[0]}</div>
+                  }
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{name}</p>
+                    <p className="text-gray-500 text-xs">{pr?.headline || 'Creator'}</p>
+                  </div>
+                </div>
+
+                {hireError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    <i className="fa-solid fa-circle-exclamation mr-2"></i>{hireError}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Select Project <span className="text-red-500">*</span></label>
+                    {myProjects.length === 0 ? (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+                        <i className="fa-solid fa-triangle-exclamation mr-2"></i>
+                        No open projects. <Link href="/client/projects/create" className="font-semibold underline">Create one first</Link>.
+                      </div>
+                    ) : (
+                      <select value={hireProject} onChange={e => setHireProject(e.target.value)}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-cobalt">
+                        <option value="">Choose a project…</option>
+                        {myProjects.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Welcome message <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <textarea value={hireNote} onChange={e => setHireNote(e.target.value)}
+                      placeholder={`e.g. "Excited to work with you on this project!"`}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-cobalt resize-none" />
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-4 text-xs text-amber-700">
+                  <i className="fa-solid fa-circle-info mr-2"></i>
+                  The creator will be hired immediately and notified. You&apos;ll need to fund escrow before work begins.
+                </div>
+
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => setShowHire(false)}
+                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition text-sm">Cancel</button>
+                  <button onClick={doDirectHire} disabled={!hireProject || hiring}
+                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition text-sm">
+                    {hiring ? <><i className="fa-solid fa-spinner animate-spin mr-2"></i>Hiring…</> : <><i className="fa-solid fa-handshake mr-2"></i>Confirm Hire</>}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Invite Modal ── */}
       {showInvite && (
