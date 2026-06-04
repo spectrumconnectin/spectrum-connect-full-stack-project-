@@ -1032,6 +1032,28 @@ export const escrow = {
   getById: (id: string): Promise<EscrowDetail> =>
     request<EscrowDetail>(`/escrow/${id}`),
 
+  create: (data: {
+    creator_id: string;
+    milestones: Array<{ title: string; amount: number; currency?: string }>;
+    job_post_id?: string;
+    project_id?: string;
+    description?: string;
+    currency?: string;
+  }): Promise<{ escrow_id: string; status: string; total_amount: number; milestones: Array<{ milestone_id: string; title: string; amount: number; status: string }> }> =>
+    request('/escrow/', { method: 'POST', body: JSON.stringify(data) }),
+
+  fundMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; funded_amount: number; transaction_id?: string; mock_transaction_id?: string }> =>
+    request(`/escrow/${escrowId}/fund-milestone`, {
+      method: 'POST',
+      body: JSON.stringify({ milestone_id: milestoneId }),
+    }),
+
+  refund: (escrowId: string, reason: string): Promise<{ success: boolean; refund_amount: number; transaction_id?: string }> =>
+    request(`/escrow/${escrowId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
   releaseMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; escrow_id: string; message: string; creator_payout?: number; fees?: CommissionBreakdown }> =>
     request(`/escrow/${escrowId}/release-milestone`, {
       method: 'POST',

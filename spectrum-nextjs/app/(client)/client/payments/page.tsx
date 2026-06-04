@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { escrow, EscrowDetail, EscrowMilestone } from '@/lib/api';
+import { escrow, jobs, EscrowDetail, EscrowMilestone, JobPostItem } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -378,6 +378,187 @@ function ReleaseModal({
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+// ── Fund Project Modal ────────────────────────────────────────────────────────
+function FundProjectModal({
+  job,
+  creatorId,
+  onFunded,
+  onClose,
+}: {
+  job: JobPostItem;
+  creatorId: string;
+  onFunded: () => void;
+  onClose: () => void;
+}) {
+  const [amount, setAmount] = useState(
+    job.budget?.min ? String(job.budget.min) : ''
+  );
+  const [milestoneTitle, setMilestoneTitle] = useState('Project Payment');
+  const [step, setStep] = useState<'setup' | 'processing' | 'done'>('setup');
+  const [txId, setTxId] = useState('');
+  const [error, setError] = useState('');
+
+  const mockTxId = () =>
+    `TXN-SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+
+  const handleFund = async () => {
+    if (!amount || Number(amount) <= 0) {
+      setError('Please enter a valid amount'); return;
+    }
+    setError('');
+    setStep('processing');
+
+    try {
+      // Step 1: Create escrow
+      const created = await escrow.create({
+        creator_id: creatorId,
+        job_post_id: job.id,
+        description: `Escrow for: ${job.title}`,
+        milestones: [{ title: milestoneTitle, amount: Number(amount), currency: 'USD' }],
+        currency: 'USD',
+      });
+
+      // Step 2: Fund the milestone (simulated)
+      const milestoneId = created.milestones[0]?.milestone_id;
+      if (!milestoneId) throw new Error('Milestone not created');
+      await escrow.fundMilestone(created.escrow_id, milestoneId);
+
+      // Generate mock transaction ID
+      setTxId(mockTxId());
+      setStep('done');
+    } catch (e) {
+      setError((e as Error).message);
+      setStep('setup');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+
+        {/* TEST MODE stripe */}
+        <div className="bg-amber-400 text-amber-900 text-xs font-bold text-center py-1.5 tracking-wide">
+          ⚗️ TEST MODE — SIMULATED PAYMENT — NO REAL MONEY
+        </div>
+
+        <div className="p-6">
+          {step === 'done' ? (
+            /* ── Success ── */
+            <div className="text-center py-4">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fa-solid fa-circle-check text-emerald-600 text-2xl"></i>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Payment Processed!</h3>
+              <p className="text-gray-500 text-sm mb-5">
+                ${Number(amount).toLocaleString()} is now held in escrow.
+                The creator has been notified and can begin work.
+              </p>
+
+              {/* Mock transaction receipt */}
+              <div className="bg-gray-50 rounded-xl p-4 text-left mb-5 border border-gray-200">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Transaction Receipt</p>
+                {[
+                  { label: 'Transaction ID', value: txId, mono: true },
+                  { label: 'Amount', value: `$${Number(amount).toLocaleString()}` },
+                  { label: 'Status', value: 'Simulated — Held in Escrow' },
+                  { label: 'Project', value: job.title },
+                  { label: 'Payment mode', value: 'TEST MODE (no real funds)' },
+                  { label: 'Timestamp', value: new Date().toLocaleString() },
+                ].map(({ label, value, mono }) => (
+                  <div key={label} className="flex justify-between items-start py-1.5 border-b border-gray-100 last:border-0">
+                    <span className="text-xs text-gray-500">{label}</span>
+                    <span className={`text-xs font-semibold text-gray-900 text-right ml-4 ${mono ? 'font-mono' : ''}`}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => { onFunded(); onClose(); }}
+                  className="flex-1 py-2.5 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Setup / Processing ── */
+            <>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Fund Project</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{job.title}</p>
+                </div>
+                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                  <i className="fa-solid fa-circle-exclamation mr-2"></i>{error}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Milestone title</label>
+                  <input type="text" value={milestoneTitle} onChange={e => setMilestoneTitle(e.target.value)}
+                    className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-cobalt" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Amount (USD) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
+                    <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full border border-gray-300 rounded-xl pl-7 pr-4 py-2.5 text-sm focus:outline-none focus:border-cobalt" />
+                  </div>
+                  {job.budget?.min && job.budget?.max && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Project budget: ${job.budget.min.toLocaleString()}–${job.budget.max.toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-xl p-3 mt-4 text-xs text-cobalt">
+                <i className="fa-solid fa-lock mr-2"></i>
+                Funds are held in <strong>simulated escrow</strong> and released only when you approve the work.
+              </div>
+
+              {step === 'processing' && (
+                <div className="flex items-center gap-3 mt-4 p-3 bg-amber-50 rounded-xl">
+                  <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                  <div className="text-xs text-amber-800">
+                    <strong>Simulating payment processing…</strong>
+                    <br />Creating escrow and locking funds
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-5">
+                <button onClick={onClose} disabled={step === 'processing'}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                  Cancel
+                </button>
+                <button onClick={handleFund} disabled={!amount || step === 'processing'}
+                  className="flex-1 py-2.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                  {step === 'processing'
+                    ? <><i className="fa-solid fa-spinner animate-spin"></i> Processing…</>
+                    : <><i className="fa-solid fa-lock"></i> Fund Escrow</>
+                  }
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentsPage() {
   const [details, setDetails] = useState<EscrowDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -385,16 +566,37 @@ export default function PaymentsPage() {
   const [tab, setTab] = useState('All');
   const [releasing, setReleasing] = useState<PaymentRow | null>(null);
   const [requestingRevisions, setRequestingRevisions] = useState<PaymentRow | null>(null);
+  // Fund project modal
+  const [pendingJobs, setPendingJobs] = useState<JobPostItem[]>([]);
+  const [fundingJob, setFundingJob] = useState<{ job: JobPostItem; creatorId: string } | null>(null);
 
   const loadEscrows = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const listRes = await escrow.list({ role: 'client', limit: 50 });
-      const allDetails = await Promise.all(
-        listRes.escrows.map(e => escrow.getById(e.escrow_id))
-      );
-      setDetails(allDetails);
+      const [listRes, jobsRes] = await Promise.allSettled([
+        escrow.list({ role: 'client', limit: 50 }),
+        jobs.getMe(),
+      ]);
+      if (listRes.status === 'fulfilled') {
+        const allDetails = await Promise.all(
+          listRes.value.escrows.map(e => escrow.getById(e.escrow_id))
+        );
+        setDetails(allDetails);
+      }
+      if (jobsRes.status === 'fulfilled') {
+        // Jobs awaiting funding (hired but no escrow yet)
+        const escrowJobIds = new Set(
+          listRes.status === 'fulfilled'
+            ? listRes.value.escrows.map(e => e.job_post_id).filter(Boolean)
+            : []
+        );
+        setPendingJobs(
+          jobsRes.value.filter(
+            (j: JobPostItem) => j.status === 'pending_funding' && !escrowJobIds.has(j.id)
+          )
+        );
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -469,6 +671,53 @@ export default function PaymentsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-1">Payments</h1>
         <p className="text-gray-600">Manage milestone payments and escrow-protected transactions</p>
       </section>
+
+      {/* Projects awaiting funding */}
+      {pendingJobs.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <i className="fa-solid fa-hourglass-half text-orange-500"></i>
+            Projects Awaiting Funding
+          </h2>
+          <div className="space-y-3">
+            {pendingJobs.map(job => (
+              <div key={job.id} className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-bold text-gray-900">{job.title}</p>
+                  <p className="text-sm text-orange-700 mt-0.5">
+                    Creator hired — fund escrow to begin work
+                  </p>
+                  {(job.budget?.min || job.budget?.max) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Budget: ${job.budget.min?.toLocaleString()}
+                      {job.budget.max ? `–$${job.budget.max.toLocaleString()}` : '+'}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={async () => {
+                    // Get the hired creator from the applicants
+                    try {
+                      const { proposals: proposalsApi } = await import('@/lib/api');
+                      const applicants = await proposalsApi.getForJob(job.id);
+                      const hired = applicants.find((a: {status: string; creator_id?: string}) =>
+                        a.status === 'accepted'
+                      );
+                      const creatorId = hired?.creator_id;
+                      if (creatorId) {
+                        setFundingJob({ job, creatorId });
+                      }
+                    } catch { /* show modal with empty creatorId */ }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition flex-shrink-0">
+                  <i className="fa-solid fa-lock"></i>
+                  Fund Escrow
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -606,6 +855,10 @@ export default function PaymentsPage() {
                           + ${row.milestone.fees.client_fee.toFixed(2)} fee
                         </p>
                       )}
+                      {/* Mock transaction ID */}
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        TXN-SIM-{row.escrow_id.slice(-8).toUpperCase()}
+                      </p>
                       <p className="text-xs text-gray-400">
                         {formatDate(row.milestone.released_at || row.milestone.funded_at || row.created_at)}
                       </p>
@@ -630,11 +883,15 @@ export default function PaymentsPage() {
                           </button>
                         </>
                       ) : row.milestone.status === 'released' ? (
-                        <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition">
-                          <i className="fa-solid fa-check mr-1 text-green-500"></i>Released
+                        <span className="text-xs text-emerald-600 font-semibold">
+                          <i className="fa-solid fa-check mr-1"></i>Released
+                        </span>
+                      ) : row.milestone.status === 'refunded' ? (
+                        <span className="text-xs text-gray-400 font-semibold">
+                          <i className="fa-solid fa-rotate-left mr-1"></i>Refunded
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-400 tabular-nums">#{row.escrow_id.slice(-8)}</span>
+                        <span className="text-xs text-gray-400">—</span>
                       )}
                     </div>
                   </div>
@@ -676,6 +933,16 @@ export default function PaymentsPage() {
           row={releasing}
           onClose={() => setReleasing(null)}
           onReleased={handleReleased}
+        />
+      )}
+
+      {/* Fund Project modal */}
+      {fundingJob && (
+        <FundProjectModal
+          job={fundingJob.job}
+          creatorId={fundingJob.creatorId}
+          onFunded={() => { setFundingJob(null); loadEscrows(); }}
+          onClose={() => setFundingJob(null)}
         />
       )}
     </>

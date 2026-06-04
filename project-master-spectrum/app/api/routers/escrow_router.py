@@ -159,22 +159,31 @@ async def fund_milestone(
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
     )
-    # Notify creator that milestone funds are ready
+    # Notify creator + advance job to in_progress on first funding
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(escrow_id)
-        if escrow:
-            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
-            m_title = milestone.title if milestone else "Milestone"
+        from app.models.escrow import Escrow as EscrowDoc
+        from app.models.schema import JobPost
+        from beanie import PydanticObjectId as _OID
+
+        esc = await EscrowDoc.get(_OID(escrow_id))
+        if esc:
+            milestone = next((m for m in esc.milestones if m.milestone_id == request.milestone_id), None)
+            m_title  = milestone.title  if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
             await NotificationService.milestone_funded(
-                creator_id=str(escrow.creator_id),
+                creator_id=str(esc.creator_id),
                 client_id=str(current_user.id),
                 milestone_title=m_title,
                 amount=m_amount,
                 escrow_id=escrow_id,
             )
+            # Advance the linked job from pending_funding → in_progress
+            if esc.job_post_id:
+                job = await JobPost.get(esc.job_post_id)
+                if job and job.status in ("pending_funding", "open", "in_review"):
+                    job.status = "in_progress"
+                    await job.save()
     except Exception:
         pass
     return result
