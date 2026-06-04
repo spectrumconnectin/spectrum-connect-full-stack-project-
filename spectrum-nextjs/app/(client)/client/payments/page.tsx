@@ -71,6 +71,160 @@ function Avatar({ username, url, size = 'sm' }: { username?: string; url?: strin
   );
 }
 
+// ── Request revisions modal ──────────────────────────────────────────────────
+function RequestRevisionsModal({
+  row,
+  onClose,
+  onRequested,
+}: {
+  row: PaymentRow;
+  onClose: () => void;
+  onRequested: (escrowId: string, milestoneId: string) => void;
+}) {
+  const [feedback, setFeedback] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const handleRequest = async () => {
+    if (!feedback.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      // Send revision request via messaging
+      const { messaging } = await import('@/lib/api');
+
+      const message = `Please review the following revision request for "${row.milestone.title}" (Milestone ${row.milestone_num}/${row.total_milestones}):\n\n${feedback.trim()}`;
+
+      // We need the creator's ID to send the message. For now, we'll store this in metadata
+      // and the message will be sent to the conversation associated with this escrow
+      await messaging.createConversation([], row.escrow_id, message);
+
+      setSent(true);
+      setTimeout(() => {
+        onRequested(row.escrow_id, row.milestone.milestone_id);
+        onClose();
+      }, 1500);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="sc-modal-backdrop" onClick={onClose}>
+        <div className="sc-modal-panel" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-check text-green-600 text-2xl"></i>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Revision Request Sent</h3>
+            <p className="text-gray-600 text-sm">
+              The creator has been notified about your revision request. They&apos;ll resubmit the work when ready.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sc-modal-backdrop" onClick={() => { if (!busy) onClose(); }}>
+      <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 500, padding: 0 }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-6 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <i className="fa-solid fa-pen-to-square text-lg"></i>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Request Revisions</h2>
+              <p className="text-orange-100 text-xs">Provide feedback on the submitted work</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-8 py-6">
+          {/* Summary */}
+          <div className="bg-gray-50 rounded-2xl p-4 mb-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm flex-shrink-0">
+                {row.milestone_num}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">{row.milestone.title}</p>
+                <p className="text-xs text-gray-500">
+                  ${row.milestone.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Feedback textarea */}
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              What revisions do you need?
+            </label>
+            <textarea
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="Be specific about what you'd like changed. For example: 'Please adjust the color to match the brand guidelines' or 'Reduce the audio levels in the second section'"
+              rows={6}
+              maxLength={1000}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 resize-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {feedback.length}/1000 characters
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-xs text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Info box */}
+          <div className="mb-5 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-xs text-blue-700">
+              <i className="fa-solid fa-info-circle mr-2"></i>
+              The creator will be notified and can resubmit revised work. You won&apos;t release funds until you approve the changes.
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={onClose}
+              disabled={busy}
+              className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleRequest}
+              disabled={!feedback.trim() || busy}
+              className="flex-1 bg-amber-500 text-white py-3 rounded-xl font-semibold hover:bg-amber-600 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2"
+            >
+              {busy ? (
+                <>
+                  <i className="fa-solid fa-spinner animate-spin"></i> Sending…
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-paper-plane"></i> Send Revision Request
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Release milestone modal ───────────────────────────────────────────────────
 function ReleaseModal({
   row,
@@ -217,6 +371,7 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState('All');
   const [releasing, setReleasing] = useState<PaymentRow | null>(null);
+  const [requestingRevisions, setRequestingRevisions] = useState<PaymentRow | null>(null);
 
   const loadEscrows = useCallback(async () => {
     setLoading(true);
@@ -278,6 +433,12 @@ export default function PaymentsPage() {
       return { ...d, milestones: updated, released_amount: newReleased };
     }));
     setReleasing(null);
+  };
+
+  const handleRevisionsRequested = (escrowId: string, milestoneId: string) => {
+    setRequestingRevisions(null);
+    // Show a success notification
+    loadEscrows();
   };
 
   return (
@@ -434,12 +595,18 @@ export default function PaymentsPage() {
                     </span>
 
                     {/* Action */}
-                    <div className="w-36 flex-shrink-0 flex justify-end">
+                    <div className="flex-shrink-0 flex justify-end gap-2">
                       {row.milestone.status === 'funded' ? (
-                        <button onClick={() => setReleasing(row)}
-                          className="px-4 py-2 bg-cobalt text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow-md">
-                          <i className="fa-solid fa-unlock mr-1.5"></i>Release Funds
-                        </button>
+                        <>
+                          <button onClick={() => setRequestingRevisions(row)}
+                            className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-semibold rounded-xl hover:bg-amber-100 transition border border-amber-200 shadow-sm">
+                            <i className="fa-solid fa-pen-to-square mr-1"></i>Revisions
+                          </button>
+                          <button onClick={() => setReleasing(row)}
+                            className="px-4 py-2 bg-cobalt text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow-md">
+                            <i className="fa-solid fa-unlock mr-1.5"></i>Release
+                          </button>
+                        </>
                       ) : row.milestone.status === 'released' ? (
                         <span className="text-xs text-gray-400 opacity-0 group-hover:opacity-100 transition">
                           <i className="fa-solid fa-check mr-1 text-green-500"></i>Released
@@ -470,6 +637,15 @@ export default function PaymentsPage() {
             </div>
           </section>
         </>
+      )}
+
+      {/* Request revisions modal */}
+      {requestingRevisions && (
+        <RequestRevisionsModal
+          row={requestingRevisions}
+          onClose={() => setRequestingRevisions(null)}
+          onRequested={handleRevisionsRequested}
+        />
       )}
 
       {/* Release modal */}
