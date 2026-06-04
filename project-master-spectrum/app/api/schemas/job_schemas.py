@@ -171,13 +171,19 @@ class JobPostCreate(BaseModel):
 
     @validator('department')
     def validate_department(cls, v):
+        # Accept both the new frontend categories and legacy film-crew values
         allowed = [
+            # New frontend categories (Stage 2 form)
+            'Design', 'Film & Video', 'Writing & Content', 'Marketing & Strategy',
+            'Music & Audio', 'Digital & Interactive', 'Photography', 'Branding',
+            # Legacy film-crew departments (kept for backwards compatibility)
             'Camera', 'Sound', 'Lighting', 'Grip', 'Electric',
             'Art Department', 'Costume', 'Makeup & Hair', 'VFX',
             'Post-Production', 'Editing', 'Color Grading', 'Sound Design',
             'Music Composition', 'Production Management', 'Directing',
             'Producing', 'Cinematography', 'Scripting', 'Storyboarding',
-            'Animation', '3D Modeling', 'Motion Graphics', 'Other'
+            'Animation', '3D Modeling', 'Motion Graphics',
+            'Other',
         ]
         if v not in allowed:
             raise ValueError(f'Department must be one of: {", ".join(allowed)}')
@@ -185,25 +191,25 @@ class JobPostCreate(BaseModel):
 
     @validator('crew_size')
     def validate_crew_size(cls, v):
-        if v not in ['individual', 'small_crew', 'full_crew']:
+        if v and v not in ['individual', 'small_crew', 'full_crew']:
             raise ValueError('crew_size must be: individual, small_crew, or full_crew')
         return v
 
     @validator('complexity')
     def validate_complexity(cls, v):
-        if v not in ['simple', 'intermediate', 'complex']:
+        if v and v not in ['simple', 'intermediate', 'complex']:
             raise ValueError('complexity must be: simple, intermediate, or complex')
         return v
 
     @validator('budget_type')
     def validate_budget_type(cls, v):
-        if v not in ['fixed', 'hourly', 'daily', 'weekly']:
-            raise ValueError('budget_type must be: fixed, hourly, daily, or weekly')
+        if v and v not in ['fixed', 'hourly', 'daily', 'weekly', 'negotiable']:
+            raise ValueError('budget_type must be: fixed, hourly, daily, weekly, or negotiable')
         return v
 
     @validator('experience_level')
     def validate_experience_level(cls, v):
-        if v not in ['student', 'entry', 'intermediate', 'expert']:
+        if v and v not in ['student', 'entry', 'intermediate', 'expert']:
             raise ValueError('experience_level must be: student, entry, intermediate, or expert')
         return v
 
