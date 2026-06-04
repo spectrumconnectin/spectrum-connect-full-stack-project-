@@ -49,15 +49,15 @@ from app.api.schemas.escrow_schemas import (
     AdminDisputeListResponse,
 )
 
-escrow_router  = APIRouter(prefix="/escrow",   tags=["Spectrum Guarantee — Escrow"])
-dispute_router = APIRouter(prefix="/disputes", tags=["Spectrum Guarantee — Disputes"])
+escrow_router  = APIRouter(prefix="/escrow",   tags=["Spectrum Guarantee — Escrow"],   redirect_slashes=False)
+dispute_router = APIRouter(prefix="/disputes", tags=["Spectrum Guarantee — Disputes"], redirect_slashes=False)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ESCROW ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@escrow_router.post("/", summary="Create escrow for a project")
+@escrow_router.post("", summary="Create escrow for a project")
 async def create_escrow(
     request: CreateEscrowRequest,
     current_user: User = Depends(get_current_user),
