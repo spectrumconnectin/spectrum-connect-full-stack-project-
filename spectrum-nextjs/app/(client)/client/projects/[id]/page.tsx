@@ -55,7 +55,15 @@ export default function ClientProjectDetailPage() {
     jobs.getById(id)
       .then(data => {
         setJob(data);
-        if (data.status === 'completed') {
+        // Fetch the hired creator for any non-draft status so we can show Start Project / Future Work buttons
+        if (data.status !== 'draft' && data.status !== 'open') {
+          proposals.getForJob(data.id)
+            .then(res => {
+              const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
+              if (accepted) setHiredCreator(accepted);
+            }).catch(() => {});
+        } else if (data.status === 'open') {
+          // Still check — a creator may have been hired while job is still open
           proposals.getForJob(data.id)
             .then(res => {
               const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
@@ -113,8 +121,9 @@ export default function ClientProjectDetailPage() {
   }
 
   const budget = formatBudget(job);
-  const canClose    = job.status === 'open';
+  const canClose    = job.status === 'open' && !hiredCreator;
   const canPublish  = job.status === 'draft' || job.status === 'paused';
+  const canStart    = (job.status === 'open' || job.status === 'closed') && !!hiredCreator;
   const canComplete = job.status === 'in_progress';
   const canDelete   = job.status === 'draft';
 
@@ -246,6 +255,14 @@ export default function ClientProjectDetailPage() {
                   {job.status === 'draft' ? 'Publish Job' : 'Re-activate'}
                 </button>
               )}
+              {canStart && (
+                <button disabled={updatingStatus} onClick={() => handleStatusChange('in_progress')}
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm disabled:opacity-50">
+                  <i className="fa-solid fa-play"></i>
+                  Start Project
+                  {hiredCreator && <span className="ml-auto text-emerald-200 text-xs font-normal truncate max-w-[100px]">with {hiredCreator.creator_name.split(' ')[0]}</span>}
+                </button>
+              )}
               {canClose && (
                 <button disabled={updatingStatus} onClick={() => handleStatusChange('closed')}
                   className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 disabled:opacity-50">
@@ -300,6 +317,32 @@ export default function ClientProjectDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Hired creator card — shown when a creator is hired but project not yet started */}
+          {hiredCreator && job.status !== 'completed' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 shadow-sm">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-3">Creator Hired</p>
+              <div className="flex items-center gap-3 mb-4">
+                {hiredCreator.creator_avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hiredCreator.creator_avatar} alt={hiredCreator.creator_name}
+                    className="w-10 h-10 rounded-full border-2 border-emerald-300 object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {hiredCreator.creator_name[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{hiredCreator.creator_name}</p>
+                  {hiredCreator.creator_title && <p className="text-xs text-gray-500 truncate">{hiredCreator.creator_title}</p>}
+                </div>
+              </div>
+              <Link href={`/client/messaging?userId=${hiredCreator.creator_id}`}
+                className="flex items-center justify-center gap-2 w-full bg-white border border-emerald-300 text-emerald-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm">
+                <i className="fa-solid fa-comment"></i>Message
+              </Link>
+            </div>
+          )}
 
           {/* Job details */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">

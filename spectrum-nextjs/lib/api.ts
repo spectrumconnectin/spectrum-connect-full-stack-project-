@@ -812,6 +812,7 @@ export interface ProposalItem {
   job_title: string;
   job_department: string;
   job_status: string;
+  client_id?: string;
   cover_letter: string;
   proposed_budget?: number;
   role?: string;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { creatorProjects, proposals, ProjectItem, ProposalItem } from '@/lib/api';
+import { creatorProjects, proposals, messaging, ProjectItem, ProposalItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['all', 'in_progress', 'active', 'on_hold', 'completed'];
 
@@ -115,6 +115,11 @@ function MyWorkInner() {
   const [appError, setAppError] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [appsFetched, setAppsFetched] = useState(false);
+  // Submit-delivery modal state
+  const [deliveringApp, setDeliveringApp] = useState<ProposalItem | null>(null);
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [sendingDelivery, setSendingDelivery] = useState(false);
+  const [deliverySentIds, setDeliverySentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (topTab !== 'applications' || appsFetched) return;
@@ -200,7 +205,101 @@ function MyWorkInner() {
           error={appError}
           withdrawing={withdrawing}
           onWithdraw={handleWithdraw}
+          deliverySentIds={deliverySentIds}
+          onDeliver={(app) => {
+            setDeliveryNote('');
+            setDeliveringApp(app);
+          }}
         />
+      )}
+
+      {/* ── Submit Delivery Modal ── */}
+      {deliveringApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => { if (!sendingDelivery) setDeliveringApp(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-8 py-6 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-box-open text-lg"></i>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">Submit Delivery</h2>
+                  <p className="text-emerald-100 text-xs truncate max-w-xs">{deliveringApp.job_title}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-8 py-6">
+              {/* Info banner */}
+              <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5">
+                <i className="fa-solid fa-info-circle text-blue-500 mt-0.5 flex-shrink-0"></i>
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  This will send the client a delivery notification and message. They&apos;ll review your work and release payment when satisfied.
+                </p>
+              </div>
+
+              {/* Delivery note */}
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Delivery notes <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={deliveryNote}
+                  onChange={e => setDeliveryNote(e.target.value)}
+                  rows={5}
+                  maxLength={1000}
+                  placeholder="Describe what you've delivered — file locations, how to access the work, any notes for the client…"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1 text-right">{deliveryNote.length}/1000</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeliveringApp(null)}
+                  disabled={sendingDelivery}
+                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm disabled:opacity-50">
+                  Cancel
+                </button>
+                <button
+                  disabled={sendingDelivery}
+                  onClick={async () => {
+                    if (!deliveringApp.client_id) return;
+                    setSendingDelivery(true);
+                    try {
+                      const msg = [
+                        `✅ **Delivery submitted for: ${deliveringApp.job_title}**`,
+                        '',
+                        deliveryNote.trim() || 'The work has been completed and is ready for your review.',
+                        '',
+                        'Please review the deliverables and release payment when satisfied. Feel free to message me if you have any questions or need revisions.',
+                      ].join('\n');
+                      await messaging.createConversation(
+                        [deliveringApp.client_id],
+                        deliveringApp.job_id,
+                        msg,
+                      );
+                      setDeliverySentIds(prev => { const next = new Set(prev); next.add(deliveringApp.id); return next; });
+                      setDeliveringApp(null);
+                    } catch (e) {
+                      alert((e as Error).message);
+                    } finally {
+                      setSendingDelivery(false);
+                    }
+                  }}
+                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2">
+                  {sendingDelivery
+                    ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                    : <><i className="fa-solid fa-paper-plane"></i> Submit Delivery</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
@@ -388,6 +487,7 @@ function ApplicationsView({
   counts, tabs, activeTab, setActiveTab,
   appList, filtered, loading, error,
   withdrawing, onWithdraw,
+  deliverySentIds, onDeliver,
 }: {
   counts: { total: number; submitted: number; shortlisted: number; accepted: number };
   tabs: string[];
@@ -398,6 +498,8 @@ function ApplicationsView({
   error: string | null;
   withdrawing: string | null;
   onWithdraw: (id: string) => void;
+  deliverySentIds: Set<string>;
+  onDeliver: (app: ProposalItem) => void;
 }) {
   return (
     <>
@@ -491,10 +593,24 @@ function ApplicationsView({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
                       <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
                         {APP_STATUS_LABEL[app.status] ?? app.status}
                       </span>
+                      {/* Hired: show Submit Delivery or Delivered confirmation */}
+                      {app.status === 'accepted' && (
+                        deliverySentIds.has(app.id) ? (
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                            <i className="fa-solid fa-circle-check"></i> Delivery sent
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onDeliver(app)}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5">
+                            <i className="fa-solid fa-box-open"></i> Submit Delivery
+                          </button>
+                        )
+                      )}
                       {['submitted', 'shortlisted', 'interviewing'].includes(app.status) && (
                         <button
                           onClick={() => onWithdraw(app.id)}

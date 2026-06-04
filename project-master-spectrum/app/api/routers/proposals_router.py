@@ -129,6 +129,7 @@ async def get_my_proposals(
             "job_title": job.title if job else "Unknown",
             "job_department": job.department if job else "",
             "job_status": job.status if job else "",
+            "client_id": str(job.client_id) if job else None,
             "cover_letter": app.cover_letter,
             "proposed_budget": app.proposed_budget,
             "role": app.role,
