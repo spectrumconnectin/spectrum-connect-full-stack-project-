@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { jobs, messaging, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
+import ProjectTracker from './tracker';
 
 const STATUS_STYLE: Record<string, string> = {
   open:        'bg-green-100 text-green-700',
@@ -202,6 +203,9 @@ export default function ClientProjectDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Project Tracker — unified view of milestones, messages, files */}
+          <ProjectTracker projectId={id} />
 
           {/* Stats */}
           <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
