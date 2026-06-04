@@ -255,9 +255,65 @@ export default function ClientDashboardPage() {
         </div>
       )}
 
-      {/* ── ETF Widget — shown below main content ── */}
+      {/* ── Bottom row: ETF + Quick Access ── */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <EtfWidget href="/client/etf" />
+
+        {/* Quick Access — 2 columns wide */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+          <h3 className="font-bold text-gray-900 mb-5">Quick Access</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              {
+                href: '/client/projects/create',
+                icon: 'fa-plus',
+                iconBg: 'bg-blue-100 text-cobalt',
+                title: 'Create a Project',
+                desc: 'Post a new job and start receiving proposals from creators.',
+                primary: true,
+              },
+              {
+                href: '/client/smart-connect',
+                icon: 'fa-bolt',
+                iconBg: 'bg-purple-100 text-purple-600',
+                title: 'Smart Connect',
+                desc: 'Let AI find and rank the best creators for your project.',
+                primary: false,
+              },
+              {
+                href: '/client/collaborators',
+                icon: 'fa-magnifying-glass',
+                iconBg: 'bg-emerald-100 text-emerald-600',
+                title: 'Find Creators',
+                desc: 'Browse verified creator profiles and invite them to apply.',
+                primary: false,
+              },
+              {
+                href: '/client/messaging',
+                icon: 'fa-comment',
+                iconBg: 'bg-amber-100 text-amber-600',
+                title: 'Messages',
+                desc: 'Chat with creators, negotiate scope, and manage deliverables.',
+                primary: false,
+              },
+            ].map(({ href, icon, iconBg, title, desc, primary }) => (
+              <Link key={href} href={href}
+                className={`flex items-start gap-4 p-4 rounded-xl border transition hover:shadow-sm group ${
+                  primary
+                    ? 'border-cobalt/30 bg-blue-50/60 hover:bg-blue-50'
+                    : 'border-gray-100 hover:border-gray-200'
+                }`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+                  <i className={`fa-solid ${icon}`}></i>
+                </div>
+                <div className="min-w-0">
+                  <p className={`font-semibold text-sm mb-0.5 ${primary ? 'text-cobalt' : 'text-gray-900'} group-hover:text-cobalt transition`}>{title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       </section>
     </>
   );
