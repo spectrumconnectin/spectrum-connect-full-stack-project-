@@ -444,24 +444,27 @@ function TimelineTab({ deadlines, projectId, role, onRefresh }: {
 
 // ─── Deliverables Tab ─────────────────────────────────────────────────────────
 
-function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
+function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend }: {
   msgs: MessageItem[];
   myUserId: string;
   role: 'client' | 'creator';
   escrowDetail: EscrowDetail | null;
   onRefresh: () => void;
+  onSend?: (text: string, file?: File) => void;
 }) {
-  // Deliverables are messages sent by the creator that contain attachments
-  // OR messages that start with delivery-related keywords
-  const deliveries = msgs.filter(m =>
-    m.attachments.length > 0 ||
-    m.content.toLowerCase().includes('deliver') ||
-    m.content.toLowerCase().includes('submission') ||
-    m.content.toLowerCase().includes('completed') ||
-    m.content.toLowerCase().includes('final')
-  );
+  // State for Final Delivery modal
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [selectedMilestone, setSelectedMilestone] = useState<EscrowMilestone | null>(null);
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [deliveryFiles, setDeliveryFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const filePickerRef = useRef<HTMLInputElement>(null);
 
-  // Delivered milestones from escrow
+  const fundedMilestones = escrowDetail?.milestones.filter(
+    m => m.status === 'funded' || m.status === 'revision_requested'
+  ) ?? [];
+
   const deliveredMilestones = escrowDetail?.milestones.filter(
     m => ['delivered', 'revision_requested', 'approved', 'released'].includes(m.status)
   ) ?? [];
@@ -482,15 +485,100 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
     }
   };
 
+  const openDeliveryModal = (m: EscrowMilestone) => {
+    setSelectedMilestone(m);
+    setDeliveryNote('');
+    setDeliveryFiles([]);
+    setSubmitted(false);
+    setShowDeliveryModal(true);
+  };
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    setDeliveryFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    e.target.value = '';
+  };
+
+  const submitDelivery = async () => {
+    if (!selectedMilestone || !escrowDetail) return;
+    setSubmitting(true);
+    try {
+      // 1. Upload any attached files and build message
+      const fileLines: string[] = [];
+      for (const file of deliveryFiles) {
+        const uploaded = await messaging.uploadAttachment(file);
+        fileLines.push(`📎 ${file.name}`);
+        if (onSend) await onSend(`📎 Delivery file: ${file.name}`, file);
+      }
+
+      // 2. Post the delivery message in chat
+      const parts = [
+        `📦 **Final Delivery: ${selectedMilestone.title}**`,
+        '',
+        deliveryNote.trim() || 'Work completed as discussed.',
+        ...fileLines,
+      ];
+      if (onSend) await onSend(parts.join('\n'));
+
+      // 3. Mark milestone as delivered via escrow endpoint
+      await escrow.deliverMilestone(escrowDetail.escrow_id, selectedMilestone.milestone_id);
+
+      setSubmitted(true);
+      onRefresh();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Message-based delivery evidence (attachments + delivery keywords)
+  const deliveryMsgs = msgs.filter(m =>
+    m.attachments.length > 0 ||
+    m.content.toLowerCase().includes('delivery') ||
+    m.content.toLowerCase().includes('📦') ||
+    m.content.toLowerCase().includes('final')
+  );
+
   return (
     <div className="space-y-5">
+
+      {/* Creator: Final Delivery button for each funded milestone */}
+      {role === 'creator' && fundedMilestones.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+          <h4 className="font-bold text-emerald-900 mb-3">
+            <i className="fa-solid fa-box-open mr-2"></i>Ready to submit your work?
+          </h4>
+          <div className="space-y-2">
+            {fundedMilestones.map(m => (
+              <div key={m.milestone_id} className="flex items-center justify-between bg-white rounded-lg p-3 border border-emerald-100">
+                <div>
+                  <p className="font-semibold text-sm text-gray-900">{m.title}</p>
+                  <p className="text-xs text-gray-500">${m.amount.toLocaleString()} · {MILESTONE_STATUS_LABEL[m.status]}</p>
+                </div>
+                <button onClick={() => openDeliveryModal(m)}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition flex items-center gap-1.5">
+                  <i className="fa-solid fa-paper-plane text-xs"></i>Submit Delivery
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Delivered milestones from escrow */}
       {deliveredMilestones.length > 0 && (
         <div>
-          <h4 className="font-semibold text-gray-700 text-sm mb-3">Escrow Deliveries</h4>
+          <h4 className="font-semibold text-gray-700 text-sm mb-3">
+            {role === 'client' ? 'Submitted Deliveries — Review Required' : 'Submitted Deliveries'}
+          </h4>
           <div className="space-y-3">
             {deliveredMilestones.map(m => (
-              <div key={m.milestone_id} className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+              <div key={m.milestone_id} className={`border rounded-xl p-4 ${
+                m.status === 'delivered' ? 'bg-indigo-50 border-indigo-300' :
+                m.status === 'released' ? 'bg-emerald-50 border-emerald-200' :
+                'bg-amber-50 border-amber-200'
+              }`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block ${MILESTONE_STATUS_COLOR[m.status]}`}>
@@ -498,6 +586,11 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
                     </span>
                     <p className="font-semibold text-gray-900">{m.title}</p>
                     <p className="text-sm font-bold text-gray-700">${m.amount.toLocaleString()}</p>
+                    {m.released_at && (
+                      <p className="text-xs text-emerald-600 mt-1">
+                        <i className="fa-solid fa-check mr-1"></i>Released {fmtDate(m.released_at)}
+                      </p>
+                    )}
                   </div>
                   {role === 'client' && m.status === 'delivered' && (
                     <div className="flex flex-col gap-2">
@@ -518,16 +611,16 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
         </div>
       )}
 
-      {/* Message-based deliverables */}
-      {deliveries.length > 0 && (
+      {/* Delivery messages with attachments */}
+      {deliveryMsgs.length > 0 && (
         <div>
-          <h4 className="font-semibold text-gray-700 text-sm mb-3">Submitted Files & Work</h4>
+          <h4 className="font-semibold text-gray-700 text-sm mb-3">Delivery Messages & Files</h4>
           <div className="space-y-3">
-            {deliveries.slice(0, 10).map(m => (
+            {deliveryMsgs.slice(0, 10).map(m => (
               <div key={m.id} className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <i className="fa-solid fa-box-open text-cobalt text-sm"></i>
+                  <div className="w-8 h-8 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i className="fa-solid fa-box-open text-indigo-600 text-sm"></i>
                   </div>
                   <div className="flex-1 min-w-0">
                     {m.content && (
@@ -550,11 +643,127 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
         </div>
       )}
 
-      {deliveries.length === 0 && deliveredMilestones.length === 0 && (
+      {deliveryMsgs.length === 0 && deliveredMilestones.length === 0 && fundedMilestones.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           <i className="fa-solid fa-box-open text-4xl mb-3 block text-gray-300"></i>
           <p className="text-sm">No deliverables submitted yet.</p>
-          {role === 'creator' && <p className="text-xs mt-1">Submit your work via the Milestones tab or upload files below.</p>}
+          {role === 'creator' && <p className="text-xs mt-1">Once a milestone is funded, you can submit your delivery here.</p>}
+          {role === 'client' && <p className="text-xs mt-1">Deliverables from the creator will appear here.</p>}
+        </div>
+      )}
+
+      {/* Final Delivery Modal */}
+      {showDeliveryModal && selectedMilestone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!submitting) setShowDeliveryModal(false); }} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden">
+
+            {submitted ? (
+              /* ── Success state ── */
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="fa-solid fa-circle-check text-emerald-600 text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Delivery Submitted!</h3>
+                <p className="text-gray-500 text-sm mb-2">
+                  <strong>{selectedMilestone.title}</strong> has been submitted to the client for review.
+                </p>
+                <p className="text-gray-400 text-xs mb-6">
+                  The client has been notified and will approve or request revisions.
+                </p>
+                <button onClick={() => setShowDeliveryModal(false)}
+                  className="px-8 py-2.5 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
+                  Done
+                </button>
+              </div>
+            ) : (
+              /* ── Form ── */
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Submit Final Delivery</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">{selectedMilestone.title} · ${selectedMilestone.amount.toLocaleString()}</p>
+                  </div>
+                  <button onClick={() => setShowDeliveryModal(false)} disabled={submitting}
+                    className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Delivery notes */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Delivery notes</label>
+                    <textarea value={deliveryNote} onChange={e => setDeliveryNote(e.target.value)}
+                      rows={3} placeholder="Describe what you've delivered, any notes, and how to access the files…"
+                      className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-cobalt resize-none" />
+                  </div>
+
+                  {/* File attachments */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Deliverable files <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input ref={filePickerRef} type="file" multiple className="hidden"
+                      onChange={handleFilePick}
+                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.rar,.txt,.mp3,.mp4,.mov,.ai,.psd,.fig,.sketch" />
+
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:border-cobalt transition cursor-pointer"
+                      onClick={() => filePickerRef.current?.click()}>
+                      <i className="fa-solid fa-upload text-gray-400 text-xl mb-2 block"></i>
+                      <p className="text-sm text-gray-600">Click to add files</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Images, videos, PDFs, documents, project assets</p>
+                    </div>
+
+                    {/* Selected files list */}
+                    {deliveryFiles.length > 0 && (
+                      <div className="mt-3 space-y-1.5">
+                        {deliveryFiles.map((f, i) => (
+                          <div key={i} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                            <i className={`fa-solid text-xs flex-shrink-0 ${
+                              f.type.startsWith('image') ? 'fa-image text-purple-500' :
+                              f.type.startsWith('video') ? 'fa-film text-blue-500' :
+                              f.type === 'application/pdf' ? 'fa-file-pdf text-red-500' :
+                              'fa-file text-gray-500'
+                            }`}></i>
+                            <span className="text-xs text-gray-700 flex-1 truncate">{f.name}</span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">{fmtSize(f.size)}</span>
+                            <button onClick={() => setDeliveryFiles(prev => prev.filter((_, j) => j !== i))}
+                              className="text-gray-300 hover:text-red-400 transition flex-shrink-0">
+                              <i className="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {submitting && (
+                  <div className="mt-4 flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+                    <div className="w-4 h-4 border-2 border-cobalt border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                    <p className="text-xs text-cobalt">
+                      {deliveryFiles.length > 0 ? `Uploading files and submitting delivery…` : 'Submitting delivery…'}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 mt-5">
+                  <button onClick={() => setShowDeliveryModal(false)} disabled={submitting}
+                    className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                    Cancel
+                  </button>
+                  <button onClick={submitDelivery} disabled={submitting}
+                    className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    {submitting
+                      ? <><i className="fa-solid fa-spinner animate-spin"></i> Submitting…</>
+                      : <><i className="fa-solid fa-paper-plane"></i> Submit Delivery</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -897,7 +1106,8 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
           <MilestonesTab escrowDetail={escrowDetail} role={role} onRefresh={loadAll} />
         )}
         {activeTab === 'deliverables' && (
-          <DeliverablesTab msgs={msgs} myUserId={myUserId} role={role} escrowDetail={escrowDetail} onRefresh={loadAll} />
+          <DeliverablesTab msgs={msgs} myUserId={myUserId} role={role} escrowDetail={escrowDetail} onRefresh={loadAll}
+            onSend={(text, file) => handleSendMessage(text, file)} />
         )}
         {activeTab === 'files' && (
           <FilesTab msgs={msgs} onSend={(text, file) => handleSendMessage(text, file)} />

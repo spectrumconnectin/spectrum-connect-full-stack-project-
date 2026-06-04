@@ -565,6 +565,34 @@ async def deliver_milestone(
         raise HTTPException(status_code=400, detail=f"Cannot deliver a milestone with status '{milestone.status}'")
     milestone.status = "delivered"
     await esc.save()
+
+    # Check if ALL milestones are now delivered/approved/released → job status = "delivered"
+    all_active_statuses = {m.status for m in esc.milestones}
+    all_submitted = all_active_statuses.issubset({"delivered", "approved", "released", "refunded"})
+    if all_submitted and esc.job_post_id:
+        try:
+            from app.models.schema import JobPost
+            job = await JobPost.get(esc.job_post_id)
+            if job and job.status == "in_progress":
+                job.status = "delivered"
+                await job.save()
+        except Exception:
+            pass
+
+    # Notify client
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.send(
+            user_id=str(esc.client_id),
+            type="escrow",
+            category="action_required",
+            title="Delivery submitted — review required",
+            message=f"The creator has submitted work on milestone '{milestone.title}'. Please review and approve or request a revision.",
+            actor_id=str(current_user.id),
+        )
+    except Exception:
+        pass
+
     return {"success": True, "milestone_id": milestone_id, "status": "delivered"}
 
 

@@ -12,6 +12,7 @@ const STATUS_STYLE: Record<string, string> = {
   pending_funding: 'bg-orange-100 text-orange-700',
   draft:           'bg-gray-100 text-gray-600',
   in_progress:     'bg-blue-100 text-blue-700',
+  delivered:       'bg-indigo-100 text-indigo-700',
   closed:          'bg-blue-100 text-blue-700',
   completed:       'bg-emerald-100 text-emerald-700',
 };
@@ -22,6 +23,7 @@ function jobStatusLabel(status: string): string {
     in_review:       'In Review',
     pending_funding: 'Pending Funding',
     in_progress:     'Active',
+    delivered:       'Delivered',
     closed:          'Active',
     completed:       'Completed',
     draft:           'Draft',
@@ -183,6 +185,24 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Delivery received banner — action required */}
+      {job.status === 'delivered' && (
+        <div className="bg-indigo-50 border-2 border-indigo-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-box-open text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Action Required</p>
+            <p className="text-indigo-700 text-sm mt-0.5 leading-relaxed">
+              The creator has submitted their work. Review the deliverables in the Milestones tab below and approve or request revisions.
+            </p>
+          </div>
+          <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Delivered
+          </span>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* ── Main content ── */}
