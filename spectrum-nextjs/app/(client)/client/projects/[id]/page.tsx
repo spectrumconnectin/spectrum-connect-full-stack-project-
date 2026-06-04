@@ -10,12 +10,18 @@ import FileShare from './files';
 const STATUS_STYLE: Record<string, string> = {
   open:        'bg-green-100 text-green-700',
   draft:       'bg-gray-100 text-gray-600',
-  paused:      'bg-yellow-100 text-yellow-700',
   in_progress: 'bg-blue-100 text-blue-700',
-  closed:      'bg-orange-100 text-orange-600',
-  completed:   'bg-purple-100 text-purple-700',
-  cancelled:   'bg-red-100 text-red-600',
+  closed:      'bg-blue-100 text-blue-700',  // legacy, show same as active
+  completed:   'bg-emerald-100 text-emerald-700',
 };
+
+function jobStatusLabel(status: string, proposalCount = 0): string {
+  if (status === 'open' && proposalCount > 0) return 'In Review';
+  const map: Record<string, string> = {
+    open: 'Open', in_progress: 'Active', closed: 'Active', completed: 'Completed', draft: 'Draft',
+  };
+  return map[status] ?? status;
+}
 
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, sfx = '') => {
@@ -121,8 +127,7 @@ export default function ClientProjectDetailPage() {
   }
 
   const budget = formatBudget(job);
-  const canClose    = job.status === 'open' && !hiredCreator;
-  const canPublish  = job.status === 'draft' || job.status === 'paused';
+  const canPublish  = job.status === 'draft';
   const canStart    = (job.status === 'open' || job.status === 'closed') && !!hiredCreator;
   const canComplete = job.status === 'in_progress';
   const canDelete   = job.status === 'draft';
@@ -139,8 +144,10 @@ export default function ClientProjectDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-3xl font-bold text-gray-900 truncate">{job.title}</h1>
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize flex-shrink-0 ${STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                {job.status.replace('_', ' ')}
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0 ${
+                job.status === 'open' && (job.proposal_count ?? 0) > 0 ? 'bg-amber-100 text-amber-700' : STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'
+              }`}>
+                {jobStatusLabel(job.status, job.proposal_count)}
               </span>
             </div>
             <p className="text-gray-500 mt-1 text-sm">
@@ -261,18 +268,6 @@ export default function ClientProjectDetailPage() {
                   <i className="fa-solid fa-play"></i>
                   Start Project
                   {hiredCreator && <span className="ml-auto text-emerald-200 text-xs font-normal truncate max-w-[100px]">with {hiredCreator.creator_name.split(' ')[0]}</span>}
-                </button>
-              )}
-              {canClose && (
-                <button disabled={updatingStatus} onClick={() => handleStatusChange('closed')}
-                  className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 disabled:opacity-50">
-                  <i className="fa-solid fa-lock text-orange-500"></i>Close to New Proposals
-                </button>
-              )}
-              {canClose && (
-                <button disabled={updatingStatus} onClick={() => handleStatusChange('paused')}
-                  className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 disabled:opacity-50">
-                  <i className="fa-solid fa-pause text-yellow-500"></i>Pause Job
                 </button>
               )}
               {canComplete && (

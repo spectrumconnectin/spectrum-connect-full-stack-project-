@@ -13,7 +13,6 @@ const navLinks = [
   { href: '/creator/find-projects',label: 'Find Projects', icon: 'fa-search' },
   { href: '/creator/smart-connect',label: 'Smart Connect', icon: 'fa-bolt' },
   { href: '/creator/projects',     label: 'My Work',       icon: 'fa-briefcase' },
-  { href: '/creator/services',     label: 'Services',      icon: 'fa-store' },
   { href: '/creator/disputes',     label: 'Disputes',      icon: 'fa-scale-balanced' },
   { href: '/creator/ai-assistant', label: 'Miya',          icon: 'fa-sparkles', isMiya: true },
 ];
@@ -130,6 +129,7 @@ function CreatorHeader() {
                     {[
                       { href: '/creator/profile',  icon: 'fa-user', label: 'My Profile' },
                       { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings' },
+                      { href: '/creator/services', icon: 'fa-store', label: 'My Services' },
                       { href: '/creator/etf',      icon: 'fa-medal', label: 'ETF — Earn Trust' },
                       { href: '/client/dashboard', icon: 'fa-arrow-right-arrow-left', label: 'Switch to Client' },
                     ].map(({ href, icon, label }) => (
@@ -251,8 +251,8 @@ function CreatorFooter() {
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/creator/dashboard" className="hover:text-cobalt transition">Dashboard</Link></li>
               <li><Link href="/creator/find-projects" className="hover:text-cobalt transition">Find Projects</Link></li>
+              <li><Link href="/creator/smart-connect" className="hover:text-cobalt transition">Smart Connect</Link></li>
               <li><Link href="/creator/projects" className="hover:text-cobalt transition">My Work</Link></li>
-              <li><Link href="/creator/services" className="hover:text-cobalt transition">Services</Link></li>
             </ul>
           </div>
           <div>
@@ -265,6 +265,8 @@ function CreatorFooter() {
           <div>
             <h3 className="font-semibold text-gray-900 mb-3 text-sm">Account</h3>
             <ul className="space-y-2 text-sm text-gray-600">
+              <li><Link href="/creator/services" className="hover:text-cobalt transition">My Services</Link></li>
+              <li><Link href="/creator/earnings" className="hover:text-cobalt transition">Earnings</Link></li>
               <li><Link href="/client/dashboard" className="hover:text-cobalt transition">Switch to Client</Link></li>
             </ul>
           </div>
