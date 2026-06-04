@@ -6,11 +6,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { auth, profile as profileApi } from '@/lib/api';
 
 const navItems = [
-  { href: '/admin/dashboard', label: 'Dashboard',    icon: 'fa-gauge-high' },
-  { href: '/admin/users',     label: 'Users',        icon: 'fa-users' },
-  { href: '/admin/projects',  label: 'Projects',     icon: 'fa-briefcase' },
-  { href: '/admin/disputes',  label: 'Disputes',     icon: 'fa-scale-balanced' },
+  { href: '/admin/dashboard',    label: 'Dashboard',    icon: 'fa-gauge-high' },
+  { href: '/admin/users',        label: 'Users',        icon: 'fa-users' },
+  { href: '/admin/projects',     label: 'Projects',     icon: 'fa-briefcase' },
+  { href: '/admin/disputes',     label: 'Disputes',     icon: 'fa-scale-balanced' },
   { href: '/admin/transactions', label: 'Transactions', icon: 'fa-dollar-sign' },
+  { href: '/admin/revenue',      label: 'Revenue',      icon: 'fa-chart-pie' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

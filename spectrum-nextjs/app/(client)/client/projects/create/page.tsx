@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { jobs, JobCreatePayload } from '@/lib/api';
 
@@ -25,6 +25,88 @@ const BUDGET_TYPES = [
 ];
 
 const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400 text-sm';
+
+function FeePreview({ min, max }: { min: string; max: string }) {
+  const amount = useMemo(() => {
+    const maxN = parseFloat(max);
+    const minN = parseFloat(min);
+    if (!isNaN(maxN) && maxN > 0) return maxN;
+    if (!isNaN(minN) && minN > 0) return minN;
+    return null;
+  }, [min, max]);
+
+  if (!amount) return (
+    <div className="mt-1 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+      <div className="flex items-center gap-2 text-cobalt text-xs font-semibold mb-1">
+        <i className="fa-solid fa-circle-info"></i> Platform Fee Preview
+      </div>
+      <p className="text-xs text-gray-500">Enter a budget above to see the fee breakdown.</p>
+    </div>
+  );
+
+  const clientFee    = parseFloat((amount * 0.04).toFixed(2));
+  const creatorFee   = parseFloat((amount * 0.08).toFixed(2));
+  const clientTotal  = parseFloat((amount + clientFee).toFixed(2));
+  const creatorEarns = parseFloat((amount - creatorFee).toFixed(2));
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <div className="mt-1 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-blue-200 bg-blue-100/60">
+        <i className="fa-solid fa-receipt text-cobalt text-sm"></i>
+        <span className="text-sm font-bold text-cobalt">Fee Preview — based on ${fmt(amount)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-4 p-4">
+        {/* Client side */}
+        <div className="bg-white rounded-xl p-4 border border-blue-100">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <i className="fa-solid fa-building text-cobalt text-xs"></i>What you pay
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-700">
+              <span>Project amount</span>
+              <span className="font-semibold">${fmt(amount)}</span>
+            </div>
+            <div className="flex justify-between text-gray-700">
+              <span>Platform fee (4%)</span>
+              <span className="font-semibold text-amber-600">+${fmt(clientFee)}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-gray-100">
+              <span className="font-bold text-gray-900">Total charged</span>
+              <span className="font-bold text-cobalt">${fmt(clientTotal)}</span>
+            </div>
+          </div>
+        </div>
+        {/* Creator side */}
+        <div className="bg-white rounded-xl p-4 border border-emerald-100">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <i className="fa-solid fa-palette text-emerald-600 text-xs"></i>Creator receives
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-700">
+              <span>Project amount</span>
+              <span className="font-semibold">${fmt(amount)}</span>
+            </div>
+            <div className="flex justify-between text-gray-700">
+              <span>Platform fee (8%)</span>
+              <span className="font-semibold text-rose-500">−${fmt(creatorFee)}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-gray-100">
+              <span className="font-bold text-gray-900">Creator earns</span>
+              <span className="font-bold text-emerald-600">${fmt(creatorEarns)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="px-4 pb-3">
+        <p className="text-xs text-gray-500 flex items-start gap-1.5">
+          <i className="fa-solid fa-shield-halved text-cobalt mt-0.5 flex-shrink-0"></i>
+          Funds are held in escrow and only released when you approve the work. Platform fees help maintain Spectrum Connect.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function CreateProjectPage() {
   const router = useRouter();
@@ -282,18 +364,22 @@ export default function CreateProjectPage() {
               ))}
             </div>
             {budgetType !== 'negotiable' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Min ($)</label>
-                  <input type="number" min="0" value={budgetMin} onChange={e => setBudgetMin(e.target.value)}
-                    placeholder="e.g. 500" className={inp} />
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Min ($)</label>
+                    <input type="number" min="0" value={budgetMin} onChange={e => setBudgetMin(e.target.value)}
+                      placeholder="e.g. 500" className={inp} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Max ($)</label>
+                    <input type="number" min="0" value={budgetMax} onChange={e => setBudgetMax(e.target.value)}
+                      placeholder="e.g. 2000" className={inp} />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Max ($)</label>
-                  <input type="number" min="0" value={budgetMax} onChange={e => setBudgetMax(e.target.value)}
-                    placeholder="e.g. 2000" className={inp} />
-                </div>
-              </div>
+                {/* Live fee preview */}
+                <FeePreview min={budgetMin} max={budgetMax} />
+              </>
             )}
           </div>
         </div>

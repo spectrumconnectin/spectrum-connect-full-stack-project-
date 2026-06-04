@@ -17,6 +17,7 @@ PATCH /admin/jobs/{job_id}/status    Change job status
 GET  /admin/disputes                 All disputes
 GET  /admin/transactions             All escrow transactions
 GET  /admin/etf/stats                ETF points summary
+GET  /admin/revenue                  Platform revenue breakdown (fees by month/project)
 """
 from __future__ import annotations
 
@@ -70,16 +71,26 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
     new_users_30d = await User.find(User.created_at >= thirty_days_ago).count()
 
-    # Escrow / financial stats
+    # Financial stats — pull from Transaction records (the source of truth for
+    # completed payments).  Escrow model is used only for status counts.
     try:
-        all_escrow = await EscrowTransaction.find_all().to_list()
-        total_volume = sum(float(e.amount or 0) for e in all_escrow)
-        active_escrow = sum(1 for e in all_escrow if e.status in ("funded", "in_progress"))
-        completed_escrow = sum(1 for e in all_escrow if e.status == "released")
-        disputed_escrow = sum(1 for e in all_escrow if e.status == "disputed")
-        total_fees = sum(float(e.platform_fee or 0) for e in all_escrow)
+        from app.models.schema import Transaction as TxModel
+        from app.models.escrow import Escrow as EscrowModel
+
+        all_tx = await TxModel.find(TxModel.status == "completed").to_list()
+        total_volume    = round(sum(float(t.amount or 0)       for t in all_tx), 2)
+        total_fees      = round(sum(float(t.platform_fee or 0) for t in all_tx), 2)
+        client_fee_usd  = round(sum(float(t.client_fee or 0)   for t in all_tx), 2)
+        creator_fee_usd = round(sum(float(t.creator_fee or 0)  for t in all_tx), 2)
+
+        # Counts come from the Escrow document statuses
+        all_escrows = await EscrowModel.find_all().to_list()
+        active_escrow    = sum(1 for e in all_escrows if e.status in ("active", "funded", "in_progress"))
+        completed_escrow = sum(1 for e in all_escrows if e.status == "completed")
+        disputed_escrow  = sum(1 for e in all_escrows if e.status == "disputed")
     except Exception:
-        total_volume = active_escrow = completed_escrow = disputed_escrow = total_fees = 0
+        total_volume = active_escrow = completed_escrow = disputed_escrow = 0
+        total_fees = client_fee_usd = creator_fee_usd = 0
 
     # ETF stats
     try:
@@ -101,8 +112,10 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
             "new_last_30_days": new_users_30d,
         },
         "escrow": {
-            "total_volume_usd": round(total_volume, 2),
-            "platform_fees_usd": round(total_fees, 2),
+            "total_volume_usd": total_volume,
+            "platform_fees_usd": total_fees,
+            "client_fee_usd": client_fee_usd,
+            "creator_fee_usd": creator_fee_usd,
             "active_count": active_escrow,
             "completed_count": completed_escrow,
             "disputed_count": disputed_escrow,
@@ -351,16 +364,16 @@ async def list_all_transactions(
     tx_status: Optional[str] = Query(None, alias="status"),
     admin: User = Depends(get_admin_user),
 ):
-    from app.models.escrow import EscrowTransaction
+    from app.models.schema import Transaction as TxModel
     try:
-        all_tx = await EscrowTransaction.find_all().to_list()
+        all_tx = await TxModel.find_all().to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "transactions": []}
 
     if tx_status:
         all_tx = [t for t in all_tx if t.status == tx_status]
 
-    all_tx.sort(key=lambda t: t.created_at or datetime.min, reverse=True)
+    all_tx.sort(key=lambda t: t.initiated_at or datetime.min, reverse=True)
     total = len(all_tx)
     start = (page - 1) * page_size
 
@@ -373,12 +386,16 @@ async def list_all_transactions(
             {
                 "id": str(t.id),
                 "status": t.status,
+                "type": t.type,
                 "amount": float(t.amount or 0),
                 "currency": t.currency,
                 "platform_fee": float(t.platform_fee or 0),
-                "client_id": str(t.client_id) if t.client_id else None,
-                "creator_id": str(t.creator_id) if t.creator_id else None,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "client_fee": float(t.client_fee or 0),
+                "creator_fee": float(t.creator_fee or 0),
+                "commission_version": t.commission_version,
+                "client_id": str(t.from_user_id) if t.from_user_id else None,
+                "creator_id": str(t.to_user_id) if t.to_user_id else None,
+                "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
             }
             for t in all_tx[start: start + page_size]
         ],
@@ -410,4 +427,91 @@ async def get_etf_stats(admin: User = Depends(get_admin_user)):
         "total_lifetime_points": total_lifetime,
         "total_redeemed_points": total_redeemed,
         "level_breakdown": levels,
+    }
+
+
+# ── Revenue Reporting ──────────────────────────────────────────────────────────
+
+@router.get("/revenue", summary="Platform revenue breakdown")
+async def get_revenue_report(admin: User = Depends(get_admin_user)):
+    """
+    Detailed fee revenue report:
+    - Monthly breakdown of client fees vs creator fees for the last 12 months
+    - All-time totals
+    - Top 10 projects by revenue
+    - Current commission version / rate info
+    """
+    from app.models.schema import Transaction as TxModel
+    from app.services.commission_service import DEFAULT_COMMISSION_VERSION
+    from collections import defaultdict
+    from datetime import timezone
+
+    try:
+        all_tx = await TxModel.find(TxModel.status == "completed").to_list()
+    except Exception:
+        all_tx = []
+
+    # ── Monthly aggregation (last 12 months) ────────────────────────────────
+    monthly: dict = defaultdict(lambda: {"client_fees": 0.0, "creator_fees": 0.0, "total_fees": 0.0, "volume": 0.0, "count": 0})
+
+    for t in all_tx:
+        ts = t.initiated_at
+        if not ts:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        key = ts.strftime("%Y-%m")   # e.g. "2025-06"
+        monthly[key]["client_fees"]  = round(monthly[key]["client_fees"]  + float(t.client_fee  or 0), 2)
+        monthly[key]["creator_fees"] = round(monthly[key]["creator_fees"] + float(t.creator_fee or 0), 2)
+        monthly[key]["total_fees"]   = round(monthly[key]["total_fees"]   + float(t.platform_fee or 0), 2)
+        monthly[key]["volume"]       = round(monthly[key]["volume"]       + float(t.amount or 0), 2)
+        monthly[key]["count"]       += 1
+
+    # Sort and take last 12 months
+    sorted_months = sorted(monthly.keys())[-12:]
+    monthly_list = [
+        {
+            "month": m,
+            **monthly[m],
+        }
+        for m in sorted_months
+    ]
+
+    # ── All-time totals ───────────────────────────────────────────────────────
+    totals = {
+        "client_fees":    round(sum(float(t.client_fee  or 0) for t in all_tx), 2),
+        "creator_fees":   round(sum(float(t.creator_fee or 0) for t in all_tx), 2),
+        "platform_total": round(sum(float(t.platform_fee or 0) for t in all_tx), 2),
+        "volume":         round(sum(float(t.amount or 0)       for t in all_tx), 2),
+        "transaction_count": len(all_tx),
+    }
+
+    # ── Top 10 projects by revenue (highest platform_fee per transaction) ────
+    sorted_by_fee = sorted(all_tx, key=lambda t: float(t.platform_fee or 0), reverse=True)[:10]
+    top_projects = [
+        {
+            "id": str(t.id),
+            "amount": float(t.amount or 0),
+            "platform_fee": float(t.platform_fee or 0),
+            "client_fee": float(t.client_fee or 0),
+            "creator_fee": float(t.creator_fee or 0),
+            "client_id": str(t.from_user_id) if t.from_user_id else None,
+            "creator_id": str(t.to_user_id) if t.to_user_id else None,
+            "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
+            "status": t.status,
+        }
+        for t in sorted_by_fee
+    ]
+
+    return {
+        "monthly": monthly_list,
+        "totals": totals,
+        "top_projects": top_projects,
+        "commission_info": {
+            "version": DEFAULT_COMMISSION_VERSION,
+            "client_rate_pct": 4.0,
+            "creator_rate_pct": 8.0,
+            "total_rate_pct": 12.0,
+            "note": "Client pays +4% on top of project amount. Creator receives amount minus 8%.",
+        },
     }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { adminApi, type AdminStats } from '@/lib/api';
 
-function StatCard({ label, value, sub, icon, color }: { label: string; value: string | number; sub?: string; icon: string; color: string }) {
+function StatCard({ label, value, sub, icon, color }: { label: string; value: string | number; sub?: string | undefined; icon: string; color: string }) {
   return (
     <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
       <div className="flex items-start justify-between mb-4">
@@ -65,9 +65,13 @@ export default function AdminDashboardPage() {
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Escrow & Revenue</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <StatCard label="Total Volume" value={`$${stats.escrow.total_volume_usd.toLocaleString()}`} icon="fa-dollar-sign" color="bg-green-600" />
-          <StatCard label="Platform Fees" value={`$${stats.escrow.platform_fees_usd.toLocaleString()}`} icon="fa-chart-line" color="bg-teal-600" />
-          <StatCard label="Active Escrow" value={stats.escrow.active_count.toLocaleString()} icon="fa-lock" color="bg-blue-600" />
-          <StatCard label="Completed" value={stats.escrow.completed_count.toLocaleString()} icon="fa-circle-check" color="bg-emerald-600" />
+          <StatCard label="Platform Revenue" value={`$${stats.escrow.platform_fees_usd.toLocaleString()}`} icon="fa-chart-line" color="bg-teal-600" sub="12% total fee" />
+          <StatCard label="Client Fees (4%)" value={`$${(stats.escrow.client_fee_usd ?? 0).toLocaleString()}`} icon="fa-building" color="bg-blue-600" sub="Charged to clients" />
+          <StatCard label="Creator Fees (8%)" value={`$${(stats.escrow.creator_fee_usd ?? 0).toLocaleString()}`} icon="fa-palette" color="bg-indigo-600" sub="Deducted from payouts" />
+          <StatCard label="Active Escrow" value={stats.escrow.active_count.toLocaleString()} icon="fa-lock" color="bg-cyan-600" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <StatCard label="Completed Projects" value={stats.escrow.completed_count.toLocaleString()} icon="fa-circle-check" color="bg-emerald-600" />
           <StatCard label="Disputed" value={stats.escrow.disputed_count.toLocaleString()} icon="fa-scale-balanced" color="bg-red-600" />
         </div>
       </div>

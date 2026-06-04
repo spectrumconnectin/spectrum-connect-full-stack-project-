@@ -65,29 +65,48 @@ export default function AdminTransactionsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-700">
-                <th className="text-left px-5 py-3 text-gray-400 font-medium">ID</th>
-                <th className="text-left px-5 py-3 text-gray-400 font-medium">Type</th>
-                <th className="text-right px-5 py-3 text-gray-400 font-medium">Amount</th>
-                <th className="text-left px-5 py-3 text-gray-400 font-medium">Date</th>
-                <th className="text-left px-5 py-3 text-gray-400 font-medium">Status</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wide">ID</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wide">Type</th>
+                <th className="text-right px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wide">Amount</th>
+                <th className="text-right px-4 py-3 text-blue-400 font-medium text-xs uppercase tracking-wide">Client Fee</th>
+                <th className="text-right px-4 py-3 text-emerald-400 font-medium text-xs uppercase tracking-wide">Creator Fee</th>
+                <th className="text-right px-4 py-3 text-indigo-400 font-medium text-xs uppercase tracking-wide">Platform</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wide">Date</th>
+                <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs uppercase tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody>
               {txns.map((t: AdminTransaction) => (
                 <tr key={t.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition">
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <span className="text-gray-400 font-mono text-xs">{t.id.slice(-10)}</span>
                   </td>
-                  <td className="px-5 py-3 text-gray-300 text-sm capitalize">{t.type?.replace('_', ' ') || '—'}</td>
-                  <td className="px-5 py-3 text-right">
-                    <span className={`font-semibold ${(t.amount || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ${Math.abs(t.amount || 0).toFixed(2)}
-                    </span>
+                  <td className="px-4 py-3 text-gray-300 text-xs capitalize">{t.type?.replace('_', ' ') || '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <span className="font-semibold text-white">${Math.abs(t.amount || 0).toFixed(2)}</span>
                   </td>
-                  <td className="px-5 py-3 text-gray-400 text-xs">
+                  <td className="px-4 py-3 text-right">
+                    {(t.client_fee || 0) > 0
+                      ? <span className="text-blue-400 font-medium">+${(t.client_fee || 0).toFixed(2)}</span>
+                      : <span className="text-gray-600">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {(t.creator_fee || 0) > 0
+                      ? <span className="text-emerald-400 font-medium">−${(t.creator_fee || 0).toFixed(2)}</span>
+                      : <span className="text-gray-600">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {(t.platform_fee || 0) > 0
+                      ? <span className="text-indigo-300 font-bold">${(t.platform_fee || 0).toFixed(2)}</span>
+                      : <span className="text-gray-600">—</span>
+                    }
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">
                     {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(t.status)}`}>
                       {t.status}
                     </span>
@@ -95,6 +114,25 @@ export default function AdminTransactionsPage() {
                 </tr>
               ))}
             </tbody>
+            {/* Totals footer */}
+            <tfoot>
+              <tr className="border-t border-gray-600 bg-gray-700/40">
+                <td colSpan={2} className="px-4 py-3 text-xs font-bold text-gray-300">Page Total ({txns.length})</td>
+                <td className="px-4 py-3 text-right text-xs font-bold text-white">
+                  ${txns.reduce((s, t) => s + (t.amount || 0), 0).toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right text-xs font-bold text-blue-300">
+                  ${txns.reduce((s, t) => s + (t.client_fee || 0), 0).toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right text-xs font-bold text-emerald-300">
+                  ${txns.reduce((s, t) => s + (t.creator_fee || 0), 0).toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right text-xs font-bold text-indigo-200">
+                  ${txns.reduce((s, t) => s + (t.platform_fee || 0), 0).toFixed(2)}
+                </td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>

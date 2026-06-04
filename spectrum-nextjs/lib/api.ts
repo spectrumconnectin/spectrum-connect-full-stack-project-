@@ -1619,7 +1619,7 @@ export interface MatchHistoryItem {
 
 export interface AdminStats {
   users: { total: number; creators: number; clients: number; admins: number; verified: number; suspended: number; new_last_30_days: number };
-  escrow: { total_volume_usd: number; platform_fees_usd: number; active_count: number; completed_count: number; disputed_count: number };
+  escrow: { total_volume_usd: number; platform_fees_usd: number; client_fee_usd: number; creator_fee_usd: number; active_count: number; completed_count: number; disputed_count: number };
   etf: { total_points_awarded: number; platinum_users: number; gold_users: number };
 }
 
@@ -1638,10 +1638,18 @@ export interface AdminJobsResponse { total: number; page: number; page_size: num
 export interface AdminDispute { id: string; escrow_id?: string; status: string; reason?: string; opened_by?: string; created_at: string }
 export interface AdminDisputesResponse { total: number; page: number; page_size: number; has_more: boolean; disputes: AdminDispute[] }
 
-export interface AdminTransaction { id: string; status: string; type?: string; amount: number; currency: string; platform_fee: number; client_id?: string; creator_id?: string; created_at: string }
+export interface AdminTransaction { id: string; status: string; type?: string; amount: number; currency: string; platform_fee: number; client_fee: number; creator_fee: number; commission_version?: string; client_id?: string; creator_id?: string; created_at: string }
 export interface AdminTransactionsResponse { total: number; page: number; page_size: number; has_more: boolean; transactions: AdminTransaction[] }
 
 export interface AdminEtfStats { total_accounts: number; total_lifetime_points: number; total_redeemed_points: number; level_breakdown: Record<string, number> }
+
+export interface AdminRevenueMonth { month: string; client_fees: number; creator_fees: number; total_fees: number; volume: number; count: number }
+export interface AdminRevenueStats {
+  monthly: AdminRevenueMonth[];
+  totals: { client_fees: number; creator_fees: number; platform_total: number; volume: number; transaction_count: number };
+  top_projects: { id: string; amount: number; platform_fee: number; client_fee: number; creator_fee: number; client_id?: string; creator_id?: string; created_at?: string; status: string }[];
+  commission_info: { version: string; client_rate_pct: number; creator_rate_pct: number; total_rate_pct: number; note: string };
+}
 
 export const adminApi = {
   getStats: (): Promise<AdminStats> => request<AdminStats>('/admin/stats'),
@@ -1665,6 +1673,7 @@ export const adminApi = {
   getTransactions: (params?: { page?: number; page_size?: number; status?: string }): Promise<AdminTransactionsResponse> =>
     request<AdminTransactionsResponse>(`/admin/transactions${buildQS(params as Record<string, string | number | undefined> || {})}`),
   getEtfStats: (): Promise<AdminEtfStats> => request<AdminEtfStats>('/admin/etf/stats'),
+  getRevenue: (): Promise<AdminRevenueStats> => request<AdminRevenueStats>('/admin/revenue'),
 };
 
 // ── User Presence ────────────────────────────────────────────────────────────
