@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { creatorProjects, proposals, messaging, ProjectItem, ProposalItem } from '@/lib/api';
+import { creatorProjects, proposals, messaging, escrow, ProjectItem, ProposalItem, EscrowListItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['all', 'in_progress', 'active', 'on_hold', 'completed'];
 
@@ -115,6 +115,8 @@ function MyWorkInner() {
   const [appError, setAppError] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [appsFetched, setAppsFetched] = useState(false);
+  // Escrow funding status keyed by job_id
+  const [escrowByJob, setEscrowByJob] = useState<Record<string, EscrowListItem>>({});
   // Submit-delivery modal state
   const [deliveringApp, setDeliveringApp] = useState<ProposalItem | null>(null);
   const [deliveryNote, setDeliveryNote] = useState('');
@@ -126,8 +128,23 @@ function MyWorkInner() {
     let cancelled = false;
     setAppLoading(true);
     setAppError(null);
-    proposals.getMe()
-      .then(data => { if (!cancelled) { setAppList(data || []); setAppsFetched(true); } })
+    Promise.all([
+      proposals.getMe(),
+      escrow.list({ limit: 50 }).catch(() => ({ escrows: [] })),
+    ])
+      .then(([apps, esc]) => {
+        if (cancelled) return;
+        setAppList(apps || []);
+        setAppsFetched(true);
+        // Build job_id → escrow map for funded/active escrows
+        const map: Record<string, EscrowListItem> = {};
+        (esc.escrows || []).forEach((e: EscrowListItem) => {
+          if (e.job_post_id && (e.status === 'active' || e.funded_amount > 0)) {
+            map[e.job_post_id] = e;
+          }
+        });
+        setEscrowByJob(map);
+      })
       .catch(e => { if (!cancelled) setAppError((e as Error).message); })
       .finally(() => { if (!cancelled) setAppLoading(false); });
     return () => { cancelled = true; };
@@ -210,6 +227,7 @@ function MyWorkInner() {
             setDeliveryNote('');
             setDeliveringApp(app);
           }}
+          escrowByJob={escrowByJob}
         />
       )}
 
@@ -488,6 +506,7 @@ function ApplicationsView({
   appList, filtered, loading, error,
   withdrawing, onWithdraw,
   deliverySentIds, onDeliver,
+  escrowByJob,
 }: {
   counts: { total: number; submitted: number; shortlisted: number; accepted: number };
   tabs: string[];
@@ -500,6 +519,7 @@ function ApplicationsView({
   onWithdraw: (id: string) => void;
   deliverySentIds: Set<string>;
   onDeliver: (app: ProposalItem) => void;
+  escrowByJob: Record<string, EscrowListItem>;
 }) {
   return (
     <>
@@ -597,9 +617,25 @@ function ApplicationsView({
                       <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
                         {APP_STATUS_LABEL[app.status] ?? app.status}
                       </span>
-                      {/* Hired: show Submit Delivery or Delivered confirmation */}
+                      {/* Hired: show escrow status + actions */}
                       {app.status === 'accepted' && (
                         <>
+                          {/* Escrow funding indicator */}
+                          {escrowByJob[app.job_id] ? (
+                            escrowByJob[app.job_id].funded_amount > 0 ? (
+                              <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                                <i className="fa-solid fa-lock"></i> ${escrowByJob[app.job_id].funded_amount.toLocaleString()} in Escrow
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+                                <i className="fa-solid fa-clock"></i> Awaiting Funding
+                              </span>
+                            )
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg">
+                              <i className="fa-solid fa-hourglass-half"></i> Not Yet Funded
+                            </span>
+                          )}
                           <Link
                             href={`/creator/projects/${app.job_id}/plan`}
                             className="px-3 py-1.5 text-xs font-semibold text-cobalt bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5">

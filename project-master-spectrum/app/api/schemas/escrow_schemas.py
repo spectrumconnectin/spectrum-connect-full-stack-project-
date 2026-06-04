@@ -92,6 +92,7 @@ class EscrowListItem(BaseModel):
     released_amount: float
     currency: str
     project_id: Optional[str] = None
+    job_post_id: Optional[str] = None
     client_id: str
     creator_id: str
     milestone_count: int

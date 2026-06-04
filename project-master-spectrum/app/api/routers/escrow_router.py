@@ -203,27 +203,86 @@ async def release_milestone(
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
     )
-    # Notify creator of released payment + confirm to client
+    # Notify creator of released payment + confirm to client + award ETF points
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(escrow_id)
-        if escrow:
-            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
+        from app.services.etf_points_service import EtfPointsService
+        from app.models.escrow import Escrow as EscrowDoc
+        from beanie import PydanticObjectId as OID
+        from datetime import datetime, timezone
+
+        esc = await EscrowDoc.get(OID(escrow_id))
+        if esc:
+            milestone = next((m for m in esc.milestones if m.milestone_id == request.milestone_id), None)
             m_title = milestone.title if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
+
             await NotificationService.milestone_released(
-                creator_id=str(escrow.creator_id),
+                creator_id=str(esc.creator_id),
                 client_id=str(current_user.id),
                 milestone_title=m_title,
                 amount=m_amount,
             )
             await NotificationService.payment_released_client(
                 client_id=str(current_user.id),
-                creator_id=str(escrow.creator_id),
+                creator_id=str(esc.creator_id),
                 milestone_title=m_title,
                 amount=m_amount,
             )
+
+            # ── ETF: On-Time Delivery ─────────────────────────────────────────
+            # Award bonus points if delivery happened before the milestone due date.
+            # "delivered" status was set when creator submitted; check release is prompt.
+            if milestone and milestone.released_at:
+                # Check if there's a linked deadline/due_date we can compare against
+                if milestone.deadline_id:
+                    from app.models.project import ProjectDeadline
+                    try:
+                        dl = await ProjectDeadline.get(OID(milestone.deadline_id))
+                        if dl and dl.due_date:
+                            due = dl.due_date if dl.due_date.tzinfo else dl.due_date.replace(tzinfo=timezone.utc)
+                            released = milestone.released_at if milestone.released_at.tzinfo else milestone.released_at.replace(tzinfo=timezone.utc)
+                            if released <= due:
+                                await EtfPointsService.award_points(
+                                    user_id=esc.creator_id,
+                                    action="on_time_delivery",
+                                    source_type="escrow_milestone",
+                                    source_id=f"{escrow_id}:{request.milestone_id}",
+                                    counterparty_id=esc.client_id,
+                                    description=f"On-time delivery: {m_title}",
+                                )
+                    except Exception:
+                        pass
+
+            # ── ETF: Repeat Client Bonus ──────────────────────────────────────
+            # Award bonus if this client has funded a previous escrow with this creator.
+            try:
+                from app.models.escrow import Escrow as EscrowModel
+                prior_count = await EscrowModel.find(
+                    EscrowModel.client_id == esc.client_id,
+                    EscrowModel.creator_id == esc.creator_id,
+                    EscrowModel.status == "completed",
+                ).count()
+                if prior_count >= 1:  # At least one completed project before this one
+                    await EtfPointsService.award_points(
+                        user_id=esc.creator_id,
+                        action="repeat_client.bonus",
+                        source_type="escrow",
+                        source_id=escrow_id,
+                        counterparty_id=esc.client_id,
+                        description="Repeat client bonus",
+                    )
+                    await EtfPointsService.award_points(
+                        user_id=esc.client_id,
+                        action="repeat_client.bonus",
+                        source_type="escrow",
+                        source_id=f"{escrow_id}:client",
+                        counterparty_id=esc.creator_id,
+                        description="Repeat creator engagement",
+                    )
+            except Exception:
+                pass
+
     except Exception:
         pass
     return result
@@ -470,3 +529,58 @@ async def resolve_dispute(
     except Exception:
         pass
     return result
+
+# ── Milestone delivery status endpoints ─────────────────────────────────────
+
+@escrow_router.post(
+    "/{escrow_id}/milestone/{milestone_id}/deliver",
+    summary="Creator marks milestone as delivered",
+)
+async def deliver_milestone(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Creator marks a funded milestone as delivered (awaiting client review)."""
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if str(esc.creator_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the creator can mark delivery")
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if milestone.status not in ("funded", "revision_requested"):
+        raise HTTPException(status_code=400, detail=f"Cannot deliver a milestone with status '{milestone.status}'")
+    milestone.status = "delivered"
+    await esc.save()
+    return {"success": True, "milestone_id": milestone_id, "status": "delivered"}
+
+
+@escrow_router.post(
+    "/{escrow_id}/milestone/{milestone_id}/request-revision",
+    summary="Client requests revision on delivered milestone",
+)
+async def request_revision(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Client requests revision — milestone goes back to revision_requested."""
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if str(esc.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the client can request revision")
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if milestone.status != "delivered":
+        raise HTTPException(status_code=400, detail="Can only request revision on delivered milestones")
+    milestone.status = "revision_requested"
+    await esc.save()
+    return {"success": True, "milestone_id": milestone_id, "status": "revision_requested"}

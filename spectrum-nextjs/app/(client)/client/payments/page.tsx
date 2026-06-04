@@ -5,40 +5,59 @@ import { escrow, EscrowDetail, EscrowMilestone } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
-  funded:   'In Escrow',
-  released: 'Released',
-  pending:  'Pending',
-  disputed: 'Disputed',
-  refunded: 'Refunded',
+  pending:            'Pending Funding',
+  funded:             'Funded — In Escrow',
+  delivered:          'Delivered',
+  revision_requested: 'Revision Requested',
+  approved:           'Approved',
+  released:           'Payment Released',
+  disputed:           'Disputed',
+  refunded:           'Refunded',
 };
 
 const MILESTONE_STATUS_STYLE: Record<string, string> = {
-  funded:   'bg-blue-100 text-blue-700',
-  released: 'bg-green-100 text-green-700',
-  pending:  'bg-yellow-100 text-yellow-700',
-  disputed: 'bg-red-100 text-red-600',
-  refunded: 'bg-gray-100 text-gray-600',
+  pending:            'bg-yellow-100 text-yellow-700',
+  funded:             'bg-blue-100 text-blue-700',
+  delivered:          'bg-indigo-100 text-indigo-700',
+  revision_requested: 'bg-orange-100 text-orange-700',
+  approved:           'bg-teal-100 text-teal-700',
+  released:           'bg-emerald-100 text-emerald-700',
+  disputed:           'bg-red-100 text-red-600',
+  refunded:           'bg-gray-100 text-gray-600',
 };
 
 const MILESTONE_ICON: Record<string, string> = {
-  funded:   'fa-lock',
-  released: 'fa-check',
-  pending:  'fa-clock',
-  disputed: 'fa-triangle-exclamation',
-  refunded: 'fa-rotate-left',
+  pending:            'fa-clock',
+  funded:             'fa-lock',
+  delivered:          'fa-box-open',
+  revision_requested: 'fa-rotate-left',
+  approved:           'fa-thumbs-up',
+  released:           'fa-check',
+  disputed:           'fa-triangle-exclamation',
+  refunded:           'fa-rotate-left',
 };
 
 const MILESTONE_ICON_BG: Record<string, string> = {
-  funded:   'bg-blue-100 text-cobalt',
-  released: 'bg-green-100 text-green-600',
-  pending:  'bg-yellow-100 text-yellow-600',
-  disputed: 'bg-red-100 text-red-600',
-  refunded: 'bg-gray-100 text-gray-500',
+  pending:            'bg-yellow-100 text-yellow-600',
+  funded:             'bg-blue-100 text-cobalt',
+  delivered:          'bg-indigo-100 text-indigo-600',
+  revision_requested: 'bg-orange-100 text-orange-600',
+  approved:           'bg-teal-100 text-teal-600',
+  released:           'bg-emerald-100 text-emerald-600',
+  disputed:           'bg-red-100 text-red-600',
+  refunded:           'bg-gray-100 text-gray-500',
 };
 
 // ── Tab filter options (using internal milestone status names) ─────────────────
-const TABS = ['All', 'funded', 'released', 'pending'];
-const TAB_LABEL: Record<string, string> = { All: 'All', funded: 'In Escrow', released: 'Released', pending: 'Pending' };
+const TABS = ['All', 'funded', 'delivered', 'revision_requested', 'released', 'pending'];
+const TAB_LABEL: Record<string, string> = {
+  All: 'All',
+  funded: 'In Escrow',
+  delivered: 'Delivered',
+  revision_requested: 'Revision',
+  released: 'Released',
+  pending: 'Pending',
+};
 
 // ── Flat row derived from escrow detail ───────────────────────────────────────
 type PaymentRow = {
@@ -91,15 +110,9 @@ function RequestRevisionsModal({
     setBusy(true);
     setError(null);
     try {
-      // Send revision request via messaging
-      const { messaging } = await import('@/lib/api');
-
-      const message = `Please review the following revision request for "${row.milestone.title}" (Milestone ${row.milestone_num}/${row.total_milestones}):\n\n${feedback.trim()}`;
-
-      // We need the creator's ID to send the message. For now, we'll store this in metadata
-      // and the message will be sent to the conversation associated with this escrow
-      await messaging.createConversation([], row.escrow_id, message);
-
+      const { escrow: escrowApi } = await import('@/lib/api');
+      // Update milestone status to revision_requested
+      await escrowApi.requestRevision(row.escrow_id, row.milestone.milestone_id);
       setSent(true);
       setTimeout(() => {
         onRequested(row.escrow_id, row.milestone.milestone_id);
@@ -443,6 +456,15 @@ export default function PaymentsPage() {
 
   return (
     <>
+      {/* TEST MODE banner */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3 mb-6">
+        <i className="fa-solid fa-flask text-amber-500 text-lg flex-shrink-0"></i>
+        <div>
+          <span className="font-bold text-amber-800 text-sm">TEST MODE — Simulated Payments</span>
+          <span className="text-amber-700 text-sm ml-2">No real money is being transferred. All transactions are simulated for testing purposes.</span>
+        </div>
+      </div>
+
       <section className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-1">Payments</h1>
         <p className="text-gray-600">Manage milestone payments and escrow-protected transactions</p>

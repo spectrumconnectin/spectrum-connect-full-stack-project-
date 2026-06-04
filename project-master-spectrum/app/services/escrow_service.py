@@ -551,6 +551,7 @@ class EscrowService:
                 "released_amount": e.released_amount,
                 "currency": e.currency,
                 "project_id": str(e.project_id) if e.project_id else None,
+                "job_post_id": str(e.job_post_id) if e.job_post_id else None,
                 "client_id": str(e.client_id),
                 "creator_id": str(e.creator_id),
                 "milestone_count": len(e.milestones),

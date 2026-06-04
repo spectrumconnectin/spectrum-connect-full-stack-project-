@@ -45,13 +45,16 @@ class EscrowMilestone(BaseModel):
     amount: float
     currency: str = "USD"
 
-    # Status machine: funded → released | disputed | refunded
+    # Status machine
     status: str = "pending"
-    # pending   – defined but not yet funded by client
-    # funded    – client has deposited funds
-    # released  – client approved, funds sent to creator
-    # disputed  – dispute raised on this milestone
-    # refunded  – funds returned to client
+    # pending            – defined but not yet funded by client
+    # funded             – client has deposited funds; creator can begin work
+    # delivered          – creator submitted delivery; awaiting client review
+    # revision_requested – client requested changes; creator must resubmit
+    # approved           – client approved the work (alias for released trigger)
+    # released           – client confirmed, funds sent to creator
+    # disputed           – dispute raised on this milestone
+    # refunded           – funds returned to client
 
     funded_at:   Optional[datetime] = None
     released_at: Optional[datetime] = None

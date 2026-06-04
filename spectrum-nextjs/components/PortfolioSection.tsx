@@ -418,12 +418,15 @@ interface PortfolioSectionProps {
   initialData?: PortfolioResponse;
   /** User ID — required for public (non-editable) view. */
   userId?: string;
+  /** When true, renders without the outer card wrapper (for onboarding embed). */
+  compact?: boolean;
 }
 
 export default function PortfolioSection({
   editable = false,
   initialData,
   userId,
+  compact = false,
 }: PortfolioSectionProps) {
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(!initialData);
@@ -478,7 +481,7 @@ export default function PortfolioSection({
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Portfolio</h2>
+          {!compact && <h2 className="text-xl font-bold text-gray-900">Portfolio</h2>}
           {!isEmpty && (
             <p className="text-sm text-gray-500 mt-0.5">
               {videos.length} video{videos.length !== 1 ? 's' : ''} · {images.length} image{images.length !== 1 ? 's' : ''}

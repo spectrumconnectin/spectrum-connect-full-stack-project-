@@ -230,6 +230,8 @@ export interface ProfileUpdate {
   social_links?: { linkedin?: string; imdb?: string; vimeo?: string; portfolio?: string };
   hourly_rate_min?: number;
   hourly_rate_max?: number;
+  availability_status?: string;
+  availability_label?: string;
 }
 
 export interface ExperienceCreate {
@@ -666,6 +668,8 @@ export interface PublicProfile {
   username: string;
   account_type: string;
   is_verified: boolean;
+  availability_status?: string;
+  availability_label?: string;
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -975,6 +979,7 @@ export interface EscrowListItem {
   released_amount: number;
   currency: string;
   project_id?: string;
+  job_post_id?: string;
   client_id: string;
   creator_id: string;
   milestone_count: number;
@@ -1003,6 +1008,12 @@ export const escrow = {
       method: 'POST',
       body: JSON.stringify({ milestone_id: milestoneId }),
     }),
+
+  deliverMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST' }),
+
+  requestRevision: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, { method: 'POST' }),
 };
 
 // ── Commission (v1 split 8/4) ────────────────────────────────────────────────
