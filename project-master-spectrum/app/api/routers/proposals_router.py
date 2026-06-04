@@ -344,14 +344,27 @@ async def rate_proposal(
         }}
     )
 
-    # Optionally update creator profile's aggregate rating
+    # Update creator's aggregate rating on both User and CrewProfile so all
+    # surfaces (public profile, talent search, Smart Connect) show the latest.
     creator = await User.get(app.crew_id)
-    if creator and creator.profile:
+    if creator:
         old_count = getattr(creator, "review_count", None) or 0
         old_rating = getattr(creator, "rating", None) or 0.0
         new_count = old_count + 1
         new_rating = round((old_rating * old_count + overall) / new_count, 2)
+        # Write to User document
         await creator.update({"$set": {"rating": new_rating, "review_count": new_count}})
+        # Also sync to CrewProfile.rating so Smart Connect ranking is accurate
+        try:
+            from app.models.schema import CrewProfile as _CP
+            cp = await _CP.find_one(_CP.user_id == creator.id)
+            if cp:
+                from app.models.schema import Rating as _R
+                cp.rating = _R(overall=new_rating, total_reviews=new_count)
+                cp.last_review_date = datetime.utcnow()
+                await cp.save()
+        except Exception:
+            pass
 
     # Notify creator they received a review
     try:

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { profile as profileApi, PublicProfile, jobs, messaging, proposals, JobPostItem } from '@/lib/api';
+import { profile as profileApi, PublicProfile, PublicReview, jobs, messaging, proposals, JobPostItem } from '@/lib/api';
 import PortfolioSection from '@/components/PortfolioSection';
 import EtfBadge from '@/components/EtfBadge';
 
@@ -30,6 +30,7 @@ export default function CollaboratorProfilePage() {
   const { id } = useParams<{ id: string }>();
 
   const [creator, setCreator] = useState<PublicProfile | null>(null);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,8 +52,14 @@ export default function CollaboratorProfilePage() {
 
   useEffect(() => {
     if (!id) return;
-    profileApi.getPublic(id)
-      .then(data => setCreator(data))
+    Promise.all([
+      profileApi.getPublic(id),
+      profileApi.getPublicReviews(id).catch(() => ({ reviews: [], total: 0 })),
+    ])
+      .then(([profileData, reviewData]) => {
+        setCreator(profileData);
+        setReviews(reviewData.reviews);
+      })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -212,25 +219,47 @@ export default function CollaboratorProfilePage() {
                 <i className="fa-solid fa-location-dot mr-1"></i>{location}
               </p>
             )}
-            <div className="flex items-center gap-4 flex-wrap text-sm">
-              {(pr?.hourly_rate_min || pr?.hourly_rate_max) && (
-                <span><i className="fa-solid fa-wallet mr-1"></i>{rate}</span>
+            <div className="flex items-center gap-3 flex-wrap mt-2">
+              {/* Rating chip — prominently shown */}
+              {creator.rating != null && creator.rating > 0 ? (
+                <div className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-400/30 rounded-full px-3 py-1.5">
+                  {[1,2,3,4,5].map(s => (
+                    <i key={s} className={`fa-star text-xs ${s <= Math.round(creator.rating!) ? 'fa-solid text-yellow-300' : 'fa-regular text-yellow-300/40'}`}></i>
+                  ))}
+                  <span className="font-bold text-white ml-0.5">{creator.rating.toFixed(1)}</span>
+                  <span className="text-yellow-100/70 text-xs">({creator.review_count ?? 0})</span>
+                </div>
+              ) : (
+                <span className="text-xs text-white/50 italic">No reviews yet</span>
               )}
+
+              {/* ETF badge inline */}
+              <EtfBadge userId={id as string} size="xs" />
+
+              {/* Availability */}
               {creator.availability_status && (
                 <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
                   creator.availability_status === 'available' ? 'bg-green-500/20 text-green-100' :
                   creator.availability_status === 'busy' ? 'bg-amber-500/20 text-amber-100' :
                   'bg-white/10 text-white/60'
                 }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${creator.availability_status === 'available' ? 'bg-green-400' : creator.availability_status === 'busy' ? 'bg-amber-400' : 'bg-gray-400'}`}></span>
                   {creator.availability_status === 'available' ? 'Available now' :
                    creator.availability_status === 'busy' ? 'Busy' : 'Unavailable'}
                 </span>
               )}
-              {creator.rating != null && creator.rating > 0 && (
-                <span><i className="fa-solid fa-star text-yellow-300 mr-1"></i>{creator.rating.toFixed(1)} ({creator.review_count ?? 0} reviews)</span>
+
+              {/* Rate */}
+              {(pr?.hourly_rate_min || pr?.hourly_rate_max) && (
+                <span className="text-sm text-white/80"><i className="fa-solid fa-wallet mr-1"></i>{rate}</span>
               )}
-              {stats?.response_time != null && stats.response_time > 0 && (
-                <span><i className="fa-solid fa-clock mr-1"></i>~{stats.response_time}h response</span>
+
+              {/* Completed projects */}
+              {(creator.completed_projects ?? completedProjects) > 0 && (
+                <span className="text-sm text-white/80">
+                  <i className="fa-solid fa-circle-check text-emerald-400 mr-1"></i>
+                  {creator.completed_projects ?? completedProjects} project{(creator.completed_projects ?? completedProjects) !== 1 ? 's' : ''} completed
+                </span>
               )}
             </div>
           </div>
@@ -355,6 +384,80 @@ export default function CollaboratorProfilePage() {
             </div>
           )}
 
+          {/* ── Reviews Section ── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Client Reviews</h2>
+                {creator.rating != null && creator.rating > 0 && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex gap-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <i key={s} className={`fa-star text-sm ${s <= Math.round(creator.rating!) ? 'fa-solid text-yellow-400' : 'fa-regular text-gray-200'}`}></i>
+                      ))}
+                    </div>
+                    <span className="font-bold text-gray-900">{creator.rating.toFixed(1)}</span>
+                    <span className="text-gray-400 text-sm">· {creator.review_count ?? 0} review{(creator.review_count ?? 0) !== 1 ? 's' : ''}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <i className="fa-regular fa-star text-4xl mb-3 block text-gray-300"></i>
+                <p className="text-sm font-medium text-gray-500">No reviews yet</p>
+                <p className="text-xs mt-1">Reviews appear here once this creator completes projects on Spectrum Connect.</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {reviews.map(r => (
+                  <div key={r.proposal_id} className="border border-gray-100 rounded-xl p-5 hover:border-gray-200 transition">
+                    {/* Stars + date */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-0.5">
+                          {[1,2,3,4,5].map(s => (
+                            <i key={s} className={`fa-star text-sm ${s <= Math.round(r.overall) ? 'fa-solid text-yellow-400' : 'fa-regular text-gray-200'}`}></i>
+                          ))}
+                        </div>
+                        <span className="font-bold text-gray-900">{r.overall.toFixed(1)}</span>
+                      </div>
+                      {r.reviewed_at && (
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {new Date(r.reviewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Project name */}
+                    {r.job_title && (
+                      <p className="text-xs font-semibold text-cobalt mb-2 flex items-center gap-1.5">
+                        <i className="fa-solid fa-briefcase text-[10px]"></i>{r.job_title}
+                      </p>
+                    )}
+
+                    {/* Review text */}
+                    {r.review && (
+                      <p className="text-sm text-gray-700 leading-relaxed">&ldquo;{r.review}&rdquo;</p>
+                    )}
+
+                    {/* Tags */}
+                    {r.tags && r.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {r.tags.map(tag => (
+                          <span key={tag} className="text-xs px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full font-medium">
+                            <i className="fa-solid fa-check text-[9px] mr-1"></i>{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Empty state */}
           {!pr?.bio && skills.length === 0 && experience.length === 0 && (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
@@ -458,10 +561,10 @@ export default function CollaboratorProfilePage() {
             )}
           </div>
 
-          {/* Reviews */}
-          {(creator.rating != null && creator.rating > 0) && (
+          {/* Rating summary in sidebar */}
+          {creator.rating != null && creator.rating > 0 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Reviews</h3>
+              <h3 className="font-bold text-gray-900 mb-4">Rating</h3>
               <div className="flex items-center gap-4">
                 <div className="text-center">
                   <div className="text-4xl font-bold text-gray-900">{creator.rating.toFixed(1)}</div>
@@ -473,6 +576,22 @@ export default function CollaboratorProfilePage() {
                   <div className="text-xs text-gray-500 mt-1">
                     {creator.review_count ?? 0} review{(creator.review_count ?? 0) !== 1 ? 's' : ''}
                   </div>
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  {[5,4,3,2,1].map(star => {
+                    const count = reviews.filter(r => Math.round(r.overall) === star).length;
+                    const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                    return (
+                      <div key={star} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 w-4">{star}</span>
+                        <i className="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                          <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-400 w-4">{count}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

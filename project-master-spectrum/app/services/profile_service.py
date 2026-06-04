@@ -188,6 +188,12 @@ class ProfileService:
             # Rating aggregate from review submissions
             "rating": user.rating if hasattr(user, "rating") else None,
             "review_count": user.review_count if hasattr(user, "review_count") else None,
+            # Completed projects count (from stats)
+            "completed_projects": (
+                (user.stats.completed_credits if user.stats else None)
+                or (user.stats.active_projects if user.stats else None)
+                or 0
+            ),
         }
 
         # Check privacy settings

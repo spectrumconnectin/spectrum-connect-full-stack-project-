@@ -371,11 +371,20 @@ function SmartConnectInner() {
                                 )}
                               </div>
                               <div className="text-right flex-shrink-0">
-                                {c.rating > 0 && (
-                                  <div className="text-sm font-bold text-gray-900">
-                                    <i className="fa-solid fa-star text-yellow-400 mr-1"></i>{c.rating.toFixed(1)}
-                                    <span className="text-gray-400 font-normal text-xs ml-1">({c.total_reviews})</span>
+                                {c.rating > 0 ? (
+                                  <div>
+                                    <div className="flex items-center justify-end gap-0.5 mb-0.5">
+                                      {[1,2,3,4,5].map(s => (
+                                        <i key={s} className={`fa-star text-[10px] ${s <= Math.round(c.rating) ? 'fa-solid text-yellow-400' : 'fa-regular text-gray-200'}`}></i>
+                                      ))}
+                                    </div>
+                                    <div className="text-sm font-bold text-gray-900">
+                                      {c.rating.toFixed(1)}
+                                      <span className="text-gray-400 font-normal text-xs ml-1">({c.total_reviews})</span>
+                                    </div>
                                   </div>
+                                ) : (
+                                  <div className="text-xs text-gray-300 italic">No reviews</div>
                                 )}
                                 {rate && <div className="text-xs text-gray-500 mt-1">{rate}</div>}
                               </div>

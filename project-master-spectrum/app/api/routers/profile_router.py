@@ -262,6 +262,62 @@ async def get_my_stats(current_user: User = Depends(get_current_user)):
 # PUBLIC PROFILE ENDPOINTS (View Other Users)
 # ============================================================================
 
+@router.get("/{user_id}/reviews", summary="Get public reviews for a creator")
+async def get_user_reviews(user_id: str):
+    """
+    Returns all client reviews left for this creator, most recent first.
+    Only reviews from completed projects are returned (client_rating is set).
+    No auth required — reviews are public trust signals.
+    """
+    from app.models.schema import Application, JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        target_id = PydanticObjectId(user_id)
+    except Exception:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    # Fetch all accepted/hired applications for this creator that have a review
+    try:
+        apps = await Application.find(Application.crew_id == target_id).to_list()
+    except Exception:
+        return {"reviews": [], "total": 0}
+
+    results = []
+    for app in apps:
+        cr = app.client_rating
+        if not cr:
+            continue
+
+        # Optionally enrich with job title
+        job_title = None
+        try:
+            job = await JobPost.get(app.project_id)
+            if job:
+                job_title = job.title
+        except Exception:
+            pass
+
+        results.append({
+            "proposal_id": str(app.id),
+            "overall": cr.get("overall", 0),
+            "ratings": cr.get("ratings", {}),
+            "review": cr.get("review", ""),
+            "tags": cr.get("tags", []),
+            "reviewed_at": cr.get("reviewed_at"),
+            "job_title": job_title,
+        })
+
+    # Sort by reviewed_at descending (most recent first)
+    results.sort(
+        key=lambda r: r["reviewed_at"] or "",
+        reverse=True,
+    )
+
+    return {"reviews": results[:30], "total": len(results)}
+
+
 @router.get("/{user_id}", summary="Get user profile by ID")
 async def get_user_profile(
     user_id: str,

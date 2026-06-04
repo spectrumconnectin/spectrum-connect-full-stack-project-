@@ -170,11 +170,18 @@ class SmartConnectService:
                 score_breakdown["location"] = loc_score
 
                 # 5. Rating bonus (max 5 pts)
+                # Primary: CrewProfile.rating (synced by proposals_router on submission).
+                # Fallback: User.rating (direct field, always up-to-date).
                 rating_score = 0
-                if crew_profile.rating and crew_profile.rating.overall:
-                    rating_score = min(5, int(crew_profile.rating.overall))
-                    if crew_profile.rating.overall >= 4.5:
-                        reasons.append(f"Highly rated ({crew_profile.rating.overall:.1f})")
+                _rating_val = (
+                    (crew_profile.rating.overall if crew_profile.rating else None)
+                    or getattr(user, "rating", None)
+                    or 0.0
+                )
+                if _rating_val:
+                    rating_score = min(5, int(_rating_val))
+                    if _rating_val >= 4.5:
+                        reasons.append(f"Highly rated ({_rating_val:.1f})")
                 score += rating_score
                 score_breakdown["rating"] = rating_score
 
@@ -296,9 +303,15 @@ class SmartConnectService:
                         "role": crew_profile.title,
                         "avatar": user.profile.profile_picture,
                         "location": user.profile.location,
-                        "rating": crew_profile.rating.overall if crew_profile.rating else 0.0,
+                        "rating": (
+                            (crew_profile.rating.overall if crew_profile.rating else None)
+                            or getattr(user, "rating", None)
+                            or 0.0
+                        ),
                         "total_reviews": (
-                            crew_profile.rating.total_reviews if crew_profile.rating else 0
+                            (crew_profile.rating.total_reviews if crew_profile.rating else None)
+                            or getattr(user, "review_count", None)
+                            or 0
                         ),
                         "skills": [
                             s.name if hasattr(s, "name") else s

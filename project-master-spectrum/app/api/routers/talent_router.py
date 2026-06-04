@@ -88,8 +88,9 @@ async def search_talent(
             "skills": skill_names,
             "hourly_rate_min": _pget(profile, "hourly_rate_min"),
             "hourly_rate_max": _pget(profile, "hourly_rate_max"),
-            "rating": _pget(profile, "rating") or stats_get("client_satisfaction"),
-            "review_count": _pget(profile, "review_count") or stats_get("projects_completed"),
+            # rating / review_count are stored directly on User, not user.profile
+            "rating": getattr(user, "rating", None) or stats_get("client_satisfaction") or 0.0,
+            "review_count": getattr(user, "review_count", None) or 0,
             # Stage 4 additions
             "etf_level": etf_level if isinstance(etf_level, str) else "bronze",
             "availability_status": availability_status or "available",

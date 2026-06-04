@@ -378,6 +378,9 @@ export const profile = {
     request(`/profiles/me/certifications/${index}`, { method: 'DELETE' }),
 
   getPublic: (userId: string): Promise<PublicProfile> => request<PublicProfile>(`/profiles/${userId}`),
+
+  getPublicReviews: (userId: string): Promise<{ reviews: PublicReview[]; total: number }> =>
+    request<{ reviews: PublicReview[]; total: number }>(`/profiles/${userId}/reviews`),
 };
 
 // ── Account Settings ─────────────────────────────────────────────────────────
@@ -719,6 +722,17 @@ export interface PublicProfile {
     total_connections?: number;
     completed_credits?: number;
   };
+  completed_projects?: number;
+}
+
+export interface PublicReview {
+  proposal_id: string;
+  overall: number;
+  ratings: Record<string, number>;
+  review: string;
+  tags: string[];
+  reviewed_at?: string;
+  job_title?: string;
 }
 
 // ── Creator Projects ──────────────────────────────────────────────────────────
