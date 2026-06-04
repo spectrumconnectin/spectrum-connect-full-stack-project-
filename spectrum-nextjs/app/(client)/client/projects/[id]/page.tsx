@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem, EscrowListItem } from '@/lib/api';
+import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem, EscrowListItem, EscrowDetail } from '@/lib/api';
 import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -72,6 +72,12 @@ export default function ClientProjectDetailPage() {
   const [sendingFutureWork, setSendingFutureWork] = useState(false);
   const [futureWorkSent, setFutureWorkSent] = useState(false);
 
+  // Release Funds modal state
+  const [showReleaseFundsModal, setShowReleaseFundsModal] = useState(false);
+  const [releasingFunds, setReleasingFunds] = useState(false);
+  const [releaseFundsSuccess, setReleaseFundsSuccess] = useState(false);
+  const [escrowDetailForRelease, setEscrowDetailForRelease] = useState<EscrowDetail | null>(null);
+
   useEffect(() => {
     if (!id) return;
     jobs.getById(id)
@@ -124,6 +130,49 @@ export default function ClientProjectDetailPage() {
     }
   };
 
+  const handleOpenReleaseFunds = async () => {
+    if (!projectEscrow) return;
+    try {
+      const detail = await escrow.getById(projectEscrow.escrow_id);
+      setEscrowDetailForRelease(detail);
+      setReleaseFundsSuccess(false);
+      setShowReleaseFundsModal(true);
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  const handleConfirmReleaseFunds = async () => {
+    if (!escrowDetailForRelease) return;
+    setReleasingFunds(true);
+    try {
+      const eligibleMilestones = escrowDetailForRelease.milestones.filter(
+        m => ['delivered', 'approved'].includes(m.status)
+      );
+      for (const m of eligibleMilestones) {
+        // Approve first if the milestone is in 'delivered' state
+        if (m.status === 'delivered') {
+          await escrow.approveMilestone(escrowDetailForRelease.escrow_id, m.milestone_id);
+        }
+        // Then release funds
+        await escrow.releaseMilestone(escrowDetailForRelease.escrow_id, m.milestone_id);
+      }
+      setReleaseFundsSuccess(true);
+      // Reload job + escrow data in the background
+      Promise.all([
+        jobs.getById(id).then(updated => setJob(updated)),
+        escrow.list({ role: 'client', limit: 50 }).then(res => {
+          const linked = res.escrows.find((e: EscrowListItem) => e.job_post_id === id);
+          if (linked) setProjectEscrow(linked);
+        }),
+      ]).catch(() => {});
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setReleasingFunds(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -152,6 +201,8 @@ export default function ClientProjectDetailPage() {
   const canStart    = (job.status === 'open' || job.status === 'closed' || job.status === 'pending_funding') && !!hiredCreator && (!!(projectEscrow && projectEscrow.funded_amount > 0) || job.status !== 'pending_funding');
   const canComplete = job.status === 'in_progress';
   const canDelete   = job.status === 'draft';
+  const canReleaseFunds = ['delivered', 'approved'].includes(job.status) &&
+    !!projectEscrow && projectEscrow.funded_amount > 0;
 
   return (
     <>
@@ -219,10 +270,16 @@ export default function ClientProjectDetailPage() {
             <i className="fa-solid fa-circle-check text-white text-xl"></i>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-teal-900 text-lg">Work Approved — Escrow Ready for Release</p>
+            <p className="font-bold text-teal-900 text-lg">Work Approved — Ready to Release Funds</p>
             <p className="text-teal-700 text-sm mt-0.5 leading-relaxed">
-              You have approved the work. The escrow is now eligible for release. Head to the Milestones tab to release payment to the creator.
+              You have approved the work. Release funds from escrow to pay the creator and complete this project.
             </p>
+            {canReleaseFunds && (
+              <button onClick={handleOpenReleaseFunds}
+                className="inline-flex items-center gap-2 mt-3 px-5 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 transition">
+                <i className="fa-solid fa-coins text-xs"></i>Release Funds
+              </button>
+            )}
           </div>
           <span className="bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
             Approved
@@ -255,10 +312,16 @@ export default function ClientProjectDetailPage() {
             <i className="fa-solid fa-box-open text-white text-xl"></i>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Action Required</p>
+            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Review &amp; Release</p>
             <p className="text-indigo-700 text-sm mt-0.5 leading-relaxed">
-              The creator has submitted their work. Review the deliverables in the Milestones tab below and approve or request revisions.
+              The creator has submitted their work. Review the deliverables below, then release funds when you&apos;re satisfied — or request revisions from the Milestones tab.
             </p>
+            {canReleaseFunds && (
+              <button onClick={handleOpenReleaseFunds}
+                className="inline-flex items-center gap-2 mt-3 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition">
+                <i className="fa-solid fa-coins text-xs"></i>Release Funds
+              </button>
+            )}
           </div>
           <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
             Delivered
@@ -406,6 +469,18 @@ export default function ClientProjectDetailPage() {
                   <i className="fa-solid fa-circle-check"></i>Mark Completed
                 </button>
               )}
+              {canReleaseFunds && (
+                <button onClick={handleOpenReleaseFunds}
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm">
+                  <i className="fa-solid fa-coins"></i>
+                  Release Funds
+                  {projectEscrow && (
+                    <span className="ml-auto text-emerald-200 text-xs font-normal">
+                      ${projectEscrow.funded_amount.toLocaleString()} in escrow
+                    </span>
+                  )}
+                </button>
+              )}
               <Link href={`/client/projects/${id}/applicants`}
                 className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200">
                 <i className="fa-solid fa-users text-cobalt"></i>
@@ -500,6 +575,141 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Release Funds Modal ── */}
+      {showReleaseFundsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => { if (!releasingFunds) setShowReleaseFundsModal(false); }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+
+            {releaseFundsSuccess ? (
+              /* ── Success state ── */
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="fa-solid fa-circle-check text-emerald-600 text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Funds Released!</h3>
+                <p className="text-gray-500 text-sm mb-1">
+                  Payment of{' '}
+                  <strong>${escrowDetailForRelease?.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</strong>{' '}
+                  has been released to{' '}
+                  <strong>{hiredCreator?.creator_name ?? 'the creator'}</strong>.
+                </p>
+                <p className="text-gray-400 text-xs mb-6">
+                  The project is now complete. You can leave a review from this page.
+                </p>
+                <button onClick={() => setShowReleaseFundsModal(false)}
+                  className="px-8 py-2.5 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
+                  Done
+                </button>
+              </div>
+            ) : (
+              /* ── Confirmation state ── */
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Release Funds</h3>
+                    <p className="text-sm text-gray-500 mt-0.5 truncate max-w-[280px]">{job?.title}</p>
+                  </div>
+                  <button onClick={() => setShowReleaseFundsModal(false)} disabled={releasingFunds}
+                    className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                {/* Creator info */}
+                {hiredCreator && (
+                  <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-4">
+                    {hiredCreator.creator_avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={hiredCreator.creator_avatar} alt={hiredCreator.creator_name}
+                        className="w-10 h-10 rounded-full border-2 border-gray-200 object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-cobalt flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {hiredCreator.creator_name[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{hiredCreator.creator_name}</p>
+                      {hiredCreator.creator_title && (
+                        <p className="text-xs text-gray-500">{hiredCreator.creator_title}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Amount summary */}
+                {escrowDetailForRelease && (
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-blue-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-cobalt">
+                        ${escrowDetailForRelease.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-gray-500">Project Budget</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-emerald-600">
+                        ${escrowDetailForRelease.funded_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-gray-500">Funds in Escrow</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Milestones being released */}
+                {escrowDetailForRelease && escrowDetailForRelease.milestones.filter(m => ['delivered', 'approved'].includes(m.status)).length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Milestones to Release</p>
+                    <div className="space-y-1.5">
+                      {escrowDetailForRelease.milestones
+                        .filter(m => ['delivered', 'approved'].includes(m.status))
+                        .map(m => (
+                          <div key={m.milestone_id}
+                            className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <i className="fa-solid fa-circle-check text-emerald-500 text-sm flex-shrink-0"></i>
+                              <span className="text-sm text-gray-800 truncate">{m.title}</span>
+                            </div>
+                            <span className="text-sm font-bold text-gray-700 flex-shrink-0 ml-2">
+                              ${m.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {/* Warning */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5 flex items-start gap-2">
+                  <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm mt-0.5 flex-shrink-0"></i>
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    <strong>This action cannot be undone.</strong> Funds will be immediately transferred from escrow to the creator&apos;s account.
+                  </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button onClick={() => setShowReleaseFundsModal(false)} disabled={releasingFunds}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmReleaseFunds} disabled={releasingFunds}
+                    className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    {releasingFunds
+                      ? <><i className="fa-solid fa-spinner animate-spin"></i> Releasing…</>
+                      : <><i className="fa-solid fa-coins"></i> Release Funds</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Future Work Modal ── */}
       {showFutureWorkModal && hiredCreator && (
