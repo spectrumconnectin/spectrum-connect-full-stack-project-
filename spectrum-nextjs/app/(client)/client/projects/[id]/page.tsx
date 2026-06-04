@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { jobs, messaging, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
 import ProjectTracker from './tracker';
+import FileShare from './files';
 
 const STATUS_STYLE: Record<string, string> = {
   open:        'bg-green-100 text-green-700',
@@ -206,6 +207,9 @@ export default function ClientProjectDetailPage() {
 
           {/* Project Tracker — unified view of milestones, messages, files */}
           <ProjectTracker projectId={id} />
+
+          {/* File Sharing — upload and organize project files */}
+          <FileShare projectId={id} />
 
           {/* Stats */}
           <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
