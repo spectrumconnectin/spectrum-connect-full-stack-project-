@@ -86,6 +86,10 @@ export default function ClientProjectsPage() {
     return matchFilter && matchSearch;
   });
 
+  // Split active projects from completed history
+  const activeProjects    = filtered.filter(p => p.status !== 'completed');
+  const completedProjects = filtered.filter(p => p.status === 'completed');
+
   return (
     <>
       <section className="mb-8">
@@ -140,71 +144,96 @@ export default function ClientProjectsPage() {
           </button>
         </div>
       ) : (
-        <section className="space-y-4">
-          {filtered.map(p => (
-            <Link key={p.id} href={`/client/projects/${p.id}`}
-              className="block bg-white rounded-2xl border border-gray-200 p-6 hover:border-cobalt transition shadow-sm group">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition mb-1">{p.title}</h3>
-                  <p className="text-sm text-gray-500 capitalize">{p.department}{p.role ? ` · ${p.role}` : ''}</p>
-                </div>
-                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${
-                  p.status === 'open' && p.proposal_count > 0
-                    ? 'bg-amber-100 text-amber-700'
-                    : STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-600'
-                }`}>
-                  {statusLabel(p.status)}
-                </span>
-              </div>
-
-              {p.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {p.tags.slice(0, 5).map(t => (
-                    <span key={t} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{t}</span>
-                  ))}
-                  {p.tags.length > 5 && (
-                    <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{p.tags.length - 5}</span>
-                  )}
-                </div>
+        <section className="space-y-8">
+          {/* Active projects */}
+          {(activeFilter === 'All' || activeFilter !== 'completed') && (
+            <div className="space-y-4">
+              {activeFilter === 'All' && activeProjects.length > 0 && (
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                  Active Projects ({activeProjects.length})
+                </h2>
               )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                <div>
-                  <p className="text-gray-500 mb-1">Budget</p>
-                  <p className="font-semibold text-gray-900">{formatBudget(p)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Complexity</p>
-                  <p className="font-semibold text-gray-900 capitalize">{p.complexity}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Crew Size</p>
-                  <p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Proposals</p>
-                  <p className="font-semibold text-gray-900">
-                    {p.proposal_count > 0 ? `${p.proposal_count} received` : 'None yet'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-xs text-gray-400">Posted {formatPosted(p.created_at)}</span>
-                <div className="flex items-center gap-3 text-sm">
-                  {p.proposal_count > 0 && p.status === 'open' && (
-                    <Link href={`/client/projects/${p.id}/applicants`}
-                      className="text-cobalt font-semibold hover:underline"
-                      onClick={e => e.stopPropagation()}>
-                      Review {p.proposal_count} applicants
-                    </Link>
+              {activeProjects.map(p => (
+                <Link key={p.id} href={`/client/projects/${p.id}`}
+                  className="block bg-white rounded-2xl border border-gray-200 p-6 hover:border-cobalt transition shadow-sm group">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition mb-1">{p.title}</h3>
+                      <p className="text-sm text-gray-500 capitalize">{p.department}{p.role ? ` · ${p.role}` : ''}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${
+                      p.status === 'open' && p.proposal_count > 0
+                        ? 'bg-amber-100 text-amber-700'
+                        : STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {statusLabel(p.status)}
+                    </span>
+                  </div>
+                  {p.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {p.tags.slice(0, 5).map(t => (
+                        <span key={t} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{t}</span>
+                      ))}
+                      {p.tags.length > 5 && (
+                        <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{p.tags.length - 5}</span>
+                      )}
+                    </div>
                   )}
-                  <span className="text-gray-400">→</span>
-                </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                    <div><p className="text-gray-500 mb-1">Budget</p><p className="font-semibold text-gray-900">{formatBudget(p)}</p></div>
+                    <div><p className="text-gray-500 mb-1">Complexity</p><p className="font-semibold text-gray-900 capitalize">{p.complexity}</p></div>
+                    <div><p className="text-gray-500 mb-1">Crew Size</p><p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p></div>
+                    <div><p className="text-gray-500 mb-1">Proposals</p><p className="font-semibold text-gray-900">{p.proposal_count > 0 ? `${p.proposal_count} received` : 'None yet'}</p></div>
+                  </div>
+                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Posted {formatPosted(p.created_at)}</span>
+                    <div className="flex items-center gap-3 text-sm">
+                      {p.proposal_count > 0 && p.status === 'open' && (
+                        <Link href={`/client/projects/${p.id}/applicants`}
+                          className="text-cobalt font-semibold hover:underline"
+                          onClick={e => e.stopPropagation()}>
+                          Review {p.proposal_count} applicants
+                        </Link>
+                      )}
+                      <span className="text-gray-400">→</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Completed History */}
+          {completedProjects.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                  <i className="fa-solid fa-trophy text-emerald-500 mr-1.5"></i>
+                  Completed History ({completedProjects.length})
+                </h2>
+                <div className="flex-1 h-px bg-gray-200"></div>
               </div>
-            </Link>
-          ))}
+              {completedProjects.map(p => (
+                <Link key={p.id} href={`/client/projects/${p.id}`}
+                  className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 px-5 py-4 hover:border-emerald-400 hover:bg-emerald-50/30 transition group">
+                  <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i className="fa-solid fa-check text-emerald-600 text-sm"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate group-hover:text-emerald-700">{p.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {p.department}{p.role ? ` · ${p.role}` : ''} · {formatBudget(p)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-gray-400">{formatPosted(p.created_at)}</span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Completed</span>
+                    <i className="fa-solid fa-chevron-right text-xs text-gray-300 group-hover:text-emerald-500 transition"></i>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">

@@ -355,6 +355,9 @@ export default function CreatorProjectDetailPage() {
             role="creator"
             projectId={project.id}
             myUserId={myUserId}
+            jobStatus={project.status}
+            proposalId={myProposalId ?? undefined}
+            jobTitle={project.title}
           />
         </div>
 

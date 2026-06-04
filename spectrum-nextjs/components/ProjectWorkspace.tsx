@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  escrow, messaging, jobs, creatorProjects,
+  escrow, messaging, jobs, creatorProjects, proposals,
   EscrowDetail, EscrowMilestone, ConversationItem, MessageItem,
   DeadlineItem, JobPostItem,
 } from '@/lib/api';
@@ -27,9 +27,15 @@ interface ProjectWorkspaceProps {
   projectId?: string;
   /** Pass current user id so we can align chat bubbles */
   myUserId?: string;
+  /** Current job status — drives the Summary tab and completion UI */
+  jobStatus?: string;
+  /** Accepted proposal id — used to fetch reviews in Summary tab */
+  proposalId?: string;
+  /** Job title for display in Summary tab */
+  jobTitle?: string;
 }
 
-type TabId = 'chat' | 'timeline' | 'milestones' | 'deliverables' | 'files' | 'progress';
+type TabId = 'chat' | 'timeline' | 'milestones' | 'deliverables' | 'files' | 'progress' | 'summary';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'chat',         label: 'Chat',        icon: 'fa-comment' },
@@ -38,6 +44,7 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'deliverables', label: 'Deliverables',icon: 'fa-box-open' },
   { id: 'files',        label: 'Files',       icon: 'fa-folder-open' },
   { id: 'progress',     label: 'Progress',    icon: 'fa-chart-line' },
+  { id: 'summary',      label: 'Summary',     icon: 'fa-trophy' },
 ];
 
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -1203,9 +1210,286 @@ function ProgressTab({ projectId, role, escrowDetail }: {
   );
 }
 
+// ─── Summary Tab ─────────────────────────────────────────────────────────────
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <span className="flex gap-0.5">
+      {[1,2,3,4,5].map(s => (
+        <i key={s} className={`fa-star text-sm ${rating >= s ? 'fa-solid text-yellow-400' : 'fa-regular text-gray-200'}`}></i>
+      ))}
+    </span>
+  );
+}
+
+function SummaryTab({ role, escrowDetail, msgs, jobStatus, proposalId, jobTitle, jobId }: {
+  role: 'client' | 'creator';
+  escrowDetail: EscrowDetail | null;
+  msgs: MessageItem[];
+  jobStatus?: string;
+  proposalId?: string;
+  jobTitle?: string;
+  jobId: string;
+}) {
+  const [reviews, setReviews] = useState<{
+    client_rating: { overall: number; review: string; tags: string[]; reviewed_at: string; ratings: Record<string,number> } | null;
+    creator_rating: { overall: number; review: string; tags: string[]; reviewed_at: string; ratings: Record<string,number> } | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!proposalId) return;
+    proposals.getReviews(proposalId)
+      .then(r => setReviews(r))
+      .catch(() => {});
+  }, [proposalId]);
+
+  const isCompleted = jobStatus === 'completed';
+  const totalFiles  = msgs.reduce((s, m) => s + m.attachments.length, 0);
+  const allFiles    = msgs.flatMap(m => m.attachments);
+  const totalPaid   = escrowDetail?.released_amount ?? 0;
+  const creatorEarnings = totalPaid * 0.96;
+  const milestones  = escrowDetail?.milestones ?? [];
+  const released    = milestones.filter(m => m.status === 'released');
+  const completedAt = escrowDetail?.completed_at;
+
+  return (
+    <div className="space-y-5">
+      {/* Completion header */}
+      <div className={`rounded-xl p-5 ${isCompleted ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200'}`}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isCompleted ? 'bg-emerald-600' : 'bg-gray-400'}`}>
+            <i className={`fa-solid text-white ${isCompleted ? 'fa-trophy' : 'fa-folder-open'}`}></i>
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900">{jobTitle ?? 'Project Summary'}</h3>
+            <p className={`text-xs mt-0.5 ${isCompleted ? 'text-emerald-700' : 'text-gray-500'}`}>
+              {isCompleted
+                ? `Completed${completedAt ? ` · ${fmtDate(completedAt)}` : ''}`
+                : `Status: ${jobStatus ?? 'In Progress'}`
+              }
+            </p>
+          </div>
+          <span className={`ml-auto text-xs font-bold px-3 py-1 rounded-full ${
+            isCompleted ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-600'
+          }`}>
+            {isCompleted ? 'Completed' : 'Active'}
+          </span>
+        </div>
+
+        {/* Quick stats */}
+        <div className="grid grid-cols-3 gap-3 mt-2">
+          {[
+            { label: 'Total paid',       value: `$${totalPaid.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`, icon: 'fa-coins', color: 'text-emerald-600' },
+            { label: 'Milestones done',  value: `${released.length} / ${milestones.length}`, icon: 'fa-list-check', color: 'text-cobalt' },
+            { label: 'Files shared',     value: String(totalFiles),   icon: 'fa-paperclip',  color: 'text-gray-600' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className="bg-white rounded-xl p-3 text-center border border-gray-100">
+              <i className={`fa-solid ${icon} ${color} mb-1 text-base`}></i>
+              <p className={`font-bold text-sm ${color}`}>{value}</p>
+              <p className="text-[10px] text-gray-400">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Transactions — milestone-by-milestone */}
+      {milestones.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-receipt text-cobalt text-sm"></i>Transactions
+          </h4>
+          <div className="space-y-0">
+            {milestones.map((m, i) => (
+              <div key={m.milestone_id}
+                className={`flex items-center justify-between py-3 ${i < milestones.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                    m.status === 'released' ? 'bg-emerald-100' :
+                    m.status === 'refunded' ? 'bg-gray-100' : 'bg-blue-100'
+                  }`}>
+                    <i className={`fa-solid text-xs ${
+                      m.status === 'released' ? 'fa-check text-emerald-600' :
+                      m.status === 'refunded' ? 'fa-rotate-left text-gray-500' :
+                      'fa-lock text-cobalt'
+                    }`}></i>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{m.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {m.status === 'released' && m.released_at
+                        ? `Released ${fmtDate(m.released_at)}`
+                        : MILESTONE_STATUS_LABEL[m.status] ?? m.status
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right flex-shrink-0 ml-3">
+                  <p className={`text-sm font-bold ${m.status === 'released' ? 'text-emerald-600' : 'text-gray-700'}`}>
+                    ${m.amount.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+                  </p>
+                  {role === 'creator' && m.status === 'released' && (
+                    <p className="text-[10px] text-gray-400">
+                      ~${(m.amount * 0.96).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} earned
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Totals row */}
+          {totalPaid > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-sm font-bold text-gray-900">Total Released</span>
+              <div className="text-right">
+                <span className="text-sm font-bold text-emerald-600">
+                  ${totalPaid.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+                </span>
+                {role === 'creator' && (
+                  <p className="text-[10px] text-gray-400">
+                    ~${creatorEarnings.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} your earnings
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reviews */}
+      {isCompleted && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-star text-amber-400 text-sm"></i>Reviews
+          </h4>
+
+          {!reviews ? (
+            <p className="text-sm text-gray-400 text-center py-3">Loading reviews…</p>
+          ) : (
+            <div className="space-y-4">
+              {/* Client → Creator review */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  {role === 'client' ? 'Your review of the creator' : 'Client’s review of you'}
+                </p>
+                {reviews.client_rating ? (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <StarRating rating={reviews.client_rating.overall} />
+                      <span className="font-bold text-gray-900 text-sm">{reviews.client_rating.overall.toFixed(1)}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{fmtDate(reviews.client_rating.reviewed_at)}</span>
+                    </div>
+                    {reviews.client_rating.review && (
+                      <p className="text-sm text-gray-700 leading-relaxed">&ldquo;{reviews.client_rating.review}&rdquo;</p>
+                    )}
+                    {reviews.client_rating.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {reviews.client_rating.tags.map(t => (
+                          <span key={t} className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-2">
+                    <i className="fa-regular fa-star text-gray-300"></i>
+                    <p className="text-sm text-gray-400">
+                      {role === 'client'
+                        ? <><a href={`/client/projects/${jobId}/review`} className="text-cobalt hover:underline font-medium">Leave a review</a> for the creator</>
+                        : 'The client has not left a review yet'
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Creator → Client review */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  {role === 'creator' ? 'Your review of the client' : 'Creator&apos;s review of you'}
+                </p>
+                {reviews.creator_rating ? (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <StarRating rating={reviews.creator_rating.overall} />
+                      <span className="font-bold text-gray-900 text-sm">{reviews.creator_rating.overall.toFixed(1)}</span>
+                      <span className="text-xs text-gray-400 ml-auto">{fmtDate(reviews.creator_rating.reviewed_at)}</span>
+                    </div>
+                    {reviews.creator_rating.review && (
+                      <p className="text-sm text-gray-700 leading-relaxed">&ldquo;{reviews.creator_rating.review}&rdquo;</p>
+                    )}
+                    {reviews.creator_rating.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {reviews.creator_rating.tags.map(t => (
+                          <span key={t} className="px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs text-gray-600">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-2">
+                    <i className="fa-regular fa-star text-gray-300"></i>
+                    <p className="text-sm text-gray-400">
+                      {role === 'creator' && proposalId
+                        ? <><a href={`/creator/projects/review?job=${jobId}&proposal=${proposalId}`} className="text-cobalt hover:underline font-medium">Leave a review</a> for the client</>
+                        : 'The creator has not left a review yet'
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Files */}
+      {allFiles.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-folder-open text-cobalt text-sm"></i>
+            Project Files <span className="text-gray-400 font-normal text-sm">({allFiles.length})</span>
+          </h4>
+          <div className="space-y-2">
+            {allFiles.slice(0,10).map(f => (
+              <a key={f.id} href={f.file_url} target="_blank" rel="noreferrer"
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 border border-gray-100 transition group">
+                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid text-xs ${
+                    f.file_type?.startsWith('image') ? 'fa-image text-purple-500' :
+                    f.file_type === 'application/pdf' ? 'fa-file-pdf text-red-500' :
+                    'fa-file text-gray-500'
+                  }`}></i>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate group-hover:text-cobalt">{f.filename}</p>
+                  {f.file_size && <p className="text-xs text-gray-400">{fmtSize(f.file_size)}</p>}
+                </div>
+                <i className="fa-solid fa-arrow-down-to-line text-xs text-gray-300 group-hover:text-cobalt transition"></i>
+              </a>
+            ))}
+            {allFiles.length > 10 && (
+              <p className="text-xs text-gray-400 text-center pt-1">+{allFiles.length - 10} more — see Files tab</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Not yet completed notice */}
+      {!isCompleted && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+          <i className="fa-solid fa-clock text-cobalt text-lg mb-2 block"></i>
+          <p className="text-sm text-blue-800 font-medium">Project in progress</p>
+          <p className="text-xs text-blue-600 mt-1">The full summary will be available once the project is completed.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Workspace ───────────────────────────────────────────────────────────
 
-export default function ProjectWorkspace({ jobId, role, projectId, myUserId = '' }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ jobId, role, projectId, myUserId = '', jobStatus, proposalId, jobTitle }: ProjectWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<TabId>('chat');
 
   // Data
@@ -1387,6 +1671,17 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
         )}
         {activeTab === 'progress' && (
           <ProgressTab projectId={projectId} role={role} escrowDetail={escrowDetail} />
+        )}
+        {activeTab === 'summary' && (
+          <SummaryTab
+            role={role}
+            escrowDetail={escrowDetail}
+            msgs={msgs}
+            jobStatus={jobStatus}
+            proposalId={proposalId}
+            jobTitle={jobTitle}
+            jobId={jobId}
+          />
         )}
       </div>
 

@@ -319,7 +319,14 @@ export default function ClientProjectDetailPage() {
           )}
 
           {/* Project Workspace — Chat, Timeline, Milestones, Deliverables, Files, Progress */}
-          <ProjectWorkspace jobId={id} role="client" myUserId={myUserId} />
+          <ProjectWorkspace
+            jobId={id}
+            role="client"
+            myUserId={myUserId}
+            jobStatus={job.status}
+            proposalId={hiredCreator?.id}
+            jobTitle={job.title}
+          />
 
           {/* Stats */}
           <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
