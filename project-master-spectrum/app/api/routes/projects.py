@@ -232,12 +232,47 @@ async def update_project_progress(
     data: ProjectProgressUpdate,
     current_user: User = Depends(get_current_user)
 ):
-    """Update project progress percentage"""
+    """Update project progress percentage and notify the client via chat + bell notification."""
     project = await ProjectService.update_progress(
         project_id=project_id,
         user_id=str(current_user.id),
         progress_percentage=data.progress_percentage
     )
+
+    # Notify client: post a progress update message in the project conversation
+    try:
+        from app.services.message_service import MessageService
+        from app.models.message import Conversation
+
+        # Find the conversation linked to the project
+        convo = await Conversation.find_one({"job_id": project.job_post_id}) if hasattr(project, "job_post_id") else None
+        if convo is None and project.client_id:
+            # Fall back: find any conversation between this creator and the project client
+            convo = await Conversation.find_one({
+                "participants": {
+                    "$all": [str(current_user.id), str(project.client_id)]
+                }
+            })
+        if convo:
+            await MessageService.send_message(
+                conversation_id=str(convo.id),
+                sender_id=str(current_user.id),
+                content=f"📊 **Progress update: {data.progress_percentage}%**\n\nI've updated the project progress to {data.progress_percentage}%.",
+            )
+
+        # Bell notification to client
+        from app.services.notification_service import NotificationService
+        if project.client_id:
+            await NotificationService.send(
+                user_id=str(project.client_id),
+                type="project",
+                category="info",
+                title=f"Progress update: {data.progress_percentage}%",
+                message=f"Creator updated progress on '{project.title}' to {data.progress_percentage}%.",
+                actor_id=str(current_user.id),
+            )
+    except Exception:
+        pass
 
     return _project_to_response(project)
 

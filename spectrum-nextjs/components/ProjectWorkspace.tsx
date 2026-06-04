@@ -83,19 +83,29 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
   convo: ConversationItem | null;
   msgs: MessageItem[];
   myUserId: string;
-  onSend: (text: string) => void;
+  onSend: (text: string, file?: File) => void;
   sending: boolean;
 }) {
   const [input, setInput] = useState('');
+  const [uploadingFile, setUploadingFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && !uploadingFile) || sending) return;
     setInput('');
-    onSend(text);
+    const file = uploadingFile;
+    setUploadingFile(null);
+    onSend(text || (file ? `📎 ${file.name}` : ''), file ?? undefined);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setUploadingFile(file);
+    e.target.value = '';
   };
 
   if (!convo) return (
@@ -144,15 +154,35 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
         <div ref={bottomRef} />
       </div>
 
+      {/* File preview */}
+      {uploadingFile && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl mb-2 text-sm">
+          <i className="fa-solid fa-paperclip text-cobalt text-xs"></i>
+          <span className="text-cobalt font-medium flex-1 truncate">{uploadingFile.name}</span>
+          <button onClick={() => setUploadingFile(null)} className="text-gray-400 hover:text-red-500 transition">
+            <i className="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 p-3">
+        {/* File attach */}
+        <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange}
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt" />
+        <button onClick={() => fileRef.current?.click()}
+          className="p-2 text-gray-400 hover:text-cobalt rounded-lg hover:bg-blue-50 transition flex-shrink-0"
+          title="Attach file">
+          <i className="fa-solid fa-paperclip text-sm"></i>
+        </button>
+
         <textarea value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           placeholder="Type a message… (Enter to send)"
           rows={1}
           className="flex-1 bg-transparent text-sm outline-none resize-none placeholder-gray-400 leading-relaxed text-gray-900" />
-        <button onClick={handleSend} disabled={!input.trim() || sending}
-          className={`p-2.5 rounded-xl transition ${input.trim() && !sending ? 'bg-cobalt text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+        <button onClick={handleSend} disabled={(!input.trim() && !uploadingFile) || sending}
+          className={`p-2.5 rounded-xl transition ${(input.trim() || uploadingFile) && !sending ? 'bg-cobalt text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
           <i className="fa-solid fa-paper-plane text-sm"></i>
         </button>
       </div>
@@ -473,37 +503,69 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh }: {
 
 // ─── Files Tab ────────────────────────────────────────────────────────────────
 
-function FilesTab({ msgs }: { msgs: MessageItem[] }) {
+function FilesTab({ msgs, onSend }: { msgs: MessageItem[]; onSend?: (text: string, file?: File) => void }) {
   const files = msgs.flatMap(m => m.attachments.map(a => ({ ...a, sent_at: m.sent_at })));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
-  if (files.length === 0) return (
-    <div className="text-center py-12 text-gray-400">
-      <i className="fa-solid fa-folder-open text-4xl mb-3 block text-gray-300"></i>
-      <p className="text-sm">No files shared yet.</p>
-      <p className="text-xs mt-1">Files sent via chat appear here automatically.</p>
-    </div>
-  );
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onSend) return;
+    setUploading(true);
+    try {
+      await onSend(`📎 Shared a file: ${file.name}`, file);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      {files.map(f => (
-        <a key={f.id} href={f.file_url} target="_blank" rel="noreferrer"
-          className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-cobalt hover:shadow-sm transition group">
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <i className={`fa-solid ${
-              f.file_type?.startsWith('image') ? 'fa-image text-purple-500' :
-              f.file_type?.startsWith('video') ? 'fa-film text-blue-500' :
-              f.file_type === 'application/pdf' ? 'fa-file-pdf text-red-500' :
-              'fa-file text-gray-500'
-            } text-lg`}></i>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 group-hover:text-cobalt truncate">{f.filename}</p>
-            <p className="text-xs text-gray-400">{fmtSize(f.file_size)} · {fmtDate((f as {sent_at?: string}).sent_at)}</p>
-          </div>
-          <i className="fa-solid fa-download text-gray-300 group-hover:text-cobalt transition flex-shrink-0"></i>
-        </a>
-      ))}
+    <div>
+      {/* Upload button */}
+      {onSend && (
+        <div className="mb-4">
+          <input ref={fileRef} type="file" className="hidden" onChange={handleUpload}
+            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt,.mp3,.mp4,.mov" />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-cobalt text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-60">
+            {uploading
+              ? <><i className="fa-solid fa-spinner animate-spin"></i> Uploading…</>
+              : <><i className="fa-solid fa-upload"></i> Upload File</>
+            }
+          </button>
+          <p className="text-xs text-gray-400 mt-1.5">Uploaded files appear in chat and are accessible to both parties.</p>
+        </div>
+      )}
+
+      {files.length === 0 ? (
+        <div className="text-center py-10 text-gray-400">
+          <i className="fa-solid fa-folder-open text-4xl mb-3 block text-gray-300"></i>
+          <p className="text-sm">No files shared yet.</p>
+          <p className="text-xs mt-1">Files uploaded here or sent via chat appear in this list.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {files.map(f => (
+            <a key={f.id} href={f.file_url} target="_blank" rel="noreferrer"
+              className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-cobalt hover:shadow-sm transition group">
+              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i className={`fa-solid ${
+                  f.file_type?.startsWith('image') ? 'fa-image text-purple-500' :
+                  f.file_type?.startsWith('video') ? 'fa-film text-blue-500' :
+                  f.file_type === 'application/pdf' ? 'fa-file-pdf text-red-500' :
+                  'fa-file text-gray-500'
+                } text-lg`}></i>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 group-hover:text-cobalt truncate">{f.filename}</p>
+                <p className="text-xs text-gray-400">{fmtSize(f.file_size)} · {fmtDate((f as {sent_at?: string}).sent_at)}</p>
+              </div>
+              <i className="fa-solid fa-download text-gray-300 group-hover:text-cobalt transition flex-shrink-0"></i>
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -676,31 +738,38 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [loadAll, convo]);
 
-  const handleSendMessage = async (text: string) => {
-    if (!convo) {
+  const handleSendMessage = async (text: string, file?: File) => {
+    let targetConvo = convo;
+
+    if (!targetConvo) {
       // Create conversation first
       try {
-        const job = await jobs.getById(jobId);
-        const newConvo = await messaging.createConversation(
-          [],
-          jobId,
-          text,
-        );
+        const newConvo = await messaging.createConversation([], jobId, text);
         setConvo(newConvo);
+        targetConvo = newConvo;
         const msgRes = await messaging.getMessages(newConvo.id, { limit: 100 });
         setMsgs(msgRes.messages);
         return;
       } catch (e) { alert((e as Error).message); return; }
     }
+
     setSending(true);
     const tmp: MessageItem = {
-      id: `tmp-${Date.now()}`, conversation_id: convo.id, sender_id: myUserId,
+      id: `tmp-${Date.now()}`, conversation_id: targetConvo.id, sender_id: myUserId,
       content: text, attachments: [], sent_at: new Date().toISOString(),
       is_deleted: false, read_by: [], message_type: 'text',
     };
     setMsgs(prev => [...prev, tmp]);
+
     try {
-      const sent = await messaging.send(convo.id, text);
+      let sent: MessageItem;
+      if (file) {
+        // Upload file then attach to message
+        const uploaded = await messaging.uploadAttachment(file);
+        sent = await messaging.sendWithAttachments(targetConvo.id, text, [uploaded.id]);
+      } else {
+        sent = await messaging.send(targetConvo.id, text);
+      }
       setMsgs(prev => prev.map(m => m.id === tmp.id ? sent : m));
     } catch {
       setMsgs(prev => prev.filter(m => m.id !== tmp.id));
@@ -758,7 +827,8 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
       {/* Tab content */}
       <div className="p-5">
         {activeTab === 'chat' && (
-          <ChatTab convo={convo} msgs={msgs} myUserId={myUserId} onSend={handleSendMessage} sending={sending} />
+          <ChatTab convo={convo} msgs={msgs} myUserId={myUserId}
+            onSend={(text, file) => handleSendMessage(text, file)} sending={sending} />
         )}
         {activeTab === 'timeline' && (
           <TimelineTab deadlines={deadlines} projectId={projectId} role={role} onRefresh={loadAll} />
@@ -770,7 +840,7 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
           <DeliverablesTab msgs={msgs} myUserId={myUserId} role={role} escrowDetail={escrowDetail} onRefresh={loadAll} />
         )}
         {activeTab === 'files' && (
-          <FilesTab msgs={msgs} />
+          <FilesTab msgs={msgs} onSend={(text, file) => handleSendMessage(text, file)} />
         )}
         {activeTab === 'progress' && (
           <ProgressTab projectId={projectId} role={role} escrowDetail={escrowDetail} />

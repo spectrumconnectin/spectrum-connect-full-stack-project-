@@ -1403,6 +1403,25 @@ export const messaging = {
   getMessages: (conversationId: string, params?: { limit?: number; before_message_id?: string }): Promise<MessageListResponse> =>
     request<MessageListResponse>(`/messages/conversations/${conversationId}/messages${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
+  uploadAttachment: async (file: File): Promise<{ id: string; filename: string; file_url: string; file_size: number; file_type: string }> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') || localStorage.getItem('access_token') : null;
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/messages/attachments/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error('File upload failed');
+    return res.json();
+  },
+
+  sendWithAttachments: (conversationId: string, content: string, attachmentIds: string[]): Promise<MessageItem> =>
+    request<MessageItem>('/messages', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: conversationId, content, attachment_ids: attachmentIds }),
+    }),
+
   send: (conversationId: string, content: string): Promise<MessageItem> =>
     request<MessageItem>('/messages', {
       method: 'POST',
