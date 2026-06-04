@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { creatorProjects, profile, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile } from '@/lib/api';
 
@@ -106,6 +106,7 @@ function ProgressModal({ current, onClose, onSave }: {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function CreatorProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [project, setProject]   = useState<ProjectItem | null>(null);
   const [activities, setActivities] = useState<ActivityLogItem[]>([]);
@@ -127,7 +128,14 @@ export default function CreatorProjectDetailPage() {
       // fetch client profile in background — don't block render
       profile.getPublic(proj.client_id).then(setClientProfile).catch(() => {});
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      // If the ID is a job_id (from old notifications) rather than a workspace
+      // project ID, redirect to the applications tab instead of showing an error.
+      if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+        router.replace('/creator/projects?tab=applications');
+        return;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
