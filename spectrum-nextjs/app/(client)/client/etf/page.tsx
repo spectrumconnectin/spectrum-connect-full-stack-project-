@@ -159,6 +159,46 @@ export default function ClientEtfPage() {
         </div>
       </section>
 
+      {/* Level Benefits */}
+      <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">What you unlock at each level</h2>
+        <p className="text-sm text-gray-600 mb-6">Higher ETF levels make you a more trusted client — giving you access to top-ranked creators faster.</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              level: 'Bronze', icon: 'fa-medal', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200',
+              perks: ['Platform access', 'Post projects', 'Standard creator visibility', 'Basic Smart Connect'],
+            },
+            {
+              level: 'Silver', icon: 'fa-medal', color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200',
+              perks: ['Silver trust badge', 'Better creator matching', 'Priority escrow support', 'Repeat creator bonus active'],
+            },
+            {
+              level: 'Gold', icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200',
+              perks: ['Gold trust badge', 'Top Smart Connect results', 'Priority dispute resolution', 'Featured client status'],
+            },
+            {
+              level: 'Platinum', icon: 'fa-gem', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200',
+              perks: ['Platinum badge', 'Cash-out eligible', 'Maximum platform visibility', 'Early access to new features'],
+            },
+          ].map(({ level, icon, color, bg, border, perks }) => (
+            <div key={level} className={`rounded-2xl border ${border} ${bg} p-5`}>
+              <div className="flex items-center gap-2 mb-3">
+                <i className={`fa-solid ${icon} text-xl ${color}`}></i>
+                <span className={`font-bold text-base ${color}`}>{level}</span>
+              </div>
+              <ul className="space-y-2">
+                {perks.map(p => (
+                  <li key={p} className="flex items-start gap-2 text-xs text-gray-700">
+                    <i className="fa-solid fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>{p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-2">How you earn ETF Points</h2>
         <p className="text-sm text-gray-600 mb-6">
@@ -167,18 +207,21 @@ export default function ClientEtfPage() {
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
-            { icon: 'fa-bullhorn',       label: 'Post a project' },
-            { icon: 'fa-handshake',      label: 'Hire a creator' },
-            { icon: 'fa-lock',           label: 'Fund a milestone' },
-            { icon: 'fa-unlock',         label: 'Release on time' },
-            { icon: 'fa-check-double',   label: 'Complete a project' },
-            { icon: 'fa-star',           label: 'Leave a review' },
+            { icon: 'fa-bullhorn',       label: 'Post a project',        pts: '+5' },
+            { icon: 'fa-handshake',      label: 'Hire a creator',        pts: '+20' },
+            { icon: 'fa-lock',           label: 'Fund a milestone',      pts: '+10' },
+            { icon: 'fa-unlock',         label: 'Release payment',       pts: '+15' },
+            { icon: 'fa-check-double',   label: 'Complete a project',    pts: '+50' },
+            { icon: 'fa-star',           label: 'Leave a review',        pts: '+15' },
           ].map(it => (
-            <div key={it.label} className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center">
-                <i className={`fa-solid ${it.icon}`}></i>
+            <div key={it.label} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${it.icon}`}></i>
+                </div>
+                <span className="text-sm font-medium text-gray-800">{it.label}</span>
               </div>
-              <span className="text-sm font-medium text-gray-800">{it.label}</span>
+              <span className="text-xs font-bold text-emerald-600 flex-shrink-0 ml-2">{it.pts}</span>
             </div>
           ))}
         </div>

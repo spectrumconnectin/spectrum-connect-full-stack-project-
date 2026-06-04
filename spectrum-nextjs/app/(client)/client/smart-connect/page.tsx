@@ -286,7 +286,7 @@ export default function ClientSmartConnectPage() {
                             ) : (
                               <div className="w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center text-cobalt text-xl font-bold border border-gray-200">{c.name[0]}</div>
                             )}
-                            {c.availability === 'available' && (
+                            {c.availability && c.availability !== 'not_available' && (
                               <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white" title="Available now"></span>
                             )}
                           </div>
@@ -304,6 +304,19 @@ export default function ClientSmartConnectPage() {
                                 </div>
                                 <p className="text-sm text-cobalt font-medium">{c.title || c.role}</p>
                                 {loc && <p className="text-xs text-gray-500 mt-0.5"><i className="fa-solid fa-location-dot mr-1"></i>{loc}</p>}
+                                {c.availability && (
+                                  <span className={`inline-flex items-center gap-1 text-xs font-medium mt-1 ${
+                                    c.availability === 'available' ? 'text-green-600' :
+                                    c.availability === 'busy' ? 'text-amber-600' : 'text-gray-400'
+                                  }`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      c.availability === 'available' ? 'bg-green-500' :
+                                      c.availability === 'busy' ? 'bg-amber-400' : 'bg-gray-300'
+                                    }`}></span>
+                                    {c.availability === 'available' ? 'Available now' :
+                                     c.availability === 'busy' ? 'Busy' : 'Unavailable'}
+                                  </span>
+                                )}
                               </div>
                               <div className="text-right flex-shrink-0">
                                 {c.rating > 0 && (

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, jobs as jobsApi, profile as profileApi, type ClientDashboardResponse, type JobPostItem } from '@/lib/api';
+import { dashboard, jobs as jobsApi, profile as profileApi, escrow as escrowApi, type ClientDashboardResponse, type JobPostItem } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 
 const statusColors: Record<string, string> = {
@@ -17,17 +17,25 @@ export default function ClientDashboardPage() {
   const [myJobs, setMyJobs] = useState<JobPostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState('');
+  const [totalInEscrow, setTotalInEscrow] = useState(0);
+  const [totalReleased, setTotalReleased] = useState(0);
+  const [activeEscrowCount, setActiveEscrowCount] = useState(0);
 
   useEffect(() => {
-    // Fetch dashboard meta, all client jobs, and profile in parallel.
-    // Jobs come from /jobs/me (same source as My Projects page) to ensure
-    // the Active Projects section is always in sync.
+    // Fetch dashboard meta, all client jobs, profile, and escrow summary in parallel.
     Promise.allSettled([
       dashboard.getClient(),
       jobsApi.getMe(),
       profileApi.getMe(),
-    ]).then(([dashResult, jobsResult, meResult]) => {
+      escrowApi.list({ role: 'client', limit: 50 }),
+    ]).then(([dashResult, jobsResult, meResult, escrowResult]) => {
       if (dashResult.status === 'fulfilled') setData(dashResult.value);
+      if (escrowResult.status === 'fulfilled') {
+        const escrows = escrowResult.value.escrows || [];
+        setTotalInEscrow(escrows.reduce((s, e) => s + (e.funded_amount - e.released_amount), 0));
+        setTotalReleased(escrows.reduce((s, e) => s + e.released_amount, 0));
+        setActiveEscrowCount(escrows.filter(e => e.status === 'active').length);
+      }
       if (jobsResult.status === 'fulfilled') setMyJobs(jobsResult.value);
       if (meResult.status === 'fulfilled') {
         const me = meResult.value;
@@ -107,6 +115,50 @@ export default function ClientDashboardPage() {
             <div className="text-sm text-gray-500">{s.label}</div>
           </div>
         ))}
+      </section>
+
+      {/* Payment Summary */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Payments</h2>
+          <Link href="/client/payments" className="text-sm text-cobalt font-semibold hover:underline">View all →</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-blue-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-lock text-cobalt text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">In Escrow</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${totalInEscrow.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">{activeEscrowCount} active project{activeEscrowCount !== 1 ? 's' : ''} funded</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-emerald-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-check text-emerald-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Released</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${totalReleased.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Total paid to creators</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-flask text-amber-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Payment Mode</span>
+            </div>
+            <div className="text-sm font-bold text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+              TEST MODE — Simulated
+            </div>
+            <Link href="/client/payments" className="mt-3 text-xs text-cobalt font-semibold hover:underline">
+              View transaction history →
+            </Link>
+          </div>
+        </div>
       </section>
 
       <div className="grid lg:grid-cols-3 gap-8 mb-10">

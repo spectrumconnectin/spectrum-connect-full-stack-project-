@@ -163,6 +163,46 @@ export default function CreatorEtfPage() {
         </div>
       </section>
 
+      {/* Level Benefits */}
+      <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">What you unlock at each level</h2>
+        <p className="text-sm text-gray-600 mb-6">Higher ETF levels earn you better visibility, stronger rankings, and more trust signals on the platform.</p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              level: 'Bronze', icon: 'fa-medal', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200',
+              perks: ['Platform access', 'Smart Connect listing', 'Standard visibility', 'Apply to projects'],
+            },
+            {
+              level: 'Silver', icon: 'fa-medal', color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200',
+              perks: ['Higher Smart Connect ranking', 'Silver trust badge on profile', 'Priority in search results', 'Repeat client bonus active'],
+            },
+            {
+              level: 'Gold', icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200',
+              perks: ['Top-tier Smart Connect ranking', 'Gold trust badge', 'Featured in client recommendations', 'Stronger trust indicators'],
+            },
+            {
+              level: 'Platinum', icon: 'fa-gem', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200',
+              perks: ['Highest Smart Connect priority', 'Platinum badge + cash-out eligible', 'Maximum recommendation boost', 'Early access to platform features'],
+            },
+          ].map(({ level, icon, color, bg, border, perks }) => (
+            <div key={level} className={`rounded-2xl border ${border} ${bg} p-5`}>
+              <div className="flex items-center gap-2 mb-3">
+                <i className={`fa-solid ${icon} text-xl ${color}`}></i>
+                <span className={`font-bold text-base ${color}`}>{level}</span>
+              </div>
+              <ul className="space-y-2">
+                {perks.map(p => (
+                  <li key={p} className="flex items-start gap-2 text-xs text-gray-700">
+                    <i className="fa-solid fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>{p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* How you earn */}
       <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-2">How you earn ETF Points</h2>
@@ -170,20 +210,25 @@ export default function CreatorEtfPage() {
           Genuine, on-platform activity is rewarded. Self-jobs, fake projects, and duplicate
           accounts never earn points.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { icon: 'fa-flag-checkered', label: 'Deliver a milestone' },
-            { icon: 'fa-trophy',         label: 'Complete a project' },
-            { icon: 'fa-handshake',      label: 'Get hired' },
-            { icon: 'fa-shield-halved',  label: 'Get verified' },
-            { icon: 'fa-star',           label: 'Leave a review' },
-            { icon: 'fa-rotate-right',   label: 'Repeat client' },
+            { icon: 'fa-flag-checkered', label: 'Deliver a milestone',   pts: '+50' },
+            { icon: 'fa-trophy',         label: 'Complete a project',    pts: '+100' },
+            { icon: 'fa-clock',          label: 'On-time delivery',      pts: '+30 bonus' },
+            { icon: 'fa-handshake',      label: 'Get hired',             pts: '+20' },
+            { icon: 'fa-shield-halved',  label: 'Get verified',          pts: '+100' },
+            { icon: 'fa-star',           label: 'Leave a review',        pts: '+15' },
+            { icon: 'fa-rotate-right',   label: 'Repeat client',         pts: '+25' },
+            { icon: 'fa-lock',           label: 'Fund a milestone',      pts: '+10' },
           ].map(it => (
-            <div key={it.label} className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center">
-                <i className={`fa-solid ${it.icon}`}></i>
+            <div key={it.label} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${it.icon}`}></i>
+                </div>
+                <span className="text-sm font-medium text-gray-800">{it.label}</span>
               </div>
-              <span className="text-sm font-medium text-gray-800">{it.label}</span>
+              <span className="text-xs font-bold text-emerald-600 flex-shrink-0 ml-2">{it.pts}</span>
             </div>
           ))}
         </div>

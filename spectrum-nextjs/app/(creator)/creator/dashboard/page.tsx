@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, type CreatorDashboardResponse } from '@/lib/api';
+import { dashboard, auth, escrow as escrowApi, type CreatorDashboardResponse } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 
 const difficultyStyles: Record<string, string> = {
@@ -14,14 +14,23 @@ const difficultyStyles: Record<string, string> = {
 export default function CreatorDashboardPage() {
   const [data, setData] = useState<CreatorDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inEscrow, setInEscrow] = useState(0);
+  const [pendingRelease, setPendingRelease] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
 
   useEffect(() => {
-    dashboard.getCreator()
-      .then(setData)
-      .catch(() => {
-        // if auth fails, let it silently show empty state (user may not be logged in yet)
-      })
-      .finally(() => setLoading(false));
+    Promise.allSettled([
+      dashboard.getCreator(),
+      escrowApi.list({ role: 'creator', limit: 50 }),
+    ]).then(([dashResult, escrowResult]) => {
+      if (dashResult.status === 'fulfilled') setData(dashResult.value);
+      if (escrowResult.status === 'fulfilled') {
+        const escrows = escrowResult.value.escrows || [];
+        setInEscrow(escrows.reduce((s, e) => s + (e.funded_amount - e.released_amount), 0));
+        setPendingRelease(escrows.filter(e => e.funded_milestones > e.released_milestones).reduce((s, e) => s + (e.funded_amount - e.released_amount), 0));
+        setTotalEarned(escrows.reduce((s, e) => s + e.released_amount, 0));
+      }
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const stats = data?.stats;
@@ -80,6 +89,46 @@ export default function CreatorDashboardPage() {
             <div className="text-sm text-gray-500">{s.label}</div>
           </div>
         ))}
+      </section>
+
+      {/* Earnings & Escrow Panel */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Earnings</h2>
+          <Link href="/creator/earnings" className="text-sm text-cobalt font-semibold hover:underline">View details →</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-blue-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-lock text-cobalt text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">In Escrow</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${inEscrow.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Secured — waiting for release</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-amber-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-hourglass-half text-amber-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Pending Release</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${pendingRelease.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Awaiting client approval</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-emerald-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Total Released</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${totalEarned.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Paid to your account</p>
+          </div>
+        </div>
       </section>
 
       <div className="grid lg:grid-cols-3 gap-8 mb-10">
