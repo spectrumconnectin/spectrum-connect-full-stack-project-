@@ -14,6 +14,7 @@ const STATUS_STYLE: Record<string, string> = {
   in_progress:        'bg-blue-100 text-blue-700',
   delivered:          'bg-indigo-100 text-indigo-700',
   revision_requested: 'bg-orange-100 text-orange-700',
+  approved:           'bg-teal-100 text-teal-700',
   closed:             'bg-blue-100 text-blue-700',
   completed:          'bg-emerald-100 text-emerald-700',
 };
@@ -26,6 +27,7 @@ function jobStatusLabel(status: string): string {
     in_progress:        'Active',
     delivered:          'Delivered',
     revision_requested: 'Revision Requested',
+    approved:           'Approved',
     closed:             'Active',
     completed:          'Completed',
     draft:              'Draft',
@@ -187,6 +189,24 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Approved — escrow eligible for release */}
+      {job.status === 'approved' && (
+        <div className="bg-teal-50 border-2 border-teal-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-circle-check text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-teal-900 text-lg">Work Approved — Escrow Ready for Release</p>
+            <p className="text-teal-700 text-sm mt-0.5 leading-relaxed">
+              You have approved the work. The escrow is now eligible for release. Head to the Milestones tab to release payment to the creator.
+            </p>
+          </div>
+          <span className="bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Approved
+          </span>
+        </div>
+      )}
 
       {/* Revision requested — waiting on creator */}
       {job.status === 'revision_requested' && (

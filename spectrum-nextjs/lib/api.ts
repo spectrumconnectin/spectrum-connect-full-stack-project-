@@ -1063,6 +1063,9 @@ export const escrow = {
   deliverMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
     request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST' }),
 
+  approveMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/approve`, { method: 'POST' }),
+
   requestRevision: (escrowId: string, milestoneId: string, feedback?: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
     request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, {
       method: 'POST',

@@ -597,6 +597,72 @@ async def deliver_milestone(
     return {"success": True, "milestone_id": milestone_id, "status": "delivered"}
 
 
+@escrow_router.post(
+    "/{escrow_id}/milestone/{milestone_id}/approve",
+    summary="Client approves delivered milestone (before releasing funds)",
+)
+async def approve_milestone(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Client marks work as approved — milestone moves to 'approved' and escrow
+    becomes eligible for release.  Funds stay locked until client explicitly
+    calls release-milestone."""
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if str(esc.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the client can approve milestones")
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if milestone.status not in ("delivered",):
+        raise HTTPException(status_code=400, detail=f"Only delivered milestones can be approved (current: '{milestone.status}')")
+    milestone.status = "approved"
+    await esc.save()
+
+    # Set job status to "approved" when ALL milestones are approved/released
+    try:
+        from app.models.schema import JobPost
+        if esc.job_post_id:
+            job = await JobPost.get(esc.job_post_id)
+            all_done = all(m.status in ("approved", "released", "refunded") for m in esc.milestones)
+            if job and all_done:
+                job.status = "approved"
+                await job.save()
+    except Exception:
+        pass
+
+    # Notify creator their work was approved
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.send(
+            user_id=str(esc.creator_id),
+            type="escrow",
+            category="success",
+            title=f"Work approved: {milestone.title}",
+            message=f"The client has approved your work on '{milestone.title}'. Payment release is now in progress.",
+            actor_id=str(current_user.id),
+        )
+        # Post to conversation
+        from app.models.message import Conversation
+        from app.services.message_service import MessageService
+        convo = await Conversation.find_one({"job_id": str(esc.job_post_id)}) if esc.job_post_id else None
+        if convo:
+            await MessageService.send_message(
+                conversation_id=str(convo.id),
+                sender_id=str(current_user.id),
+                content=f"✅ **Work Approved: {milestone.title}**\n\nYour work has been approved. Payment will be released shortly.",
+            )
+    except Exception:
+        pass
+
+    return {"success": True, "milestone_id": milestone_id, "status": "approved"}
+
+
 class RevisionRequest(BaseModel):
     feedback: Optional[str] = None  # client's explanation of what needs to change
 

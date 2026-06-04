@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { jobs, JobPostItem } from '@/lib/api';
 
-const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'completed', 'draft'];
+const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'approved', 'completed', 'draft'];
 
 // Map raw status → display label
 function statusLabel(status: string): string {
@@ -15,6 +15,7 @@ function statusLabel(status: string): string {
     in_progress:        'Active',
     delivered:          'Delivered',
     revision_requested: 'Revision Requested',
+    approved:           'Approved',
     completed:          'Completed',
     draft:              'Draft',
     closed:             'Active',  // legacy
@@ -29,6 +30,7 @@ const STATUS_STYLES: Record<string, string> = {
   in_progress:        'bg-blue-100 text-blue-700',
   delivered:          'bg-indigo-100 text-indigo-700',
   revision_requested: 'bg-orange-100 text-orange-700',
+  approved:           'bg-teal-100 text-teal-700',
   completed:          'bg-emerald-100 text-emerald-700',
   draft:              'bg-gray-100 text-gray-500',
   closed:             'bg-blue-100 text-blue-700',

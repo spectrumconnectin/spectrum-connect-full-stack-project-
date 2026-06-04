@@ -200,12 +200,14 @@ function MilestonesTab({ escrowDetail, role, onRefresh, onRequestRevision }: {
 }) {
   const [acting, setActing] = useState<string | null>(null);
 
-  const doAction = async (action: 'deliver' | 'release', milestoneId: string) => {
+  const doAction = async (action: 'deliver' | 'approve' | 'release', milestoneId: string) => {
     if (!escrowDetail) return;
     setActing(milestoneId);
     try {
       if (action === 'deliver') {
         await escrow.deliverMilestone(escrowDetail.escrow_id, milestoneId);
+      } else if (action === 'approve') {
+        await escrow.approveMilestone(escrowDetail.escrow_id, milestoneId);
       } else if (action === 'release') {
         await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
       }
@@ -319,15 +321,21 @@ function MilestonesTab({ escrowDetail, role, onRefresh, onRequestRevision }: {
                       )}
                       {role === 'client' && m.status === 'delivered' && (
                         <>
-                          <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
-                            className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
-                            ✓ Approve & Release
+                          <button onClick={() => doAction('approve', m.milestone_id)} disabled={acting === m.milestone_id}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition disabled:opacity-60">
+                            {acting === m.milestone_id ? 'Approving…' : '✓ Approve Work'}
                           </button>
                           <button onClick={() => onRequestRevision?.(m)}
                             className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
                             ↩ Request Revision
                           </button>
                         </>
+                      )}
+                      {role === 'client' && m.status === 'approved' && (
+                        <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
+                          {acting === m.milestone_id ? 'Releasing…' : '💸 Release Payment'}
+                        </button>
                       )}
                     </div>
                   </div>
@@ -489,11 +497,12 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
     }
   };
 
-  const doAction = async (action: 'release', milestoneId: string) => {
+  const doAction = async (action: 'approve' | 'release', milestoneId: string) => {
     if (!escrowDetail) return;
     setActing(milestoneId);
     try {
-      await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
+      if (action === 'approve') await escrow.approveMilestone(escrowDetail.escrow_id, milestoneId);
+      else await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
       onRefresh();
     } catch (e) {
       alert((e as Error).message);
@@ -611,13 +620,25 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                   </div>
                   {role === 'client' && m.status === 'delivered' && (
                     <div className="flex flex-col gap-2">
-                      <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
-                        {acting === m.milestone_id ? 'Releasing…' : '✓ Approve & Release'}
+                      <button onClick={() => doAction('approve', m.milestone_id)} disabled={acting === m.milestone_id}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition disabled:opacity-60">
+                        {acting === m.milestone_id ? 'Approving…' : '✓ Approve Work'}
                       </button>
                       <button onClick={() => { setRevisionTarget(m); setRevisionFeedback(''); }}
                         className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
                         ↩ Request Revision
+                      </button>
+                    </div>
+                  )}
+                  {role === 'client' && m.status === 'approved' && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200">
+                        <i className="fa-solid fa-circle-check text-teal-600"></i>
+                        <span className="font-semibold">Approved</span>
+                      </div>
+                      <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
+                        className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
+                        {acting === m.milestone_id ? 'Releasing…' : '💸 Release Payment'}
                       </button>
                     </div>
                   )}

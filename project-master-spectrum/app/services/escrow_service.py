@@ -223,10 +223,10 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        if milestone.status != "funded":
+        if milestone.status not in ("funded", "approved"):
             raise HTTPException(
                 status_code=400,
-                detail=f"Milestone must be 'funded' before release (current: '{milestone.status}').",
+                detail=f"Milestone must be 'funded' or 'approved' before release (current: '{milestone.status}').",
             )
 
         now = datetime.utcnow()
