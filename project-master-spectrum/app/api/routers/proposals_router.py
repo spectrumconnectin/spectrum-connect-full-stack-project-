@@ -238,7 +238,6 @@ async def update_proposal_status(
         await job.save()
     elif data.status == "rejected" and job.status in ("in_review", "pending_funding"):
         # If all proposals are now rejected/withdrawn, reopen the job
-        from app.models.schema import Application
         remaining = await Application.find(
             Application.project_id == job.id,
             Application.status.in_(["submitted", "shortlisted", "interviewing", "accepted"]),
