@@ -81,6 +81,56 @@ async def smart_match(
         )
 
 
+# ── Project-linked auto-match ─────────────────────────────────────────────────
+
+@router.get("/match-for-project/{job_id}", response_model=SmartMatchResponse)
+async def match_for_project(
+    job_id: str,
+    limit: int = Query(default=12, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Automatically generate Smart Connect matches for a specific published project.
+    Reads project title, description, category, skills, and location from the
+    job post and runs the full scoring algorithm.
+
+    Used when a client clicks 'Find Matching Creators' on their project page.
+    """
+    from app.models.schema import JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        job = await JobPost.get(PydanticObjectId(job_id))
+    except Exception:
+        job = None
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    if job.status not in ("open", "in_progress"):
+        raise HTTPException(status_code=400, detail="Project must be published (open) to find matches")
+
+    try:
+        result = await SmartConnectService.smart_match(
+            project_description=job.description,
+            project_type=job.department or "",
+            roles_needed=[job.role] if job.role else [],
+            timeline=job.duration,
+            skills_required=job.skills or [],
+            location=None,  # optional per spec
+            is_remote=False,
+            workload_aware=True,
+            limit=limit,
+        )
+        return SmartMatchResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Smart matching failed: {str(e)}",
+        )
+
+
 # ── Search ─────────────────────────────────────────────────────────────────────
 
 @router.post("/search", response_model=CreativeSearchResponse)

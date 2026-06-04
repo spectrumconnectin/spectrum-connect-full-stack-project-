@@ -230,6 +230,50 @@ class SmartConnectService:
                 score += portfolio_bonus
                 score_breakdown["portfolio"] = portfolio_bonus
 
+                # 10. Previous Projects / track record (max 10 pts).
+                # Rewards creators who have successfully completed projects on the platform.
+                prev_score = 0
+                if user.stats and user.stats.projects_completed:
+                    completed = user.stats.projects_completed
+                    if completed >= 10:
+                        prev_score = 10
+                        reasons.append(f"Experienced: {completed} projects completed")
+                    elif completed >= 5:
+                        prev_score = 7
+                        reasons.append(f"{completed} projects completed")
+                    elif completed >= 1:
+                        prev_score = 3
+                score += prev_score
+                score_breakdown["previous_projects"] = prev_score
+
+                # 11. Response Rate / speed (max 5 pts).
+                # Faster responders score higher — response_time is in hours.
+                response_score = 0
+                if user.stats and user.stats.response_time is not None:
+                    rt = user.stats.response_time
+                    if rt <= 2:
+                        response_score = 5
+                        reasons.append("Fast responder (<2h)")
+                    elif rt <= 12:
+                        response_score = 3
+                        reasons.append(f"~{rt}h response time")
+                    elif rt <= 24:
+                        response_score = 1
+                score += response_score
+                score_breakdown["response_rate"] = response_score
+
+                # 12. Category / department experience (max 10 pts).
+                # Bonus when the project's type aligns with the creator's listed departments.
+                category_score = 0
+                if project_type and crew_profile.departments:
+                    for dept in crew_profile.departments:
+                        if project_type.lower() in dept.lower() or dept.lower() in project_type.lower():
+                            category_score = 10
+                            reasons.append(f"Category match: {dept}")
+                            break
+                score += category_score
+                score_breakdown["category_experience"] = category_score
+
                 # Threshold and match level
                 if score < 20:
                     continue

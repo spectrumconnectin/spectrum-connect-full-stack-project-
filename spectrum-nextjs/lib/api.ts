@@ -1492,6 +1492,9 @@ export const smartConnect = {
       body: JSON.stringify(data),
     }),
 
+  matchForProject: (jobId: string, limit = 12): Promise<SmartMatchApiResponse> =>
+    request<SmartMatchApiResponse>(`/smart-connect/match-for-project/${jobId}?limit=${limit}`),
+
   getFeatured: (limit = 6): Promise<SavedProfilesApiResponse> =>
     request<SavedProfilesApiResponse>(`/smart-connect/featured?limit=${limit}`, {}, false),
 

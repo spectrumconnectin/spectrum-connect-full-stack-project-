@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { smartConnect, SmartCreativeProfile, MatchHistoryItem } from '@/lib/api';
+import { useSearchParams } from 'next/navigation';
+import { smartConnect, SmartCreativeProfile, MatchHistoryItem, SmartMatchResultItem, jobs } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
 const ROLE_OPTIONS = [
@@ -50,8 +51,12 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export default function ClientSmartConnectPage() {
+function SmartConnectInner() {
+  const searchParams = useSearchParams();
+  const projectId = searchParams.get('project');
+
   const [creatives, setCreatives] = useState<SmartCreativeProfile[]>([]);
+  const [matchResults, setMatchResults] = useState<SmartMatchResultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -65,6 +70,8 @@ export default function ClientSmartConnectPage() {
   const [activeTab, setActiveTab] = useState<'discover' | 'history'>('discover');
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [projectTitle, setProjectTitle] = useState('');
+  const isProjectMode = Boolean(projectId && matchResults.length > 0);
 
   const loadFeatured = useCallback(async () => {
     setLoading(true); setError(null);
@@ -79,7 +86,25 @@ export default function ClientSmartConnectPage() {
     }
   }, []);
 
-  useEffect(() => { loadFeatured(); }, [loadFeatured]);
+  // Auto-match when ?project= param is present
+  useEffect(() => {
+    if (!projectId) { loadFeatured(); return; }
+    setLoading(true); setError(null);
+    Promise.allSettled([
+      smartConnect.matchForProject(projectId, 12),
+      jobs.getById(projectId),
+    ]).then(([matchRes, jobRes]) => {
+      if (matchRes.status === 'fulfilled') {
+        setMatchResults(matchRes.value.matches);
+        setCreatives(matchRes.value.matches.map(m => m.profile));
+        setTotalResults(matchRes.value.matches.length);
+        setHasSearched(true);
+      } else {
+        setError((matchRes.reason as Error).message);
+      }
+      if (jobRes.status === 'fulfilled') setProjectTitle(jobRes.value.title);
+    }).finally(() => setLoading(false));
+  }, [projectId, loadFeatured]);
 
   useEffect(() => {
     if (activeTab === 'history' && history.length === 0) {
@@ -94,6 +119,7 @@ export default function ClientSmartConnectPage() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setSearching(true); setError(null);
+    setMatchResults([]); // clear project-mode results
     try {
       const res = await smartConnect.search({
         query: query.trim() || undefined,
@@ -183,6 +209,25 @@ export default function ClientSmartConnectPage() {
         </section>
 
         <section className="lg:col-span-2">
+          {/* Project-mode banner */}
+          {isProjectMode && (
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl px-5 py-4 flex items-start gap-3 mb-5">
+              <i className="fa-solid fa-bolt text-purple-500 text-lg mt-0.5 flex-shrink-0"></i>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-purple-900 text-sm">
+                  AI-matched for: <span className="font-bold">{projectTitle || 'Your Project'}</span>
+                </p>
+                <p className="text-purple-700 text-xs mt-0.5">
+                  {totalResults} creator{totalResults !== 1 ? 's' : ''} ranked by skills, portfolio, ratings, ETF score, and availability
+                </p>
+              </div>
+              <Link href={`/client/projects/${projectId}`}
+                className="text-xs text-purple-600 font-semibold hover:underline flex-shrink-0">
+                Back to project →
+              </Link>
+            </div>
+          )}
+
           {/* Tabs */}
           <div className="flex items-center gap-2 mb-5">
             {([
@@ -271,13 +316,16 @@ export default function ClientSmartConnectPage() {
                   {hasSearched ? `${totalResults} creator${totalResults !== 1 ? 's' : ''} found` : `${creatives.length} top-rated creators`}
                 </p>
                 <div className="space-y-4">
-                  {creatives.map(c => {
+                  {creatives.map((c, idx) => {
                     const isSaved = savedIds.has(c.user_id);
                     const isSaving = savingId === c.user_id;
                     const rate = formatRate(c.daily_rate);
                     const loc = locationStr(c.location as string | { city?: string; country?: string });
+                    const matchReasons = isProjectMode && matchResults[idx]?.match_reasons || [];
+                    const matchScore = isProjectMode && matchResults[idx]?.match_score;
+                    const matchLevel = isProjectMode && matchResults[idx]?.match_level;
                     return (
-                      <div key={c.user_id} className="bg-white rounded-2xl border border-gray-200 p-6 hover:border-cobalt hover:shadow-md transition">
+                      <div key={c.user_id} className={`bg-white rounded-2xl border p-6 hover:shadow-md transition ${isProjectMode && matchScore && matchScore >= 80 ? 'border-purple-200 hover:border-purple-400' : 'border-gray-200 hover:border-cobalt'}`}>
                         <div className="flex items-start gap-4">
                           <div className="relative flex-shrink-0">
                             {c.avatar ? (
@@ -342,6 +390,26 @@ export default function ClientSmartConnectPage() {
                                 {c.active_project_count}/{c.workload_capacity} active project{c.active_project_count !== 1 ? 's' : ''}
                               </p>
                             )}
+                            {/* Match reasons — shown in project mode */}
+                            {isProjectMode && matchReasons.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-3">
+                                {matchLevel && (
+                                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                                    matchLevel === 'Perfect Fit' ? 'bg-purple-100 text-purple-700' :
+                                    matchLevel === 'Great Fit' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {matchLevel}
+                                    {matchScore ? ` · ${matchScore}%` : ''}
+                                  </span>
+                                )}
+                                {matchReasons.map(r => (
+                                  <span key={r} className="text-xs px-2.5 py-1 bg-green-50 text-green-700 rounded-full border border-green-100">
+                                    <i className="fa-solid fa-check mr-1 text-[10px]"></i>{r}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
@@ -367,5 +435,18 @@ export default function ClientSmartConnectPage() {
         </section>
       </div>
     </>
+  );
+}
+
+export default function ClientSmartConnectPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-500 text-sm">Loading Smart Connect…</p>
+      </div>
+    }>
+      <SmartConnectInner />
+    </Suspense>
   );
 }

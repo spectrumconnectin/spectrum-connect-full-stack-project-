@@ -313,6 +313,13 @@ export default function ClientProjectDetailPage() {
                 <i className="fa-solid fa-users text-cobalt"></i>
                 Review Applicants {job.proposal_count > 0 && `(${job.proposal_count})`}
               </Link>
+              {(job.status === 'open' || job.status === 'in_progress') && (
+                <Link href={`/client/smart-connect?project=${id}`}
+                  className="flex items-center gap-3 w-full bg-purple-50 text-purple-700 px-4 py-3 rounded-xl font-semibold hover:bg-purple-100 transition text-sm border border-purple-200">
+                  <i className="fa-solid fa-bolt text-purple-500"></i>
+                  Find Matching Creators
+                </Link>
+              )}
               {canDelete && (
                 <button onClick={handleDelete}
                   className="flex items-center gap-3 w-full bg-red-50 text-red-600 px-4 py-3 rounded-xl font-semibold hover:bg-red-100 transition text-sm border border-red-100">
