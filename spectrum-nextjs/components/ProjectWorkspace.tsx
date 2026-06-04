@@ -660,12 +660,36 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                 'bg-amber-50 border-amber-200'
               }`}>
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block ${MILESTONE_STATUS_COLOR[m.status]}`}>
                       {MILESTONE_STATUS_LABEL[m.status]}
                     </span>
                     <p className="font-semibold text-gray-900">{m.title}</p>
                     <p className="text-sm font-bold text-gray-700">${m.amount.toLocaleString()}</p>
+
+                    {/* Google Drive delivery link — shown to both client and creator */}
+                    {m.google_drive_link && (
+                      <div className="mt-2 bg-white border border-indigo-200 rounded-lg px-3 py-2">
+                        <p className="text-xs font-semibold text-indigo-700 mb-1 flex items-center gap-1.5">
+                          <i className="fa-brands fa-google-drive"></i>Deliverables
+                        </p>
+                        <a href={m.google_drive_link} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-cobalt underline break-all hover:text-blue-700 transition">
+                          {m.google_drive_link}
+                        </a>
+                        {m.delivery_notes && (
+                          <p className="text-xs text-gray-600 mt-1.5 italic border-t border-indigo-100 pt-1.5">
+                            &ldquo;{m.delivery_notes}&rdquo;
+                          </p>
+                        )}
+                        {m.delivered_at && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            <i className="fa-regular fa-clock mr-1"></i>Submitted {fmtDate(m.delivered_at)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {m.released_at && (
                       <p className="text-xs text-emerald-600 mt-1">
                         <i className="fa-solid fa-check mr-1"></i>Released {fmtDate(m.released_at)}

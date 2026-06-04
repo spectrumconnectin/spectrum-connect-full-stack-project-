@@ -324,6 +324,25 @@ class JobService:
                 detail="Cannot change status of cancelled job"
             )
 
+        # Gate: cannot mark completed until escrow funds have been released
+        if new_status == 'completed':
+            try:
+                from app.models.escrow import Escrow as _Escrow
+                from beanie import PydanticObjectId as _OID
+                escs = await _Escrow.find(_Escrow.job_post_id == job.id).to_list()
+                for esc in escs:
+                    funded = [m for m in esc.milestones if m.status in ('funded', 'delivered', 'approved')]
+                    if funded:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Payment must be released before this project can be completed. "
+                                   "Release the escrow funds to the creator first."
+                        )
+            except HTTPException:
+                raise
+            except Exception:
+                pass  # If escrow lookup fails, allow status change (non-blocking)
+
         # Update status
         old_status = job.status
         job.status = new_status

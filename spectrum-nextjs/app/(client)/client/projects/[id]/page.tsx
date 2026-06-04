@@ -197,12 +197,51 @@ export default function ClientProjectDetailPage() {
 
   const budget = formatBudget(job);
   const canPublish  = job.status === 'draft';
-  // Can start once escrow is funded (pending_funding → in_progress)
   const canStart    = (job.status === 'open' || job.status === 'closed' || job.status === 'pending_funding') && !!hiredCreator && (!!(projectEscrow && projectEscrow.funded_amount > 0) || job.status !== 'pending_funding');
-  const canComplete = job.status === 'in_progress';
   const canDelete   = job.status === 'draft';
   const canReleaseFunds = ['delivered', 'approved'].includes(job.status) &&
     !!projectEscrow && projectEscrow.funded_amount > 0;
+
+  // Completion checklist — all gates must pass before marking complete
+  const checklistItems = [
+    {
+      id: 'hired',
+      label: 'Creator hired',
+      done: !!hiredCreator,
+      info: null,
+    },
+    {
+      id: 'funded',
+      label: 'Escrow funded',
+      done: !!(projectEscrow && projectEscrow.funded_amount > 0),
+      info: projectEscrow && projectEscrow.funded_amount > 0
+        ? `$${projectEscrow.funded_amount.toLocaleString()} secured`
+        : 'Client must fund escrow',
+    },
+    {
+      id: 'delivered',
+      label: 'Delivery submitted',
+      done: ['delivered', 'approved', 'completed'].includes(job.status),
+      info: ['delivered', 'approved', 'completed'].includes(job.status)
+        ? 'Google Drive link provided'
+        : 'Creator must submit work',
+    },
+    {
+      id: 'released',
+      label: 'Payment released',
+      done: !!(projectEscrow &&
+        projectEscrow.funded_milestones > 0 &&
+        projectEscrow.released_milestones >= projectEscrow.funded_milestones),
+      info: projectEscrow && projectEscrow.released_milestones > 0
+        ? `${projectEscrow.released_milestones}/${projectEscrow.funded_milestones} milestone${projectEscrow.funded_milestones !== 1 ? 's' : ''} released`
+        : 'Must release funds to creator',
+    },
+  ];
+  const allChecksPassed  = checklistItems.every(c => c.done);
+  const paymentReleased  = checklistItems.find(c => c.id === 'released')!.done;
+  // Can only complete after payment has been released
+  const canComplete      = job.status === 'in_progress' && paymentReleased;
+  const completionBlocked = ['in_progress', 'delivered', 'approved'].includes(job.status) && !paymentReleased;
 
   return (
     <>
@@ -465,9 +504,23 @@ export default function ClientProjectDetailPage() {
               )}
               {canComplete && (
                 <button disabled={updatingStatus} onClick={() => handleStatusChange('completed')}
-                  className="flex items-center gap-3 w-full bg-emerald-50 text-emerald-700 px-4 py-3 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm border border-emerald-200 disabled:opacity-50">
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm disabled:opacity-50">
                   <i className="fa-solid fa-circle-check"></i>Mark Completed
                 </button>
+              )}
+              {/* Payment gate — block completion with clear message */}
+              {completionBlocked && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <div className="flex items-start gap-2 mb-2">
+                    <i className="fa-solid fa-lock text-red-500 mt-0.5 flex-shrink-0 text-sm"></i>
+                    <p className="text-xs font-bold text-red-800">
+                      Payment must be released before this project can be completed.
+                    </p>
+                  </div>
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    Release the escrow funds to the creator first, then you&apos;ll be able to mark this project as complete.
+                  </p>
+                </div>
               )}
               {canReleaseFunds && (
                 <button onClick={handleOpenReleaseFunds}
@@ -524,6 +577,71 @@ export default function ClientProjectDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Completion Checklist — shown for active/in-flight jobs */}
+          {!['draft', 'open', 'completed'].includes(job.status) && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Completion Checklist</h2>
+                {allChecksPassed ? (
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    All done ✓
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-500">
+                    {checklistItems.filter(c => c.done).length}/{checklistItems.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+                <div
+                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(checklistItems.filter(c => c.done).length / checklistItems.length) * 100}%` }}
+                />
+              </div>
+
+              <div className="space-y-3">
+                {checklistItems.map(item => (
+                  <div key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border transition ${
+                    item.done
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      item.done ? 'bg-emerald-500' : 'bg-gray-200'
+                    }`}>
+                      {item.done
+                        ? <i className="fa-solid fa-check text-white text-[10px]"></i>
+                        : <i className="fa-solid fa-lock text-gray-400 text-[10px]"></i>
+                      }
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${item.done ? 'text-emerald-800' : 'text-gray-600'}`}>
+                        {item.label}
+                      </p>
+                      {item.info && (
+                        <p className={`text-xs mt-0.5 ${item.done ? 'text-emerald-600' : 'text-gray-400'}`}>
+                          {item.info}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Final gate message */}
+              {!paymentReleased && job.status !== 'open' && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                  <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5 flex-shrink-0 text-sm"></i>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <span className="font-semibold">Release payment</span> to unlock project completion.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Hired creator card — shown when a creator is hired but project not yet started */}
           {hiredCreator && job.status !== 'completed' && (
