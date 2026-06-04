@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { proposals, JobProposalItem } from '@/lib/api';
+import { proposals, profile as profileApi, JobProposalItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected'];
 
@@ -41,11 +41,18 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    proposals.getForJob(id)
-      .then(data => setApplicants(data || []))
+    Promise.all([
+      proposals.getForJob(id),
+      profileApi.getMe(),
+    ])
+      .then(([data, me]) => {
+        setApplicants(data || []);
+        setMyUserId(me.id ?? null);
+      })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -186,6 +193,11 @@ export default function ApplicantsPage() {
               <div className="flex gap-3 mt-5 pt-5 border-t border-gray-100 flex-wrap">
                 {a.status !== 'accepted' && a.status !== 'rejected' && (
                   <>
+                    {myUserId && a.creator_id === myUserId ? (
+                      <div className="flex-1 min-w-[120px] flex items-center gap-2 text-amber-600 text-sm font-semibold bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl">
+                        <i className="fa-solid fa-ban"></i>Can&apos;t hire yourself
+                      </div>
+                    ) : (
                     <button
                       disabled={updating === a.id}
                       onClick={() => handleStatus(a.id, 'accepted')}
@@ -193,6 +205,7 @@ export default function ApplicantsPage() {
                       {updating === a.id ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-check mr-2"></i>}
                       Hire {a.creator_name.split(' ')[0]}
                     </button>
+                    )}
                     {a.status !== 'shortlisted' && (
                       <button
                         disabled={updating === a.id}

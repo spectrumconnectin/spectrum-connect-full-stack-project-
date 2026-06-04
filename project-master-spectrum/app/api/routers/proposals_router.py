@@ -70,6 +70,10 @@ async def submit_proposal(
     if job.status != "open":
         raise HTTPException(status_code=400, detail="This job is not accepting proposals")
 
+    # Prevent self-hire: creator cannot apply to their own job post
+    if str(job.client_id) == str(current_user.id):
+        raise HTTPException(status_code=400, detail="You cannot apply to your own job post")
+
     existing = await Application.find_one(
         Application.project_id == _oid(job_id),
         Application.crew_id == current_user.id,
@@ -218,6 +222,10 @@ async def update_proposal_status(
     job = await JobPost.get(app.project_id)
     if not job or str(job.client_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorised")
+
+    # Prevent self-hire: client cannot accept a proposal from themselves
+    if data.status == "accepted" and str(app.crew_id) == str(current_user.id):
+        raise HTTPException(status_code=400, detail="You cannot hire yourself")
 
     app.status = data.status
     await app.save()

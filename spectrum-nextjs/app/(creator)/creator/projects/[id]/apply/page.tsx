@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, proposals, JobPostItem } from '@/lib/api';
+import { jobs, proposals, profile as profileApi, JobPostItem } from '@/lib/api';
 
 const DURATION_OPTIONS = [
   { label: 'Less than 1 week', value: 1 },
@@ -39,6 +39,7 @@ export default function ProjectApplicationPage() {
 
   const [job, setJob] = useState<JobPostItem | null>(null);
   const [loadingJob, setLoadingJob] = useState(true);
+  const [isOwnJob, setIsOwnJob] = useState(false);
 
   const [coverLetter, setCoverLetter] = useState('');
   const [proposedBudget, setProposedBudget] = useState('');
@@ -49,8 +50,14 @@ export default function ProjectApplicationPage() {
 
   useEffect(() => {
     if (!id) return;
-    jobs.getById(id)
-      .then(setJob)
+    Promise.all([jobs.getById(id), profileApi.getMe()])
+      .then(([jobData, me]) => {
+        setJob(jobData);
+        // Block self-application: job's client_id matches the logged-in user
+        if (jobData.client_id && me.id && String(jobData.client_id) === String(me.id)) {
+          setIsOwnJob(true);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoadingJob(false));
   }, [id]);
@@ -111,7 +118,19 @@ export default function ProjectApplicationPage() {
           )}
         </div>
 
-        {submitted ? (
+        {isOwnJob ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-10 text-center shadow-sm">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-ban text-amber-500 text-3xl"></i>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">You can&apos;t apply to your own job</h2>
+            <p className="text-gray-600 text-sm mb-6">This project was posted from your account. You cannot apply to or hire yourself.</p>
+            <Link href="/creator/find-projects"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+              <i className="fa-solid fa-magnifying-glass"></i>Find Other Projects
+            </Link>
+          </div>
+        ) : submitted ? (
           <div className="bg-white rounded-2xl border border-emerald-200 p-12 text-center shadow-sm">
             <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <i className="fa-solid fa-circle-check text-emerald-500 text-3xl"></i>
