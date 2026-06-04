@@ -128,6 +128,9 @@ def _default_points_for(action: str) -> int:
         "project.completed.client":       settings.ETF_POINTS_PROJECT_COMPLETED_CLIENT,
         "project.completed.creator":      settings.ETF_POINTS_PROJECT_COMPLETED_CREATOR,
         "review.submitted":               settings.ETF_POINTS_REVIEW_SUBMITTED,
+        "review.given":                   settings.ETF_POINTS_REVIEW_SUBMITTED,  # alias: leaving review
+        "positive_review":                settings.ETF_POINTS_POSITIVE_REVIEW,
+        "platform.activity":              settings.ETF_POINTS_PLATFORM_ACTIVITY,
         "repeat_client.bonus":            settings.ETF_POINTS_REPEAT_CLIENT_BONUS,
         "on_time_delivery":               settings.ETF_POINTS_ON_TIME_DELIVERY,
         "profile.verified":               settings.ETF_POINTS_PROFILE_VERIFIED,

@@ -8,18 +8,22 @@ import { useEffect, useState } from 'react';
 import { etfPoints, type EtfBalance, type EtfEvent, type EtfCashoutEligibility } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
-const ACTION_META: Record<string, { label: string; icon: string }> = {
-  'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn' },
-  'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake' },
-  'milestone.funded':               { label: 'Funded a milestone',         icon: 'fa-lock' },
-  'milestone.released.client':      { label: 'Released milestone',         icon: 'fa-unlock' },
-  'milestone.released.creator':     { label: 'Delivered milestone',        icon: 'fa-flag-checkered' },
-  'project.completed.client':       { label: 'Completed a project',        icon: 'fa-check-double' },
-  'project.completed.creator':      { label: 'Completed a project',        icon: 'fa-trophy' },
-  'review.submitted':               { label: 'Left a review',              icon: 'fa-star' },
-  'repeat_client.bonus':            { label: 'Repeat creator bonus',       icon: 'fa-rotate-right' },
-  'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved' },
-  'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket' },
+const ACTION_META: Record<string, { label: string; icon: string; color?: string }> = {
+  'project.posted':                 { label: 'Posted a project',            icon: 'fa-bullhorn',             color: 'text-cobalt' },
+  'project.hired':                  { label: 'Hired a creator',             icon: 'fa-handshake',            color: 'text-cobalt' },
+  'milestone.funded':               { label: 'Funded a milestone',          icon: 'fa-lock',                 color: 'text-cobalt' },
+  'milestone.released.client':      { label: 'Released milestone payment',  icon: 'fa-unlock',               color: 'text-emerald-600' },
+  'milestone.released.creator':     { label: 'Milestone payment received',  icon: 'fa-flag-checkered',       color: 'text-emerald-600' },
+  'project.completed.client':       { label: 'Project completed',           icon: 'fa-check-double',         color: 'text-emerald-600' },
+  'project.completed.creator':      { label: 'Project completed',           icon: 'fa-trophy',               color: 'text-amber-500' },
+  'on_time_delivery':               { label: 'On-time delivery bonus',      icon: 'fa-clock',                color: 'text-amber-500' },
+  'positive_review':                { label: 'Positive review bonus',       icon: 'fa-star',                 color: 'text-amber-400' },
+  'review.submitted':               { label: 'Left a review',               icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'review.given':                   { label: 'Left a review',               icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'repeat_client.bonus':            { label: 'Repeat creator bonus',        icon: 'fa-rotate-right',         color: 'text-purple-500' },
+  'platform.activity':              { label: 'Platform engagement',         icon: 'fa-bolt',                 color: 'text-sky-500' },
+  'profile.verified':               { label: 'Profile verified',            icon: 'fa-shield-halved',        color: 'text-green-600' },
+  'cashout.requested':              { label: 'Cash-out requested',          icon: 'fa-arrow-right-from-bracket', color: 'text-gray-500' },
 };
 
 function actionMeta(action: string) {

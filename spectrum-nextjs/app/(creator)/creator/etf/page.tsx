@@ -8,18 +8,22 @@ import EtfBadge from '@/components/EtfBadge';
 // Backend actions are dotted strings (e.g. "milestone.released.creator").
 // We map known ones to a short verb + icon for the UI; unknowns fall back
 // to a generic chip so the feed stays readable even as we add actions.
-const ACTION_META: Record<string, { label: string; icon: string }> = {
-  'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn' },
-  'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake' },
-  'milestone.funded':               { label: 'Funded a milestone',         icon: 'fa-lock' },
-  'milestone.released.client':      { label: 'Released milestone',         icon: 'fa-unlock' },
-  'milestone.released.creator':     { label: 'Delivered milestone',        icon: 'fa-flag-checkered' },
-  'project.completed.client':       { label: 'Completed a project',        icon: 'fa-check-double' },
-  'project.completed.creator':      { label: 'Completed a project',        icon: 'fa-trophy' },
-  'review.submitted':               { label: 'Left a review',              icon: 'fa-star' },
-  'repeat_client.bonus':            { label: 'Repeat client bonus',        icon: 'fa-rotate-right' },
-  'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved' },
-  'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket' },
+const ACTION_META: Record<string, { label: string; icon: string; color?: string }> = {
+  'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn',             color: 'text-cobalt' },
+  'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake',            color: 'text-cobalt' },
+  'milestone.funded':               { label: 'Funded a milestone',         icon: 'fa-lock',                 color: 'text-cobalt' },
+  'milestone.released.client':      { label: 'Released milestone payment', icon: 'fa-unlock',               color: 'text-emerald-600' },
+  'milestone.released.creator':     { label: 'Milestone payment received', icon: 'fa-flag-checkered',       color: 'text-emerald-600' },
+  'project.completed.client':       { label: 'Project completed',          icon: 'fa-check-double',         color: 'text-emerald-600' },
+  'project.completed.creator':      { label: 'Project completed',          icon: 'fa-trophy',               color: 'text-amber-500' },
+  'on_time_delivery':               { label: 'On-time delivery bonus',     icon: 'fa-clock',                color: 'text-amber-500' },
+  'positive_review':                { label: 'Positive review bonus',      icon: 'fa-star',                 color: 'text-amber-400' },
+  'review.submitted':               { label: 'Left a review',              icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'review.given':                   { label: 'Left a review',              icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'repeat_client.bonus':            { label: 'Repeat client bonus',        icon: 'fa-rotate-right',         color: 'text-purple-500' },
+  'platform.activity':              { label: 'Platform engagement',        icon: 'fa-bolt',                 color: 'text-sky-500' },
+  'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved',        color: 'text-green-600' },
+  'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket', color: 'text-gray-500' },
 };
 
 function actionMeta(action: string) {
@@ -253,14 +257,17 @@ export default function CreatorEtfPage() {
             {events.map(ev => {
               const meta = actionMeta(ev.action);
               const positive = ev.points >= 0;
+              const iconColor = meta.color ?? (positive ? 'text-emerald-600' : 'text-rose-600');
               return (
                 <li key={ev.id} className="flex items-center gap-4 px-8 py-4 hover:bg-gray-50 transition">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${positive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                    <i className={`fa-solid ${meta.icon}`}></i>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gray-100`}>
+                    <i className={`fa-solid ${meta.icon} ${iconColor}`}></i>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{meta.label}</p>
-                    <p className="text-xs text-gray-400 truncate">{ev.description}</p>
+                    {ev.description && (
+                      <p className="text-xs text-gray-400 truncate">{ev.description}</p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className={`text-sm font-bold tabular-nums ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>

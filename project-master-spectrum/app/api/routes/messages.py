@@ -140,6 +140,19 @@ async def create_conversation(
         initial_message=data.initial_message
     )
 
+    # ETF: platform activity for initiating contact
+    try:
+        from app.services.etf_points_service import EtfPointsService
+        await EtfPointsService.award_points(
+            user_id=current_user.id,
+            action="platform.activity",
+            source_type="conversation",
+            source_id=str(conversation.id),
+            description="Started a project conversation",
+        )
+    except Exception:
+        pass
+
     return await _conversation_to_response(conversation, str(current_user.id))
 
 

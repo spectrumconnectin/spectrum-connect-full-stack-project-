@@ -266,6 +266,21 @@ async def update_proposal_status(
     except Exception:
         pass
 
+    # ETF: award client points for hiring a creator
+    if data.status == "accepted":
+        try:
+            from app.services.etf_points_service import EtfPointsService
+            await EtfPointsService.award_points(
+                user_id=current_user.id,
+                action="project.hired",
+                source_type="application",
+                source_id=str(app.id),
+                counterparty_id=app.crew_id,
+                description=f"Hired creator for: {job.title}",
+            )
+        except Exception:
+            pass
+
     return {"id": str(app.id), "status": app.status, "job_status": job.status}
 
 
@@ -348,6 +363,31 @@ async def rate_proposal(
             rating=overall,
             job_title=job.title,
         )
+    except Exception:
+        pass
+
+    # ETF: review submission (client) + positive review bonus (creator)
+    try:
+        from app.services.etf_points_service import EtfPointsService
+        # Client gets points for leaving a review (platform activity)
+        await EtfPointsService.award_points(
+            user_id=current_user.id,
+            action="review.submitted",
+            source_type="application",
+            source_id=proposal_id,
+            counterparty_id=app.crew_id,
+            description=f"Submitted review for: {job.title}",
+        )
+        # Creator gets bonus if review is ≥4 stars (positive review bonus)
+        if overall >= 4.0:
+            await EtfPointsService.award_points(
+                user_id=app.crew_id,
+                action="positive_review",
+                source_type="application",
+                source_id=proposal_id,
+                counterparty_id=current_user.id,
+                description=f"Received {overall}★ review on: {job.title}",
+            )
     except Exception:
         pass
 

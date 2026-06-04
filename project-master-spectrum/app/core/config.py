@@ -84,9 +84,11 @@ class Settings(BaseSettings):
     ETF_POINTS_MILESTONE_RELEASED_CREATOR: int = 50 # creator gets paid out
     ETF_POINTS_PROJECT_COMPLETED_CLIENT: int = 50   # whole project wraps
     ETF_POINTS_PROJECT_COMPLETED_CREATOR: int = 100 # whole project wraps
-    ETF_POINTS_REVIEW_SUBMITTED: int = 15           # leaving a review
+    ETF_POINTS_REVIEW_SUBMITTED: int = 15           # leaving a review (either party)
+    ETF_POINTS_POSITIVE_REVIEW: int = 20            # bonus when creator receives ≥4-star review
     ETF_POINTS_REPEAT_CLIENT_BONUS: int = 25        # creator rewarded for repeat hire
     ETF_POINTS_ON_TIME_DELIVERY: int = 30           # bonus for delivering before due date
+    ETF_POINTS_PLATFORM_ACTIVITY: int = 5           # general engagement (invite, message, etc.)
     ETF_POINTS_PROFILE_VERIFIED: int = 100          # one-shot on first verification
 
     # Level thresholds (in lifetime points). Crossing these flips the badge.

@@ -1147,6 +1147,58 @@ function ProgressTab({ projectId, role, escrowDetail }: {
           </div>
         </div>
       )}
+
+      {/* ETF Points summary for completed projects */}
+      {allReleased && (
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fa-solid fa-medal text-purple-600 text-lg"></i>
+            <h4 className="font-bold text-purple-900">ETF Points Awarded</h4>
+          </div>
+          <p className="text-xs text-purple-700 mb-3 leading-relaxed">
+            Points were automatically awarded to both parties for completing this project.
+          </p>
+          <div className="space-y-1.5">
+            {role === 'creator' ? (
+              <>
+                {[
+                  { label: 'Milestone payment received',      pts: '50 pts', icon: 'fa-flag-checkered' },
+                  { label: 'Project completed bonus',          pts: '100 pts', icon: 'fa-trophy' },
+                  { label: 'On-time delivery (if before due)', pts: '30 pts', icon: 'fa-clock' },
+                  { label: 'Positive review received (≥4★)',  pts: '20 pts', icon: 'fa-star' },
+                ].map(({ label, pts, icon }) => (
+                  <div key={label} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-purple-800">
+                      <i className={`fa-solid ${icon} text-purple-500 w-4 text-center`}></i>{label}
+                    </span>
+                    <span className="font-bold text-emerald-600">+{pts}</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                {[
+                  { label: 'Milestone released',              pts: '15 pts', icon: 'fa-unlock' },
+                  { label: 'Project completed',               pts: '50 pts', icon: 'fa-check-double' },
+                  { label: 'Review submitted',                pts: '15 pts', icon: 'fa-pen-to-square' },
+                  { label: 'Platform engagement (messaging)', pts: '5 pts',  icon: 'fa-bolt' },
+                ].map(({ label, pts, icon }) => (
+                  <div key={label} className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-purple-800">
+                      <i className={`fa-solid ${icon} text-purple-500 w-4 text-center`}></i>{label}
+                    </span>
+                    <span className="font-bold text-emerald-600">+{pts}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          <a href={role === 'creator' ? '/creator/etf' : '/client/etf'}
+            className="mt-3 flex items-center gap-1.5 text-xs text-purple-700 font-semibold hover:underline">
+            <i className="fa-solid fa-medal"></i>View your ETF score →
+          </a>
+        </div>
+      )}
     </div>
   );
 }
