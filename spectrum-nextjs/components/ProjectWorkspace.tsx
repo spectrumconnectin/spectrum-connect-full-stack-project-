@@ -225,10 +225,32 @@ function MilestonesTab({ escrowDetail, role, onRefresh }: {
     </div>
   );
 
+  // Count completed milestones
+  const completed = escrowDetail.milestones.filter(m => ['released', 'approved'].includes(m.status)).length;
+  const total = escrowDetail.milestones.length;
+  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Progress Summary */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="font-bold text-gray-900 text-lg">{completed} of {total} Milestones Complete</p>
+            <p className="text-sm text-gray-600 mt-0.5">Track project progress through funded milestones</p>
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-bold text-cobalt">{completionPct}%</p>
+            <p className="text-xs text-gray-500">Progress</p>
+          </div>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="bg-cobalt h-2.5 rounded-full transition-all duration-500" style={{ width: `${completionPct}%` }} />
+        </div>
+      </div>
+
       {/* Escrow summary */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Total', value: `$${escrowDetail.total_amount.toLocaleString()}`, color: 'text-gray-900' },
           { label: 'In Escrow', value: `$${(escrowDetail.funded_amount - escrowDetail.released_amount).toLocaleString()}`, color: 'text-cobalt' },
@@ -241,43 +263,81 @@ function MilestonesTab({ escrowDetail, role, onRefresh }: {
         ))}
       </div>
 
-      {escrowDetail.milestones.map((m: EscrowMilestone) => (
-        <div key={m.milestone_id} className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${MILESTONE_STATUS_COLOR[m.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {MILESTONE_STATUS_LABEL[m.status] ?? m.status}
-                </span>
+      {/* Milestones as visual timeline */}
+      <div className="space-y-0">
+        {escrowDetail.milestones.map((m: EscrowMilestone, i: number) => {
+          const isComplete = ['released', 'approved'].includes(m.status);
+          const isActive = ['funded', 'delivered'].includes(m.status);
+          const isPending = m.status === 'pending';
+
+          return (
+            <div key={m.milestone_id} className="relative">
+              {/* Connecting line */}
+              {i < escrowDetail.milestones.length - 1 && (
+                <div className={`absolute left-6 top-20 w-1 h-6 ${isComplete ? 'bg-emerald-400' : 'bg-gray-200'}`}></div>
+              )}
+
+              {/* Milestone card */}
+              <div className={`relative pl-16 pb-4 ${isComplete ? 'opacity-75' : ''}`}>
+                {/* Status dot */}
+                <div className={`absolute left-0 top-1.5 w-5 h-5 rounded-full border-4 flex items-center justify-center flex-shrink-0 ${
+                  isComplete ? 'bg-emerald-500 border-emerald-200' :
+                  isActive ? 'bg-cobalt border-blue-200' :
+                  'bg-gray-300 border-gray-200'
+                }`}>
+                  {isComplete && <i className="fa-solid fa-check text-white text-xs"></i>}
+                </div>
+
+                {/* Card */}
+                <div className={`rounded-xl border p-4 ${
+                  isComplete ? 'bg-emerald-50 border-emerald-200' :
+                  isActive ? 'bg-white border-cobalt/30' :
+                  'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${MILESTONE_STATUS_COLOR[m.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {MILESTONE_STATUS_LABEL[m.status] ?? m.status}
+                        </span>
+                        {isComplete && <i className="fa-solid fa-circle-check text-emerald-600 text-sm"></i>}
+                      </div>
+                      <p className={`font-semibold ${isComplete ? 'text-gray-600 line-through' : 'text-gray-900'}`}>
+                        {m.title}
+                      </p>
+                      <p className="text-lg font-bold text-gray-700">${m.amount.toLocaleString()}</p>
+                      <div className="flex gap-4 text-xs text-gray-500 mt-2">
+                        {m.funded_at && <span><i className="fa-solid fa-lock mr-1 text-cobalt"></i>Funded {fmtDate(m.funded_at)}</span>}
+                        {m.released_at && <span><i className="fa-solid fa-check mr-1 text-emerald-600"></i>Released {fmtDate(m.released_at)}</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      {role === 'creator' && m.status === 'funded' && (
+                        <button onClick={() => doAction('deliver', m.milestone_id)} disabled={acting === m.milestone_id}
+                          className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-60">
+                          {acting === m.milestone_id ? 'Submitting…' : 'Submit Delivery'}
+                        </button>
+                      )}
+                      {role === 'client' && m.status === 'delivered' && (
+                        <>
+                          <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
+                            ✓ Approve & Release
+                          </button>
+                          <button onClick={() => doAction('request-revision', m.milestone_id)} disabled={acting === m.milestone_id}
+                            className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition disabled:opacity-60">
+                            ↩ Request Revision
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="font-semibold text-gray-900">{m.title}</p>
-              <p className="text-lg font-bold text-gray-900">${m.amount.toLocaleString()}</p>
-              {m.funded_at && <p className="text-xs text-gray-400 mt-1">Funded {fmtDate(m.funded_at)}</p>}
-              {m.released_at && <p className="text-xs text-emerald-600 mt-0.5">Released {fmtDate(m.released_at)}</p>}
             </div>
-            <div className="flex flex-col gap-2 flex-shrink-0">
-              {role === 'creator' && m.status === 'funded' && (
-                <button onClick={() => doAction('deliver', m.milestone_id)} disabled={acting === m.milestone_id}
-                  className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-60">
-                  {acting === m.milestone_id ? 'Submitting…' : 'Submit Delivery'}
-                </button>
-              )}
-              {role === 'client' && m.status === 'delivered' && (
-                <>
-                  <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
-                    className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
-                    Release Payment
-                  </button>
-                  <button onClick={() => doAction('request-revision', m.milestone_id)} disabled={acting === m.milestone_id}
-                    className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition disabled:opacity-60">
-                    Request Revision
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
+          );
+        })}
+      </div>
     </div>
   );
 }
