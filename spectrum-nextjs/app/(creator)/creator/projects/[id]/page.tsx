@@ -114,6 +114,7 @@ export default function CreatorProjectDetailPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -129,17 +130,18 @@ export default function CreatorProjectDetailPage() {
       profile.getPublic(proj.client_id).then(setClientProfile).catch(() => {});
     } catch (e) {
       const msg = (e as Error).message;
-      // If the ID is a job_id (from old notifications) rather than a workspace
-      // project ID, redirect to the applications tab instead of showing an error.
-      if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+      // This ID is a job_id (e.g. from an old notification link) not a workspace
+      // project ID — redirect to Applications tab which shows all hired work.
+      if (msg.includes('404') || msg.toLowerCase().includes('not found') || msg.includes('HTTP 4')) {
+        setRedirecting(true);
         router.replace('/creator/projects?tab=applications');
-        return;
+        return; // finally still runs but redirecting=true keeps the spinner up
       }
       setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -149,10 +151,11 @@ export default function CreatorProjectDetailPage() {
     setProject(updated);
   };
 
-  if (loading) return (
+  // Keep spinner visible while navigating away — prevents "Project not found" flash
+  if (loading || redirecting) return (
     <div className="flex flex-col items-center justify-center py-32 gap-4">
       <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
-      <p className="text-gray-500 text-sm">Loading project…</p>
+      <p className="text-gray-500 text-sm">{redirecting ? 'Redirecting…' : 'Loading project…'}</p>
     </div>
   );
 
