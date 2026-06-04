@@ -298,43 +298,78 @@ function CreatorMessagingPageInner() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {selectedConvo.job_id && (
-                  <Link href={`/creator/projects/${selectedConvo.job_id}`}
-                    className="px-4 py-2 text-cobalt border border-cobalt rounded-lg text-sm font-semibold hover:bg-blue-50 transition">
-                    View Project
-                  </Link>
-                )}
-                <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition">
-                  <i className="fa-solid fa-ellipsis-vertical"></i>
-                </button>
-              </div>
             </div>
 
+            {/* Negotiation topic quick-send (for project conversations) */}
+            {selectedConvo.job_id && (
+              <div className="px-4 py-2.5 bg-white border-b border-gray-100 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <span className="text-xs text-gray-400 font-medium flex-shrink-0">Reply re:</span>
+                {[
+                  { icon: 'fa-list-check', label: 'Scope', color: 'text-cobalt bg-blue-50 hover:bg-blue-100 border-blue-100',
+                    msg: '📋 **Re: Scope**\n\nJust to confirm my understanding of the scope:\n- [List what you understand the scope to be]\n\nPlease let me know if I\'ve missed anything.' },
+                  { icon: 'fa-dollar-sign', label: 'Budget', color: 'text-green-700 bg-green-50 hover:bg-green-100 border-green-100',
+                    msg: '💰 **Re: Budget**\n\nBased on the scope, my rate for this project would be: $[amount].\n\nThis includes: [what\'s covered]. Let me know if this works.' },
+                  { icon: 'fa-calendar-days', label: 'Timeline', color: 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-100',
+                    msg: '📅 **Re: Timeline**\n\nI can deliver this project by: [date].\n\nMilestones:\n- [Stage 1]: [date]\n- [Final delivery]: [date]' },
+                  { icon: 'fa-box-open', label: 'Deliverables', color: 'text-purple-700 bg-purple-50 hover:bg-purple-100 border-purple-100',
+                    msg: '📦 **Re: Deliverables**\n\nHere\'s what I\'ll provide:\n- [File/asset 1]\n- [File/asset 2]\n\nAll files in: [formats]. Please confirm this is what you need.' },
+                  { icon: 'fa-rotate-left', label: 'Revisions', color: 'text-orange-700 bg-orange-50 hover:bg-orange-100 border-orange-100',
+                    msg: '🔄 **Re: Revisions**\n\nI include [N] revision rounds in my rate. Additional revisions are charged at [rate/hour]. Does that work for you?' },
+                ].map(t => (
+                  <button key={t.label} onClick={() => setInput(t.msg)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition flex-shrink-0 ${t.color}`}>
+                    <i className={`fa-solid ${t.icon} text-[10px]`}></i>{t.label}
+                  </button>
+                ))}
+                <button onClick={async () => {
+                  const msg = '✅ **I agree to the terms**\n\nI\'m ready to begin work based on the scope, budget, timeline, deliverables, and revisions we\'ve discussed. Let\'s get started!';
+                  setInput(msg);
+                }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition flex-shrink-0 ml-auto">
+                  <i className="fa-solid fa-check text-[10px]"></i>I Agree
+                </button>
+              </div>
+            )}
+
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50">
               {loadingMsgs ? (
                 <div className="flex justify-center py-12">
                   <div className="w-8 h-8 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : msgs.filter(m => !m.is_deleted).map(m => {
                 const isMe = m.sender_id === myId;
+                const isAgreement = m.content.startsWith('✅');
                 return (
                   <div key={m.id} className={`flex items-end gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
                     {!isMe && <Avatar url={other?.avatar_url} name={displayName(other)} size={8} />}
-                    <div className={`max-w-md ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
-                      <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${isMe
-                        ? 'bg-cobalt text-white rounded-br-sm'
-                        : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'}`}>
-                        {m.content}
-                        {m.attachments.length > 0 && m.attachments.map(a => (
-                          <div key={a.id} className={`mt-2 flex items-center gap-2 text-xs p-2 rounded-lg ${isMe ? 'bg-white/20' : 'bg-gray-100'}`}>
-                            <i className="fa-solid fa-paperclip"></i>
-                            <a href={a.file_url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate">{a.filename}</a>
+                    <div className={`max-w-md ${isAgreement ? 'w-full max-w-sm' : ''}`}>
+                      {isAgreement ? (
+                        <div className={`rounded-2xl border-2 p-4 ${isMe ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <i className="fa-solid fa-handshake text-emerald-600"></i>
+                            <span className="font-bold text-emerald-800 text-sm">
+                              {m.content.includes('I agree to the terms') ? 'Agreement Confirmed' : 'Agreement Proposal'}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                      <span className={`text-xs text-gray-400 mt-1 ${isMe ? 'text-right' : ''}`}>{msgTime(m.sent_at)}</span>
+                          <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{m.content.split('\n').slice(2).join('\n')}</p>
+                          <p className="text-xs text-gray-400 mt-2">{msgTime(m.sent_at)}</p>
+                        </div>
+                      ) : (
+                        <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                          <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${isMe
+                            ? 'bg-cobalt text-white rounded-br-sm'
+                            : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200'}`}>
+                            <span className="whitespace-pre-line">{m.content}</span>
+                            {m.attachments.length > 0 && m.attachments.map(a => (
+                              <div key={a.id} className={`mt-2 flex items-center gap-2 text-xs p-2 rounded-lg ${isMe ? 'bg-white/20' : 'bg-gray-100'}`}>
+                                <i className="fa-solid fa-paperclip"></i>
+                                <a href={a.file_url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate">{a.filename}</a>
+                              </div>
+                            ))}
+                          </div>
+                          <span className="text-xs text-gray-400 mt-1">{msgTime(m.sent_at)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -344,22 +379,20 @@ function CreatorMessagingPageInner() {
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <textarea
-                    placeholder="Type your message… (Enter to send)"
-                    rows={1}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl resize-none focus:border-cobalt focus:outline-none text-sm"
-                  />
-                </div>
+              <div className="flex items-end gap-3 bg-gray-50 rounded-2xl border border-gray-200 p-3">
+                <textarea
+                  placeholder="Type your message… (Enter to send, Shift+Enter for new line)"
+                  rows={input.split('\n').length > 2 ? Math.min(input.split('\n').length, 6) : 1}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  className="flex-1 bg-transparent text-sm text-gray-900 outline-none resize-none placeholder-gray-400 leading-relaxed"
+                />
                 <button onClick={handleSend} disabled={!input.trim() || sending}
-                  className={`px-5 py-3 rounded-xl font-semibold transition ${
-                    input.trim() && !sending ? 'bg-cobalt text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  className={`p-2.5 rounded-xl transition ${
+                    input.trim() && !sending ? 'bg-cobalt text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}>
-                  <i className="fa-solid fa-paper-plane"></i>
+                  <i className="fa-solid fa-paper-plane text-sm"></i>
                 </button>
               </div>
             </div>
