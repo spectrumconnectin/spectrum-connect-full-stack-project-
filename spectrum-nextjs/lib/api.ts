@@ -726,6 +726,7 @@ export interface ProjectItem {
   budget_min?: number;
   budget_max?: number;
   location?: string;
+  job_post_id?: string;
 }
 
 export interface ProjectListResponse {
@@ -748,6 +749,22 @@ export interface ActivityLogItem {
   created_at: string;
 }
 
+export interface DeadlineItem {
+  id: string;
+  project_id: string;
+  project_title: string;
+  title: string;
+  description?: string;
+  due_date: string;
+  priority: string;
+  status: string;
+  days_remaining: number;
+  assigned_to: string[];
+  created_by: string;
+  created_at: string;
+  completed_at?: string;
+}
+
 export const creatorProjects = {
   list: (params?: { status?: string; search?: string; page?: number }): Promise<ProjectListResponse> =>
     request<ProjectListResponse>(`/projects${buildQS(params as Record<string, string | number | undefined> || {})}`),
@@ -763,6 +780,36 @@ export const creatorProjects = {
       method: 'PATCH',
       body: JSON.stringify({ progress_percentage }),
     }),
+
+  create: (data: {
+    title: string;
+    description: string;
+    category: string;
+    tags?: string[];
+    budget_min?: number;
+    budget_max?: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<ProjectItem> =>
+    request<ProjectItem>('/projects', { method: 'POST', body: JSON.stringify({ ...data, icon_type: 'film', is_public: false, total_roles: 1 }) }),
+
+  getDeadlines: (projectId: string): Promise<{ deadlines: DeadlineItem[]; total: number }> =>
+    request(`/projects/${projectId}/deadlines`),
+
+  createDeadline: (data: {
+    project_id: string;
+    title: string;
+    description?: string;
+    due_date: string;
+    priority?: string;
+  }): Promise<DeadlineItem> =>
+    request<DeadlineItem>('/projects/deadlines', { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteDeadline: (deadlineId: string): Promise<void> =>
+    request<void>(`/projects/deadlines/${deadlineId}`, { method: 'DELETE' }),
+
+  completeDeadline: (deadlineId: string): Promise<DeadlineItem> =>
+    request<DeadlineItem>(`/projects/deadlines/${deadlineId}/complete`, { method: 'POST' }),
 };
 
 // ── Earnings ──────────────────────────────────────────────────────────────────

@@ -140,7 +140,8 @@ async def create_project(
         budget_max=data.budget_max,
         location=data.location,
         start_date=data.start_date,
-        end_date=data.end_date
+        end_date=data.end_date,
+        job_post_id=data.job_post_id,
     )
 
     return _project_to_response(project)
@@ -389,6 +390,18 @@ async def get_upcoming_deadlines(
         deadlines=deadline_responses,
         total=len(deadline_responses)
     )
+
+
+@router.get("/{project_id}/deadlines", response_model=DeadlineListResponse)
+async def get_project_deadlines(
+    project_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all deadlines for a project"""
+    deadlines = await ProjectDeadline.find(
+        ProjectDeadline.project_id == project_id
+    ).sort(+ProjectDeadline.due_date).to_list()
+    return DeadlineListResponse(deadlines=[_deadline_to_response(d) for d in deadlines], total=len(deadlines))
 
 
 @router.patch("/deadlines/{deadline_id}", response_model=DeadlineResponse)

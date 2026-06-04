@@ -599,17 +599,24 @@ function ApplicationsView({
                       </span>
                       {/* Hired: show Submit Delivery or Delivered confirmation */}
                       {app.status === 'accepted' && (
-                        deliverySentIds.has(app.id) ? (
-                          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
-                            <i className="fa-solid fa-circle-check"></i> Delivery sent
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => onDeliver(app)}
-                            className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5">
-                            <i className="fa-solid fa-box-open"></i> Submit Delivery
-                          </button>
-                        )
+                        <>
+                          <Link
+                            href={`/creator/projects/${app.job_id}/plan`}
+                            className="px-3 py-1.5 text-xs font-semibold text-cobalt bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5">
+                            <i className="fa-solid fa-calendar-days"></i> Plan Timeline
+                          </Link>
+                          {deliverySentIds.has(app.id) ? (
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
+                              <i className="fa-solid fa-circle-check"></i> Delivery sent
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => onDeliver(app)}
+                              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5">
+                              <i className="fa-solid fa-box-open"></i> Submit Delivery
+                            </button>
+                          )}
+                        </>
                       )}
                       {['submitted', 'shortlisted', 'interviewing'].includes(app.status) && (
                         <button
