@@ -524,6 +524,7 @@ export interface JobPostItem {
   published_at?: string;
   created_at?: string;
   workspace?: { progress: number; roles_required: number; roles_filled: number };
+  location?: string;
 }
 
 export interface JobSearchResponse {

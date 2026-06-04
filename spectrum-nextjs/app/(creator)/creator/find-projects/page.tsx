@@ -305,11 +305,11 @@ function ProjectCard({
 
       {/* Actions */}
       <div className="px-5 pb-4 flex items-center gap-3 border-t border-gray-100 pt-4">
-        <Link href={`/creator/projects/${p.id}/apply`}
+        <Link href={`/creator/find-projects/${p.id}/apply`}
           className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
           <i className="fa-solid fa-paper-plane mr-2"></i>Apply Now
         </Link>
-        <Link href={`/creator/projects/${p.id}`}
+        <Link href={`/creator/find-projects/${p.id}`}
           className="px-5 py-2.5 border border-cobalt text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-50 transition">
           View Details
         </Link>

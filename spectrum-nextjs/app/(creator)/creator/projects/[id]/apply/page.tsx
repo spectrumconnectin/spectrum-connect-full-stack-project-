@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { jobs, proposals, profile as profileApi, JobPostItem } from '@/lib/api';
 
 const DURATION_OPTIONS = [
@@ -36,6 +36,10 @@ function budgetLabel(job: JobPostItem): string {
 export default function ProjectApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const backHref = pathname.includes('/find-projects/')
+    ? `/creator/find-projects/${id}`
+    : '/creator/find-projects';
 
   const [job, setJob] = useState<JobPostItem | null>(null);
   const [loadingJob, setLoadingJob] = useState(true);
@@ -85,7 +89,7 @@ export default function ProjectApplicationPage() {
   return (
     <>
       <div className="mb-6">
-        <Link href={`/creator/projects/${id}`} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium">
+        <Link href={backHref} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium">
           <i className="fa-solid fa-arrow-left"></i>Back to Project
         </Link>
       </div>
