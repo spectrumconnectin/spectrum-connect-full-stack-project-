@@ -213,11 +213,12 @@ async def release_milestone(
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
     )
-    # Notify creator of released payment + confirm to client + award ETF points
+    # Notify creator of released payment + confirm to client + update job status
     try:
         from app.services.notification_service import NotificationService
         from app.services.etf_points_service import EtfPointsService
         from app.models.escrow import Escrow as EscrowDoc
+        from app.models.schema import JobPost
         from beanie import PydanticObjectId as OID
         from datetime import datetime, timezone
 
@@ -239,6 +240,43 @@ async def release_milestone(
                 milestone_title=m_title,
                 amount=m_amount,
             )
+
+            # Update job to 'completed' once all escrow milestones are released
+            if esc.status == "completed" and esc.job_post_id:
+                job = await JobPost.get(esc.job_post_id)
+                if job:
+                    job.status = "completed"
+                    if hasattr(job, "closed_at"):
+                        from datetime import datetime as _dt
+                        job.closed_at = _dt.utcnow()
+                    await job.save()
+
+            # Post a payment confirmation message to project conversation
+            try:
+                from app.models.message import Conversation
+                from app.services.message_service import MessageService
+                convo = await Conversation.find_one({"job_id": str(esc.job_post_id)}) if esc.job_post_id else None
+                if convo:
+                    # Commission details for the payout message
+                    from app.services.commission_service import calc_commission
+                    fees = calc_commission(m_amount, currency=esc.currency)
+                    creator_payout = fees.creator_payout
+                    platform_fee   = fees.platform_take
+
+                    chat_msg = (
+                        f"💰 **Payment Released: {m_title}**\n\n"
+                        f"Amount: ${m_amount:,.2f}\n"
+                        f"Platform fee: ${platform_fee:,.2f}\n"
+                        f"Creator earnings: ${creator_payout:,.2f}\n\n"
+                        f"Thank you for working together on Spectrum Connect!"
+                    )
+                    await MessageService.send_message(
+                        conversation_id=str(convo.id),
+                        sender_id=str(current_user.id),
+                        content=chat_msg,
+                    )
+            except Exception:
+                pass
 
             # ── ETF: On-Time Delivery ─────────────────────────────────────────
             # Award bonus points if delivery happened before the milestone due date.

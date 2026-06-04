@@ -190,6 +190,24 @@ export default function ClientProjectDetailPage() {
         </div>
       </section>
 
+      {/* Payment completed — project finished */}
+      {job.status === 'completed' && (
+        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-trophy text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-emerald-900 text-lg">Payment Completed — Project Finished</p>
+            <p className="text-emerald-700 text-sm mt-0.5 leading-relaxed">
+              All payments have been released to the creator. Your project is complete. Consider leaving a review.
+            </p>
+          </div>
+          <span className="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Completed
+          </span>
+        </div>
+      )}
+
       {/* Approved — escrow eligible for release */}
       {job.status === 'approved' && (
         <div className="bg-teal-50 border-2 border-teal-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">

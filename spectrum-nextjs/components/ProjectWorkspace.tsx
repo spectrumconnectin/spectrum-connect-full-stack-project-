@@ -123,9 +123,13 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
         {msgs.filter(m => !m.is_deleted).map(m => {
           const isMe = m.sender_id === myUserId;
           const isAgreement = m.content.startsWith('✅');
+          const isPayment = m.content.startsWith('💰');
+          const isRevision = m.content.startsWith('🔄');
+          const isDelivery = m.content.startsWith('📦');
+          const isSystem   = isAgreement || isPayment || isRevision || isDelivery;
           return (
-            <div key={m.id} className={`flex items-end gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-              <div className={`max-w-[70%]`}>
+            <div key={m.id} className={`flex items-end gap-2 ${isMe && !isSystem ? 'flex-row-reverse' : ''}`}>
+              <div className={`${isSystem ? 'w-full' : 'max-w-[70%]'}`}>
                 {isAgreement ? (
                   <div className={`rounded-2xl border-2 p-3 ${isMe ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
                     <div className="flex items-center gap-1.5 mb-1">
@@ -133,6 +137,33 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
                       <span className="font-bold text-emerald-800 text-xs">Agreement</span>
                     </div>
                     <p className="text-xs text-gray-600 whitespace-pre-line">{m.content.split('\n').slice(2).join('\n')}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
+                  </div>
+                ) : isPayment ? (
+                  <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 w-full">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <i className="fa-solid fa-coins text-emerald-600 text-xs"></i>
+                      <span className="font-bold text-emerald-800 text-xs">Payment Released</span>
+                    </div>
+                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(1).join('\n')}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
+                  </div>
+                ) : isRevision ? (
+                  <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-3 w-full">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <i className="fa-solid fa-rotate-left text-orange-600 text-xs"></i>
+                      <span className="font-bold text-orange-800 text-xs">Revision Requested</span>
+                    </div>
+                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(2).join('\n')}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
+                  </div>
+                ) : isDelivery ? (
+                  <div className="rounded-2xl border-2 border-indigo-300 bg-indigo-50 p-3 w-full">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <i className="fa-solid fa-box-open text-indigo-600 text-xs"></i>
+                      <span className="font-bold text-indigo-800 text-xs">Delivery Submitted</span>
+                    </div>
+                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(1).join('\n')}</p>
                     <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
                   </div>
                 ) : (
@@ -971,12 +1002,68 @@ function ProgressTab({ projectId, role, escrowDetail }: {
   };
 
   // Calculate escrow progress
-  const total = escrowDetail?.total_amount ?? 0;
+  const total    = escrowDetail?.total_amount    ?? 0;
   const released = escrowDetail?.released_amount ?? 0;
   const paymentPct = total > 0 ? Math.round((released / total) * 100) : 0;
+  const allReleased = escrowDetail ? escrowDetail.milestones.every(m => ['released', 'refunded'].includes(m.status)) : false;
+
+  // Estimate creator earnings after platform fee (~4%)
+  const estimatedEarnings = released * 0.96;
 
   return (
     <div className="space-y-6">
+
+      {/* Payment Released / Earnings Added — shown when all milestones released */}
+      {allReleased && escrowDetail && released > 0 && (
+        <div className={`rounded-xl border-2 p-5 ${
+          role === 'creator'
+            ? 'bg-emerald-50 border-emerald-300'
+            : 'bg-blue-50 border-blue-300'
+        }`}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              role === 'creator' ? 'bg-emerald-600' : 'bg-cobalt'
+            }`}>
+              <i className={`fa-solid text-white text-lg ${role === 'creator' ? 'fa-coins' : 'fa-circle-check'}`}></i>
+            </div>
+            <div>
+              <p className={`font-bold text-base ${role === 'creator' ? 'text-emerald-900' : 'text-blue-900'}`}>
+                {role === 'creator' ? 'Payment Released — Earnings Added' : 'Payment Completed'}
+              </p>
+              <p className={`text-xs mt-0.5 ${role === 'creator' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                {role === 'creator'
+                  ? 'All milestones paid out. Earnings added to your balance.'
+                  : 'All payments released. This project is complete.'}
+              </p>
+            </div>
+          </div>
+
+          {role === 'creator' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-xl p-3 text-center border border-emerald-100">
+                <p className="text-xl font-bold text-emerald-700">${released.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Total paid</p>
+              </div>
+              <div className="bg-white rounded-xl p-3 text-center border border-emerald-100">
+                <p className="text-xl font-bold text-emerald-700">~${estimatedEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Your earnings (after fee)</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                <p className="text-xl font-bold text-cobalt">${released.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Total paid out</p>
+              </div>
+              <div className="bg-white rounded-xl p-3 text-center border border-blue-100">
+                <p className="text-xl font-bold text-cobalt">{escrowDetail.milestones.filter(m => m.status === 'released').length}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Milestones completed</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Work progress */}
       {projectId && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -1007,19 +1094,24 @@ function ProgressTab({ projectId, role, escrowDetail }: {
       {/* Payment progress */}
       {escrowDetail && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h4 className="font-semibold text-gray-900 mb-4">Payment Released</h4>
+          <h4 className="font-semibold text-gray-900 mb-4">
+            Payment {allReleased ? 'Summary' : 'Progress'}
+          </h4>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">${released.toLocaleString()} of ${total.toLocaleString()}</span>
-            <span className="font-bold text-emerald-600 text-lg">{paymentPct}%</span>
+            <span className="text-sm text-gray-600">
+              ${released.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} released
+            </span>
+            <span className={`font-bold text-lg ${paymentPct === 100 ? 'text-emerald-600' : 'text-cobalt'}`}>{paymentPct}%</span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-3">
-            <div className="bg-emerald-500 h-3 rounded-full transition-all duration-500" style={{ width: `${paymentPct}%` }} />
+          <div className="w-full bg-gray-100 rounded-full h-3 mb-4">
+            <div className={`h-3 rounded-full transition-all duration-500 ${paymentPct === 100 ? 'bg-emerald-500' : 'bg-cobalt'}`}
+              style={{ width: `${paymentPct}%` }} />
           </div>
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Total escrow', value: `$${total.toLocaleString()}`, color: 'text-gray-700' },
-              { label: 'In escrow', value: `$${(total - released).toLocaleString()}`, color: 'text-cobalt' },
-              { label: 'Released', value: `$${released.toLocaleString()}`, color: 'text-emerald-600' },
+              { label: 'Escrow total',  value: `$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-gray-700' },
+              { label: 'Locked',        value: `$${(total - released).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: total > released ? 'text-cobalt' : 'text-gray-400' },
+              { label: 'Released',      value: `$${released.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-emerald-600' },
             ].map(({ label, value, color }) => (
               <div key={label} className="text-center bg-gray-50 rounded-lg p-2">
                 <p className={`font-bold text-sm ${color}`}>{value}</p>
@@ -1027,6 +1119,15 @@ function ProgressTab({ projectId, role, escrowDetail }: {
               </div>
             ))}
           </div>
+          {role === 'creator' && released > 0 && (
+            <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+              <p className="text-xs text-emerald-700 font-semibold">
+                <i className="fa-solid fa-coins mr-1.5"></i>
+                Your earnings: ~${(released * 0.96).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="font-normal ml-1">(after ~4% platform fee)</span>
+              </p>
+            </div>
+          )}
         </div>
       )}
 
