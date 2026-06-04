@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { creatorProjects, profile, escrow as escrowApi, auth, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile, EscrowListItem } from '@/lib/api';
+import { creatorProjects, profile, escrow as escrowApi, auth, proposals, ProjectItem, ProjectTeamMember, ActivityLogItem, PublicProfile, EscrowListItem } from '@/lib/api';
 import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -114,6 +114,7 @@ export default function CreatorProjectDetailPage() {
   const [clientProfile, setClientProfile] = useState<PublicProfile | null>(null);
   const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
   const [myUserId, setMyUserId] = useState('');
+  const [myProposalId, setMyProposalId] = useState<string | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(false);
@@ -135,7 +136,14 @@ export default function CreatorProjectDetailPage() {
         const linked = res.escrows.find(e => e.job_post_id === id || e.project_id === proj.id);
         if (linked) setProjectEscrow(linked);
       }).catch(() => {});
-      auth.me().then(u => setMyUserId(u.id)).catch(() => {});
+      auth.me().then(u => {
+        setMyUserId(u.id);
+        // Get the proposal ID for review link (creator's accepted proposal)
+        proposals.getMe().then((apps: {id: string; job_id: string; status: string}[]) => {
+          const mine = apps.find(a => a.job_id === id && a.status === 'accepted');
+          if (mine) setMyProposalId(mine.id);
+        }).catch(() => {});
+      }).catch(() => {});
     } catch (e) {
       const msg = (e as Error).message;
       // This ID is a job_id (e.g. from an old notification link) not a workspace
@@ -190,7 +198,7 @@ export default function CreatorProjectDetailPage() {
       </div>
 
       {/* Funds Secured banner — shown prominently at top when escrow is funded */}
-      {projectEscrow && projectEscrow.funded_amount > 0 && (
+      {projectEscrow && projectEscrow.funded_amount > 0 && projectEscrow.funded_amount > projectEscrow.released_amount && (
         <div className="bg-emerald-50 border border-emerald-300 rounded-2xl px-6 py-4 mb-6 flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
             <i className="fa-solid fa-shield-halved text-white text-xl"></i>
@@ -204,6 +212,31 @@ export default function CreatorProjectDetailPage() {
             </p>
           </div>
           <i className="fa-solid fa-circle-check text-emerald-600 text-2xl flex-shrink-0"></i>
+        </div>
+      )}
+
+      {/* Project completed — prompt creator to review the client */}
+      {project.status === 'completed' && (
+        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-trophy text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-emerald-900 text-lg">Project Complete — Payment Released</p>
+            <p className="text-emerald-700 text-sm mt-1 leading-relaxed">
+              Great work! Help the Spectrum community by leaving a review for your client.
+            </p>
+            {myProposalId && (
+              <Link
+                href={`/creator/projects/review?job=${id}&proposal=${myProposalId}`}
+                className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition">
+                <i className="fa-solid fa-star text-xs"></i>Review This Client
+              </Link>
+            )}
+          </div>
+          <span className="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Completed
+          </span>
         </div>
       )}
 

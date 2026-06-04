@@ -940,6 +940,21 @@ export const proposals = {
   }): Promise<{ success: boolean; message: string }> =>
     request(`/proposals/${proposalId}/rate`, { method: 'POST', body: JSON.stringify(data) }),
 
+  reviewClient: (proposalId: string, data: {
+    ratings: Record<string, number>;
+    review: string;
+    tags?: string[];
+  }): Promise<{ success: boolean; message: string; overall: number }> =>
+    request(`/proposals/${proposalId}/review-client`, { method: 'POST', body: JSON.stringify(data) }),
+
+  getReviews: (proposalId: string): Promise<{
+    client_rating: { ratings: Record<string, number>; overall: number; review: string; tags: string[]; reviewed_at: string } | null;
+    creator_rating: { ratings: Record<string, number>; overall: number; review: string; tags: string[]; reviewed_at: string } | null;
+    proposal_id: string;
+    job_title: string | null;
+  }> =>
+    request(`/proposals/${proposalId}/reviews`),
+
   directHire: (data: {
     job_id: string;
     creator_id: string;

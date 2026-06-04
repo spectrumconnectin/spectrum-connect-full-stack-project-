@@ -354,6 +354,114 @@ async def rate_proposal(
     return {"success": True, "message": "Review submitted successfully", "overall": overall}
 
 
+@router.post(
+    "/{proposal_id}/review-client",
+    summary="Creator reviews the client after project completion",
+)
+async def review_client(
+    proposal_id: str = Path(...),
+    data: RatingCreate = ...,
+    current_user: User = Depends(get_current_user),
+):
+    app = await Application.get(_oid(proposal_id))
+    if not app:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    # Only the creator (crew_id) can review the client
+    if str(app.crew_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the creator can leave a client review")
+
+    job = await JobPost.get(app.project_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status != "completed":
+        raise HTTPException(status_code=400, detail="Can only review after project is completed")
+
+    if not data.ratings:
+        raise HTTPException(status_code=400, detail="At least one rating is required")
+
+    overall = round(sum(data.ratings.values()) / len(data.ratings), 2)
+
+    # Persist creator's review on the application document
+    await app.update(
+        {"$set": {
+            "creator_rating": {
+                "ratings": data.ratings,
+                "overall": overall,
+                "review": data.review,
+                "tags": data.tags or [],
+                "reviewed_at": datetime.utcnow().isoformat(),
+            }
+        }}
+    )
+
+    # Update client's aggregate rating (on User document)
+    client = await User.get(job.client_id)
+    if client:
+        old_count  = getattr(client, "client_review_count", None) or 0
+        old_rating = getattr(client, "client_rating",       None) or 0.0
+        new_count  = old_count + 1
+        new_rating = round((old_rating * old_count + overall) / new_count, 2)
+        await client.update({"$set": {
+            "client_rating":       new_rating,
+            "client_review_count": new_count,
+        }})
+
+    # Notify client they received a review
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.review_received(
+            user_id=str(job.client_id),
+            reviewer_id=str(current_user.id),
+            rating=overall,
+            job_title=job.title,
+        )
+    except Exception:
+        pass
+
+    # ETF points for leaving a review
+    try:
+        from app.services.etf_points_service import EtfPointsService
+        await EtfPointsService.award_points(
+            user_id=current_user.id,
+            action="review.given",
+            source_type="application",
+            source_id=proposal_id,
+            counterparty_id=job.client_id,
+            description=f"Left a review for client on: {job.title}",
+        )
+    except Exception:
+        pass
+
+    return {"success": True, "message": "Client review submitted", "overall": overall}
+
+
+@router.get(
+    "/{proposal_id}/reviews",
+    summary="Get both reviews for a completed proposal",
+)
+async def get_proposal_reviews(
+    proposal_id: str = Path(...),
+    current_user: User = Depends(get_current_user),
+):
+    app = await Application.get(_oid(proposal_id))
+    if not app:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    job = await JobPost.get(app.project_id)
+    # Only the two parties can read reviews
+    is_creator = str(app.crew_id) == str(current_user.id)
+    is_client  = job and str(job.client_id) == str(current_user.id)
+    if not (is_creator or is_client):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    return {
+        "client_rating":  getattr(app, "client_rating",  None),
+        "creator_rating": getattr(app, "creator_rating", None),
+        "proposal_id":    proposal_id,
+        "job_title":      job.title if job else None,
+    }
+
+
 # ── Direct Hire ───────────────────────────────────────────────────────────────
 
 class DirectHireRequest(BaseModel):
