@@ -1063,8 +1063,11 @@ export const escrow = {
   deliverMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
     request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST' }),
 
-  requestRevision: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
-    request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, { method: 'POST' }),
+  requestRevision: (escrowId: string, milestoneId: string, feedback?: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, {
+      method: 'POST',
+      body: JSON.stringify({ feedback: feedback ?? '' }),
+    }),
 };
 
 // ── Commission (v1 split 8/4) ────────────────────────────────────────────────

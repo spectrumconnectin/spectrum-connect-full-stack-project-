@@ -192,21 +192,20 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
 
 // ─── Milestones Tab ──────────────────────────────────────────────────────────
 
-function MilestonesTab({ escrowDetail, role, onRefresh }: {
+function MilestonesTab({ escrowDetail, role, onRefresh, onRequestRevision }: {
   escrowDetail: EscrowDetail | null;
   role: 'client' | 'creator';
   onRefresh: () => void;
+  onRequestRevision?: (m: EscrowMilestone) => void;
 }) {
   const [acting, setActing] = useState<string | null>(null);
 
-  const doAction = async (action: 'deliver' | 'request-revision' | 'release', milestoneId: string) => {
+  const doAction = async (action: 'deliver' | 'release', milestoneId: string) => {
     if (!escrowDetail) return;
     setActing(milestoneId);
     try {
       if (action === 'deliver') {
         await escrow.deliverMilestone(escrowDetail.escrow_id, milestoneId);
-      } else if (action === 'request-revision') {
-        await escrow.requestRevision(escrowDetail.escrow_id, milestoneId);
       } else if (action === 'release') {
         await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
       }
@@ -324,8 +323,8 @@ function MilestonesTab({ escrowDetail, role, onRefresh }: {
                             className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
                             ✓ Approve & Release
                           </button>
-                          <button onClick={() => doAction('request-revision', m.milestone_id)} disabled={acting === m.milestone_id}
-                            className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition disabled:opacity-60">
+                          <button onClick={() => onRequestRevision?.(m)}
+                            className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
                             ↩ Request Revision
                           </button>
                         </>
@@ -470,13 +469,31 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
   ) ?? [];
 
   const [acting, setActing] = useState<string | null>(null);
+  // Revision request modal state
+  const [revisionTarget, setRevisionTarget] = useState<EscrowMilestone | null>(null);
+  const [revisionFeedback, setRevisionFeedback] = useState('');
+  const [requestingRevision, setRequestingRevision] = useState(false);
 
-  const doAction = async (action: 'release' | 'request-revision', milestoneId: string) => {
+  const submitRevisionRequest = async () => {
+    if (!revisionTarget || !escrowDetail) return;
+    setRequestingRevision(true);
+    try {
+      await escrow.requestRevision(escrowDetail.escrow_id, revisionTarget.milestone_id, revisionFeedback.trim() || undefined);
+      setRevisionTarget(null);
+      setRevisionFeedback('');
+      onRefresh();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setRequestingRevision(false);
+    }
+  };
+
+  const doAction = async (action: 'release', milestoneId: string) => {
     if (!escrowDetail) return;
     setActing(milestoneId);
     try {
-      if (action === 'release') await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
-      else await escrow.requestRevision(escrowDetail.escrow_id, milestoneId);
+      await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
       onRefresh();
     } catch (e) {
       alert((e as Error).message);
@@ -596,10 +613,10 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                     <div className="flex flex-col gap-2">
                       <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
                         className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
-                        ✓ Approve & Release
+                        {acting === m.milestone_id ? 'Releasing…' : '✓ Approve & Release'}
                       </button>
-                      <button onClick={() => doAction('request-revision', m.milestone_id)} disabled={acting === m.milestone_id}
-                        className="px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition disabled:opacity-60">
+                      <button onClick={() => { setRevisionTarget(m); setRevisionFeedback(''); }}
+                        className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
                         ↩ Request Revision
                       </button>
                     </div>
@@ -763,6 +780,68 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Creator: Revision Requested banner — shows what the client wants changed */}
+      {role === 'creator' && escrowDetail && escrowDetail.milestones.some(m => m.status === 'revision_requested') && (
+        <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4 flex items-start gap-3">
+          <i className="fa-solid fa-rotate-left text-orange-500 text-lg mt-0.5 flex-shrink-0"></i>
+          <div>
+            <p className="font-bold text-orange-900 text-sm">Revision Requested</p>
+            <p className="text-orange-700 text-xs mt-1 leading-relaxed">
+              The client has requested changes. Check the chat for their feedback, then resubmit your updated work via the &ldquo;Submit Delivery&rdquo; button above. Funds remain locked in escrow.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Request Revision Modal (client) */}
+      {revisionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!requestingRevision) setRevisionTarget(null); }} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Request Revision</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{revisionTarget.title}</p>
+              </div>
+              <button onClick={() => setRevisionTarget(null)} disabled={requestingRevision}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 flex items-start gap-2">
+              <i className="fa-solid fa-lock text-orange-500 text-sm mt-0.5 flex-shrink-0"></i>
+              <p className="text-xs text-orange-700 leading-relaxed">
+                Funds remain locked in escrow until you approve. The creator will be notified and can resubmit.
+              </p>
+            </div>
+
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              What needs to change? <span className="text-red-500">*</span>
+            </label>
+            <textarea value={revisionFeedback} onChange={e => setRevisionFeedback(e.target.value)}
+              rows={4}
+              placeholder="Be specific: describe exactly what needs to be changed, added, or removed…"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none mb-4" />
+
+            <div className="flex gap-3">
+              <button onClick={() => setRevisionTarget(null)} disabled={requestingRevision}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={submitRevisionRequest}
+                disabled={!revisionFeedback.trim() || requestingRevision}
+                className="flex-1 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                {requestingRevision
+                  ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                  : <><i className="fa-solid fa-rotate-left"></i> Request Revision</>
+                }
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -962,6 +1041,25 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
   const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  // Shared revision request modal state (opened from both Milestones and Deliverables tabs)
+  const [sharedRevisionTarget, setSharedRevisionTarget] = useState<EscrowMilestone | null>(null);
+  const [sharedRevisionFeedback, setSharedRevisionFeedback] = useState('');
+  const [sharedRequestingRevision, setSharedRequestingRevision] = useState(false);
+
+  const submitSharedRevision = async () => {
+    if (!sharedRevisionTarget || !escrowDetail) return;
+    setSharedRequestingRevision(true);
+    try {
+      await escrow.requestRevision(escrowDetail.escrow_id, sharedRevisionTarget.milestone_id, sharedRevisionFeedback.trim() || undefined);
+      setSharedRevisionTarget(null);
+      setSharedRevisionFeedback('');
+      loadAll();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setSharedRequestingRevision(false);
+    }
+  };
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -1103,7 +1201,8 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
           <TimelineTab deadlines={deadlines} projectId={projectId} role={role} onRefresh={loadAll} />
         )}
         {activeTab === 'milestones' && (
-          <MilestonesTab escrowDetail={escrowDetail} role={role} onRefresh={loadAll} />
+          <MilestonesTab escrowDetail={escrowDetail} role={role} onRefresh={loadAll}
+            onRequestRevision={m => { setSharedRevisionTarget(m); setSharedRevisionFeedback(''); }} />
         )}
         {activeTab === 'deliverables' && (
           <DeliverablesTab msgs={msgs} myUserId={myUserId} role={role} escrowDetail={escrowDetail} onRefresh={loadAll}
@@ -1116,6 +1215,55 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
           <ProgressTab projectId={projectId} role={role} escrowDetail={escrowDetail} />
         )}
       </div>
+
+      {/* Shared Request Revision Modal — opened from Milestones or Deliverables tab */}
+      {sharedRevisionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!sharedRequestingRevision) setSharedRevisionTarget(null); }} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Request Revision</h3>
+                <p className="text-sm text-gray-500 mt-0.5">{sharedRevisionTarget.title} · ${sharedRevisionTarget.amount.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setSharedRevisionTarget(null)} disabled={sharedRequestingRevision}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 flex items-start gap-2">
+              <i className="fa-solid fa-lock text-orange-500 text-sm mt-0.5 flex-shrink-0"></i>
+              <p className="text-xs text-orange-700 leading-relaxed">
+                Funds remain locked in escrow. The creator will be notified and can resubmit updated work.
+              </p>
+            </div>
+
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              What needs to change? <span className="text-red-500">*</span>
+            </label>
+            <textarea value={sharedRevisionFeedback} onChange={e => setSharedRevisionFeedback(e.target.value)}
+              rows={4}
+              placeholder="Be specific — describe exactly what needs to be changed, corrected, or added…"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none mb-4" />
+
+            <div className="flex gap-3">
+              <button onClick={() => setSharedRevisionTarget(null)} disabled={sharedRequestingRevision}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={submitSharedRevision}
+                disabled={!sharedRevisionFeedback.trim() || sharedRequestingRevision}
+                className="flex-1 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                {sharedRequestingRevision
+                  ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                  : <><i className="fa-solid fa-rotate-left"></i> Request Revision</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,26 +7,28 @@ import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem,
 import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 const STATUS_STYLE: Record<string, string> = {
-  open:            'bg-green-100 text-green-700',
-  in_review:       'bg-amber-100 text-amber-700',
-  pending_funding: 'bg-orange-100 text-orange-700',
-  draft:           'bg-gray-100 text-gray-600',
-  in_progress:     'bg-blue-100 text-blue-700',
-  delivered:       'bg-indigo-100 text-indigo-700',
-  closed:          'bg-blue-100 text-blue-700',
-  completed:       'bg-emerald-100 text-emerald-700',
+  open:               'bg-green-100 text-green-700',
+  in_review:          'bg-amber-100 text-amber-700',
+  pending_funding:    'bg-orange-100 text-orange-700',
+  draft:              'bg-gray-100 text-gray-600',
+  in_progress:        'bg-blue-100 text-blue-700',
+  delivered:          'bg-indigo-100 text-indigo-700',
+  revision_requested: 'bg-orange-100 text-orange-700',
+  closed:             'bg-blue-100 text-blue-700',
+  completed:          'bg-emerald-100 text-emerald-700',
 };
 
 function jobStatusLabel(status: string): string {
   const map: Record<string, string> = {
-    open:            'Open',
-    in_review:       'In Review',
-    pending_funding: 'Pending Funding',
-    in_progress:     'Active',
-    delivered:       'Delivered',
-    closed:          'Active',
-    completed:       'Completed',
-    draft:           'Draft',
+    open:               'Open',
+    in_review:          'In Review',
+    pending_funding:    'Pending Funding',
+    in_progress:        'Active',
+    delivered:          'Delivered',
+    revision_requested: 'Revision Requested',
+    closed:             'Active',
+    completed:          'Completed',
+    draft:              'Draft',
   };
   return map[status] ?? status;
 }
@@ -185,6 +187,24 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Revision requested — waiting on creator */}
+      {job.status === 'revision_requested' && (
+        <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-rotate-left text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-orange-900 text-lg">Revision Requested</p>
+            <p className="text-orange-700 text-sm mt-0.5 leading-relaxed">
+              You have requested revisions. The creator has been notified and will resubmit updated work. Funds remain locked in escrow.
+            </p>
+          </div>
+          <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            In Progress
+          </span>
+        </div>
+      )}
 
       {/* Delivery received banner — action required */}
       {job.status === 'delivered' && (

@@ -4,32 +4,34 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { jobs, JobPostItem } from '@/lib/api';
 
-const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'completed', 'draft'];
+const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'completed', 'draft'];
 
 // Map raw status → display label
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    open:            'Open',
-    in_review:       'In Review',
-    pending_funding: 'Pending Funding',
-    in_progress:     'Active',
-    delivered:       'Delivered',
-    completed:       'Completed',
-    draft:           'Draft',
-    closed:          'Active',  // legacy
+    open:               'Open',
+    in_review:          'In Review',
+    pending_funding:    'Pending Funding',
+    in_progress:        'Active',
+    delivered:          'Delivered',
+    revision_requested: 'Revision Requested',
+    completed:          'Completed',
+    draft:              'Draft',
+    closed:             'Active',  // legacy
   };
   return labels[status] ?? status;
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  open:            'bg-green-100 text-green-700',
-  in_review:       'bg-amber-100 text-amber-700',
-  pending_funding: 'bg-orange-100 text-orange-700',
-  in_progress:     'bg-blue-100 text-blue-700',
-  delivered:       'bg-indigo-100 text-indigo-700',
-  completed:       'bg-emerald-100 text-emerald-700',
-  draft:           'bg-gray-100 text-gray-500',
-  closed:          'bg-blue-100 text-blue-700',
+  open:               'bg-green-100 text-green-700',
+  in_review:          'bg-amber-100 text-amber-700',
+  pending_funding:    'bg-orange-100 text-orange-700',
+  in_progress:        'bg-blue-100 text-blue-700',
+  delivered:          'bg-indigo-100 text-indigo-700',
+  revision_requested: 'bg-orange-100 text-orange-700',
+  completed:          'bg-emerald-100 text-emerald-700',
+  draft:              'bg-gray-100 text-gray-500',
+  closed:             'bg-blue-100 text-blue-700',
 };
 
 function formatBudget(p: JobPostItem): string {

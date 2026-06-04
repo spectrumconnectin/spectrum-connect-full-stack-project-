@@ -24,6 +24,7 @@ PATCH /disputes/{dispute_id}/resolve [Admin] – admin resolves
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
+from pydantic import BaseModel
 
 from app.models.schema import User
 from app.auth.auth import get_current_user, get_admin_user
@@ -596,6 +597,9 @@ async def deliver_milestone(
     return {"success": True, "milestone_id": milestone_id, "status": "delivered"}
 
 
+class RevisionRequest(BaseModel):
+    feedback: Optional[str] = None  # client's explanation of what needs to change
+
 @escrow_router.post(
     "/{escrow_id}/milestone/{milestone_id}/request-revision",
     summary="Client requests revision on delivered milestone",
@@ -603,9 +607,11 @@ async def deliver_milestone(
 async def request_revision(
     escrow_id: str,
     milestone_id: str,
+    body: RevisionRequest = RevisionRequest(),
     current_user: User = Depends(get_current_user),
 ):
-    """Client requests revision — milestone goes back to revision_requested."""
+    """Client requests revision — milestone goes back to revision_requested.
+    Optionally accepts feedback explaining what needs to change."""
     from app.models.escrow import Escrow as EscrowDoc
     from beanie import PydanticObjectId
     esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
@@ -620,4 +626,48 @@ async def request_revision(
         raise HTTPException(status_code=400, detail="Can only request revision on delivered milestones")
     milestone.status = "revision_requested"
     await esc.save()
+
+    # Update job status to revision_requested if not all milestones still delivered
+    try:
+        from app.models.schema import JobPost
+        if esc.job_post_id:
+            job = await JobPost.get(esc.job_post_id)
+            if job and job.status in ("delivered", "in_progress"):
+                job.status = "revision_requested"
+                await job.save()
+    except Exception:
+        pass
+
+    # Post feedback as a message in project conversation + notify creator
+    try:
+        from app.services.notification_service import NotificationService
+        feedback_text = body.feedback or "Please review and make the requested changes."
+
+        # Bell notification
+        await NotificationService.send(
+            user_id=str(esc.creator_id),
+            type="escrow",
+            category="action_required",
+            title=f"Revision requested: {milestone.title}",
+            message=feedback_text,
+            actor_id=str(current_user.id),
+        )
+
+        # Post feedback message to the project conversation
+        from app.models.message import Conversation
+        from app.services.message_service import MessageService
+        convo = await Conversation.find_one({"job_id": str(esc.job_post_id)}) if esc.job_post_id else None
+        if convo:
+            chat_msg = (
+                f"🔄 **Revision Requested: {milestone.title}**\n\n"
+                f"{feedback_text}"
+            )
+            await MessageService.send_message(
+                conversation_id=str(convo.id),
+                sender_id=str(current_user.id),
+                content=chat_msg,
+            )
+    except Exception:
+        pass
+
     return {"success": True, "milestone_id": milestone_id, "status": "revision_requested"}
