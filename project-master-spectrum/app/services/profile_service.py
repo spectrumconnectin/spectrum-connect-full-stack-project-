@@ -181,6 +181,13 @@ class ProfileService:
             "is_verified": user.is_verified,
             "verification_badge": user.verification_badge,
             "is_online": is_online,
+            # Availability status (set during onboarding / profile settings)
+            "availability_status": (
+                user.settings.availability_status if user.settings else "available"
+            ),
+            # Rating aggregate from review submissions
+            "rating": user.rating if hasattr(user, "rating") else None,
+            "review_count": user.review_count if hasattr(user, "review_count") else None,
         }
 
         # Check privacy settings

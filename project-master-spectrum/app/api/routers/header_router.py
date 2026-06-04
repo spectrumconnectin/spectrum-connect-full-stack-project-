@@ -114,3 +114,26 @@ async def mark_one_read(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to mark notification as read: {str(e)}"
         )
+
+
+@router.post("/notifications/send")
+async def send_notification(
+    data: dict,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Send a notification to another user (e.g. invite notification from a client)."""
+    from app.services.notification_service import send as send_notif
+    target_user_id = data.get("user_id")
+    if not target_user_id:
+        raise HTTPException(status_code=400, detail="user_id required")
+    await send_notif(
+        user_id=str(target_user_id),
+        type=data.get("type", "system"),
+        category=data.get("category", "info"),
+        title=data.get("title", ""),
+        message=data.get("message", ""),
+        action_url=data.get("action_url"),
+        action_text=data.get("action_text"),
+        actor_id=str(current_user.id),
+    )
+    return {"success": True}

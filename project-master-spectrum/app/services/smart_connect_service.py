@@ -266,7 +266,7 @@ class SmartConnectService:
                         ),
                         "bio": user.profile.bio,
                         "daily_rate": crew_profile.daily_rate,
-                        "availability": "Available" if crew_profile.availability else None,
+                        "availability": (user.settings.availability_status if user.settings and user.settings.availability_status else ("available" if crew_profile.availability else None)),
                         "active_project_count": crew_profile.active_project_count,
                         "workload_capacity": crew_profile.workload_capacity,
                         "trust_tier": tier_label,

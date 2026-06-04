@@ -74,6 +74,19 @@ export default function CollaboratorProfilePage() {
         `View project: ${typeof window !== 'undefined' ? window.location.origin : ''}/creator/projects/${selectedProject}/apply`,
       ].join('\n');
       await messaging.createConversation([creator.id], selectedProject, msg);
+      // Also send a bell notification so creator sees it immediately
+      try {
+        const { notifications } = await import('@/lib/api');
+        await notifications.send?.({
+          user_id: creator.id,
+          type: 'proposal',
+          category: 'info',
+          title: `You've been invited to apply for a project`,
+          message: `${job?.title || 'A client'} wants to work with you. Check your messages to view the invite.`,
+          action_url: '/creator/messaging',
+          action_text: 'View invite',
+        });
+      } catch { /* notification is best-effort */ }
       setInviteSent(true);
     } catch (e) {
       alert((e as Error).message);
@@ -312,6 +325,34 @@ export default function CollaboratorProfilePage() {
 
         {/* ── Sidebar ── */}
         <div className="space-y-6">
+          {/* Rating & Reviews */}
+          {(creator.rating != null || creator.review_count != null) && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <h3 className="font-bold text-gray-900 mb-4">Reviews</h3>
+              <div className="flex items-center gap-4">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-gray-900">
+                    {creator.rating != null ? creator.rating.toFixed(1) : '—'}
+                  </div>
+                  <div className="flex items-center justify-center gap-0.5 mt-1">
+                    {[1,2,3,4,5].map(star => (
+                      <i key={star} className={`fa-solid fa-star text-sm ${
+                        creator.rating != null && star <= Math.round(creator.rating)
+                          ? 'text-yellow-400' : 'text-gray-200'
+                      }`}></i>
+                    ))}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {creator.review_count ?? 0} review{(creator.review_count ?? 0) !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                {creator.review_count === 0 || creator.review_count == null ? (
+                  <p className="text-sm text-gray-400 flex-1">No reviews yet — be the first to work with {name.split(' ')[0]}!</p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {/* Stats */}
           {stats && (
             <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">

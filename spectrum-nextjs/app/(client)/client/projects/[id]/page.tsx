@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, messaging, proposals, JobPostItem, JobProposalItem } from '@/lib/api';
+import { jobs, messaging, proposals, escrow, JobPostItem, JobProposalItem, EscrowListItem } from '@/lib/api';
 import ProjectTracker from './tracker';
 import FileShare from './files';
 
@@ -51,6 +51,7 @@ export default function ClientProjectDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
+  const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
   const [showFutureWorkModal, setShowFutureWorkModal] = useState(false);
   const [futureWorkMessage, setFutureWorkMessage] = useState('');
   const [sendingFutureWork, setSendingFutureWork] = useState(false);
@@ -61,20 +62,24 @@ export default function ClientProjectDetailPage() {
     jobs.getById(id)
       .then(data => {
         setJob(data);
-        // Fetch the hired creator for any non-draft status so we can show Start Project / Future Work buttons
-        if (data.status !== 'draft' && data.status !== 'open') {
-          proposals.getForJob(data.id)
-            .then(res => {
+        // Fetch hired creator + escrow status in parallel
+        if (data.status !== 'draft') {
+          Promise.allSettled([
+            proposals.getForJob(data.id),
+            escrow.list({ role: 'client', limit: 50 }),
+          ]).then(([propResult, escResult]) => {
+            if (propResult.status === 'fulfilled') {
+              const res = propResult.value;
               const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
               if (accepted) setHiredCreator(accepted);
-            }).catch(() => {});
-        } else if (data.status === 'open') {
-          // Still check — a creator may have been hired while job is still open
-          proposals.getForJob(data.id)
-            .then(res => {
-              const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
-              if (accepted) setHiredCreator(accepted);
-            }).catch(() => {});
+            }
+            if (escResult.status === 'fulfilled') {
+              const linked = escResult.value.escrows.find(
+                (e: EscrowListItem) => e.job_post_id === data.id
+              );
+              if (linked) setProjectEscrow(linked);
+            }
+          });
         }
       })
       .catch(e => setError((e as Error).message))
@@ -254,6 +259,33 @@ export default function ClientProjectDetailPage() {
           {/* Status management */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="font-bold text-gray-900 mb-4">Manage Job</h2>
+
+            {/* Escrow / payment status */}
+            {hiredCreator && (
+              <div className={`flex items-center gap-3 p-3 rounded-xl mb-4 text-sm font-semibold ${
+                projectEscrow && projectEscrow.funded_amount > 0
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-amber-50 border border-amber-200 text-amber-700'
+              }`}>
+                <i className={`fa-solid ${projectEscrow && projectEscrow.funded_amount > 0 ? 'fa-lock' : 'fa-hourglass-half'}`}></i>
+                <div>
+                  {projectEscrow && projectEscrow.funded_amount > 0 ? (
+                    <>
+                      <div>Funded — In Escrow</div>
+                      <div className="text-xs font-normal opacity-80">${projectEscrow.funded_amount.toLocaleString()} secured</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>Not Yet Funded</div>
+                      <div className="text-xs font-normal opacity-80">
+                        <Link href="/client/payments" className="underline">Fund escrow →</Link>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               {canPublish && (
                 <button disabled={updatingStatus} onClick={() => handleStatusChange('open')}

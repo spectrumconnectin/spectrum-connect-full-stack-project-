@@ -303,6 +303,17 @@ export const notifications = {
 
   markOneRead: (id: string): Promise<{ success: boolean }> =>
     request(`/header/notifications/${id}/read`, { method: 'POST' }),
+
+  send: (data: {
+    user_id: string;
+    type: string;
+    category: string;
+    title: string;
+    message: string;
+    action_url?: string;
+    action_text?: string;
+  }): Promise<{ success: boolean }> =>
+    request('/header/notifications/send', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Profile ──────────────────────────────────────────────────────────────────
@@ -670,6 +681,8 @@ export interface PublicProfile {
   is_verified: boolean;
   availability_status?: string;
   availability_label?: string;
+  rating?: number;
+  review_count?: number;
   profile?: {
     first_name?: string;
     last_name?: string;
