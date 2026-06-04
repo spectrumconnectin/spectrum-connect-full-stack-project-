@@ -8,7 +8,7 @@ Enhanced project management models for client dashboard:
 - ProjectDeadline: Milestones and deadlines
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
@@ -212,5 +212,8 @@ class ProjectDeadline(Document):
 
     def days_remaining(self) -> int:
         """Calculate days until deadline"""
-        delta = self.due_date - datetime.utcnow()
+        # Normalise both sides to UTC-aware to avoid offset-naive vs offset-aware errors
+        now = datetime.now(timezone.utc)
+        due = self.due_date if self.due_date.tzinfo else self.due_date.replace(tzinfo=timezone.utc)
+        delta = due - now
         return max(0, delta.days)
