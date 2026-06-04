@@ -1519,14 +1519,20 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
     }
   };
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Keep a stable ref to `convo` so the polling interval can always access the
+  // latest value without being listed as a useEffect dependency (which would
+  // cause a reload loop every time setConvo is called inside loadAll).
+  const convoRef = useRef<ConversationItem | null>(null);
+  useEffect(() => { convoRef.current = convo; }, [convo]);
 
   const loadAll = useCallback(async () => {
     try {
       // Load conversation linked to this job
       const convRes = await messaging.listConversations({ limit: 50 });
-      const linked = convRes.conversations.find(c => c.job_id === jobId);
-      setConvo(linked ?? null);
+      const linked = convRes.conversations.find(c => c.job_id === jobId) ?? null;
+      setConvo(linked);
+      convoRef.current = linked;
 
       if (linked) {
         const msgRes = await messaging.getMessages(linked.id, { limit: 100 });
@@ -1549,19 +1555,22 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
       }
     } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [jobId, projectId]);
+  }, [jobId, projectId]);  // ← only re-create when the job/project id changes
 
   useEffect(() => {
     loadAll();
+    // Poll only for new messages every 8 s — use the ref so we never need
+    // `convo` as a dependency (avoids the reload loop).
     pollRef.current = setInterval(() => {
-      if (convo) {
-        messaging.getMessages(convo.id, { limit: 100 })
+      const current = convoRef.current;
+      if (current) {
+        messaging.getMessages(current.id, { limit: 100 })
           .then(r => setMsgs(r.messages))
           .catch(() => {});
       }
     }, 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [loadAll, convo]);
+  }, [loadAll]);  // ← no `convo` dep — loadAll is stable for the life of this jobId
 
   const handleSendMessage = async (text: string, file?: File) => {
     let targetConvo = convo;
