@@ -324,8 +324,12 @@ function SmartConnectInner() {
                     const matchReasons = isProjectMode && matchResults[idx]?.match_reasons || [];
                     const matchScore = isProjectMode && matchResults[idx]?.match_score;
                     const matchLevel = isProjectMode && matchResults[idx]?.match_level;
+                    const hasPortfolio = (c.portfolio_item_count ?? 0) > 0;
                     return (
-                      <div key={c.user_id} className={`bg-white rounded-2xl border p-6 hover:shadow-md transition ${isProjectMode && matchScore && matchScore >= 80 ? 'border-purple-200 hover:border-purple-400' : 'border-gray-200 hover:border-cobalt'}`}>
+                      <div key={c.user_id} className={`bg-white rounded-2xl border overflow-hidden hover:shadow-md transition ${isProjectMode && matchScore && matchScore >= 80 ? 'border-purple-200 hover:border-purple-400' : 'border-gray-200 hover:border-cobalt'}`}>
+                        {/* Portfolio preview strip */}
+                        <div className={`h-1.5 w-full ${hasPortfolio ? (c.portfolio_has_video ? 'bg-gradient-to-r from-purple-400 to-blue-500' : 'bg-gradient-to-r from-blue-300 to-cobalt') : 'bg-gray-100'}`} />
+                        <div className="p-6">
                         <div className="flex items-start gap-4">
                           <div className="relative flex-shrink-0">
                             {c.avatar ? (
@@ -390,6 +394,13 @@ function SmartConnectInner() {
                                 {c.active_project_count}/{c.workload_capacity} active project{c.active_project_count !== 1 ? 's' : ''}
                               </p>
                             )}
+                            {/* Portfolio indicator */}
+                            {hasPortfolio && (
+                              <span className="inline-flex items-center gap-1 text-xs text-purple-600 font-medium mt-2">
+                                <i className={`fa-solid ${c.portfolio_has_video ? 'fa-film' : 'fa-image'} text-[10px]`}></i>
+                                {c.portfolio_has_video ? 'Video portfolio' : 'Portfolio'}
+                              </span>
+                            )}
                             {/* Match reasons — shown in project mode */}
                             {isProjectMode && matchReasons.length > 0 && (
                               <div className="flex flex-wrap gap-1.5 mt-3">
@@ -425,6 +436,7 @@ function SmartConnectInner() {
                             <i className={`fa-solid fa-${isSaved ? 'check' : 'bookmark'}`}></i>
                           </button>
                         </div>
+                        </div>{/* close p-6 */}
                       </div>
                     );
                   })}

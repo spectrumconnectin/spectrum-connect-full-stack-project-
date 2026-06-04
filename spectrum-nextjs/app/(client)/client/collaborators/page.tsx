@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { talent, TalentItem } from '@/lib/api';
+import EtfBadge from '@/components/EtfBadge';
 
 const ROLES = [
   'All Roles',
@@ -162,61 +163,104 @@ export default function CollaboratorsPage() {
 
 // ── Creator card ──────────────────────────────────────────────────────────────
 
+function AvailabilityDot({ status }: { status?: string }) {
+  if (!status) return null;
+  const color = status === 'available' ? 'bg-green-500' : status === 'busy' ? 'bg-amber-400' : 'bg-gray-300';
+  const label = status === 'available' ? 'Available' : status === 'busy' ? 'Busy' : 'Unavailable';
+  return (
+    <span className={`flex items-center gap-1 text-xs font-medium ${status === 'available' ? 'text-green-600' : status === 'busy' ? 'text-amber-600' : 'text-gray-400'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full inline-block ${color}`}></span>
+      {label}
+    </span>
+  );
+}
+
 function CreatorCard({ creator: c }: { creator: TalentItem }) {
   const rate = formatRate(c.hourly_rate_min, c.hourly_rate_max);
+  const hasPortfolio = (c.portfolio_item_count ?? 0) > 0;
 
   return (
     <Link href={`/client/collaborators/${c.id}`}
-      className="block bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:border-cobalt hover:shadow-md transition group">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="relative shrink-0">
-            {c.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.avatar} alt={c.name}
-                className="w-14 h-14 rounded-xl border-2 border-gray-200 object-cover" />
-            ) : (
-              <div className="w-14 h-14 rounded-xl border-2 border-gray-200 bg-blue-100 flex items-center justify-center text-cobalt font-bold text-xl">
-                {c.name[0]?.toUpperCase()}
-              </div>
-            )}
-            {c.location && (
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white" title="Available"></span>
-            )}
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900 group-hover:text-cobalt transition">{c.name}</h3>
-            {c.title && <p className="text-sm text-cobalt font-medium line-clamp-1">{c.title}</p>}
-            {c.location && <p className="text-xs text-gray-400 mt-0.5"><i className="fa-solid fa-location-dot mr-1"></i>{c.location}</p>}
-          </div>
-        </div>
-        {c.rating ? (
-          <div className="text-right shrink-0">
-            <div className="text-lg font-bold text-amber-500">{c.rating.toFixed(1)}</div>
-            <div className="text-xs text-gray-400">★ rating</div>
-          </div>
-        ) : null}
-      </div>
+      className="flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:border-cobalt hover:shadow-md transition group overflow-hidden">
 
-      {c.skills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {c.skills.slice(0, 4).map(s => (
-            <span key={s} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{s}</span>
-          ))}
-          {c.skills.length > 4 && (
-            <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{c.skills.length - 4}</span>
+      {/* Portfolio preview strip — shows if creator has portfolio */}
+      <div className={`h-1.5 w-full ${hasPortfolio ? (c.portfolio_has_video ? 'bg-gradient-to-r from-purple-400 to-blue-500' : 'bg-gradient-to-r from-blue-300 to-cobalt') : 'bg-gray-100'}`} />
+
+      <div className="p-5 flex flex-col flex-1">
+        {/* Header: avatar + name + rating */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              {c.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.avatar} alt={c.name}
+                  className="w-14 h-14 rounded-xl border-2 border-gray-100 object-cover" />
+              ) : (
+                <div className="w-14 h-14 rounded-xl border-2 border-gray-100 bg-blue-100 flex items-center justify-center text-cobalt font-bold text-xl">
+                  {c.name[0]?.toUpperCase()}
+                </div>
+              )}
+              {/* Availability dot on avatar */}
+              {c.availability_status && c.availability_status !== 'not_available' && (
+                <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${c.availability_status === 'available' ? 'bg-green-500' : 'bg-amber-400'}`} />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-gray-900 group-hover:text-cobalt transition truncate">{c.name}</h3>
+              {c.title && <p className="text-sm text-cobalt font-medium truncate mt-0.5">{c.title}</p>}
+              {c.location && <p className="text-xs text-gray-400 mt-0.5 truncate"><i className="fa-solid fa-location-dot mr-1"></i>{c.location}</p>}
+            </div>
+          </div>
+          {/* Rating */}
+          {c.rating ? (
+            <div className="text-right shrink-0 ml-2">
+              <div className="text-base font-bold text-amber-500 flex items-center gap-1">
+                <i className="fa-solid fa-star text-sm"></i>{c.rating.toFixed(1)}
+              </div>
+              <div className="text-xs text-gray-400">{c.review_count ?? 0} reviews</div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Skills */}
+        {c.skills.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {c.skills.slice(0, 4).map(s => (
+              <span key={s} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{s}</span>
+            ))}
+            {c.skills.length > 4 && (
+              <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{c.skills.length - 4}</span>
+            )}
+          </div>
+        )}
+
+        {/* ETF Badge + Availability + Portfolio */}
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          {c.etf_level && (
+            <EtfBadge
+              level={{ name: c.etf_level as 'bronze'|'silver'|'gold'|'platinum', label: c.etf_level.charAt(0).toUpperCase() + c.etf_level.slice(1), icon: '', color: '', min_points: 0, next_min_points: null, progress_pct: 0 }}
+              size="xs"
+            />
+          )}
+          <AvailabilityDot status={c.availability_status} />
+          {hasPortfolio && (
+            <span className="flex items-center gap-1 text-xs text-purple-600 font-medium">
+              <i className={`fa-solid ${c.portfolio_has_video ? 'fa-film' : 'fa-image'} text-[10px]`}></i>
+              {c.portfolio_has_video ? 'Video portfolio' : 'Portfolio'}
+            </span>
           )}
         </div>
-      )}
 
-      <div className="flex items-center justify-between text-sm border-t border-gray-100 pt-4">
-        <span className="font-bold text-gray-900">{rate}</span>
-        <span className="text-gray-500">
-          {c.review_count != null && c.review_count > 0
-            ? <><i className="fa-solid fa-briefcase text-gray-400 mr-1"></i>{c.review_count} projects</>
-            : <span className="text-blue-400 font-medium">New</span>
-          }
-        </span>
+        {/* Footer */}
+        <div className="flex items-center justify-between text-sm border-t border-gray-100 pt-3 mt-auto">
+          <span className="font-bold text-gray-900">{rate}</span>
+          <span className="text-xs text-gray-500">
+            {c.review_count != null && c.review_count > 0
+              ? <><i className="fa-solid fa-briefcase text-gray-300 mr-1"></i>{c.review_count} project{c.review_count !== 1 ? 's' : ''}</>
+              : <span className="text-emerald-500 font-medium">New</span>
+            }
+          </span>
+        </div>
       </div>
     </Link>
   );

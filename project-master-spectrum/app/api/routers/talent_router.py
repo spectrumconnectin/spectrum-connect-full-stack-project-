@@ -6,6 +6,16 @@ from app.services.talent_service import TalentService
 router = APIRouter(prefix="/talent", tags=["talent"])
 
 
+async def _get_etf_level(user_id) -> str:
+    """Return the creator's ETF level name (bronze/silver/gold/platinum)."""
+    try:
+        from app.services.etf_points_service import EtfPointsService
+        level = await EtfPointsService.badge_for(user_id)
+        return level.name
+    except Exception:
+        return "bronze"
+
+
 def _pget(obj, attr, default=None):
     """Safely get an attribute from either a Pydantic model or a dict."""
     if obj is None:
@@ -24,12 +34,19 @@ async def search_talent(
 ):
     results = await TalentService.search(q=q, location=location, skill=skill, limit=limit)
 
-    def serialize(user):
+    # Fetch ETF levels for all users in parallel to avoid N+1
+    import asyncio
+    etf_levels = await asyncio.gather(
+        *[_get_etf_level(u.id) for u in results],
+        return_exceptions=True
+    )
+
+    def serialize(user, etf_level: str):
         profile = user.profile
         stats = user.stats or {}
         stats_get = stats.get if isinstance(stats, dict) else lambda k, d=None: getattr(stats, k, d)
 
-        # Location: might be a nested object or dict
+        # Location
         loc = _pget(profile, "location")
         city = None
         if isinstance(loc, dict):
@@ -37,7 +54,7 @@ async def search_talent(
         elif loc is not None:
             city = getattr(loc, "city", None)
 
-        # Skills: list of dicts or Pydantic objects
+        # Skills
         raw_skills = _pget(profile, "skills") or []
         skill_names = []
         for s in raw_skills:
@@ -48,6 +65,19 @@ async def search_talent(
         first = _pget(profile, "first_name") or ""
         last = _pget(profile, "last_name") or ""
         full_name = f"{first} {last}".strip()
+
+        # Portfolio info
+        portfolio_items = _pget(profile, "portfolio_items") or []
+        portfolio_has_video = any(
+            (i.get("type") if isinstance(i, dict) else getattr(i, "type", None)) == "video"
+            for i in portfolio_items
+        )
+        portfolio_item_count = len(portfolio_items)
+
+        # Availability status (set during onboarding / profile settings)
+        availability_status = None
+        if user.settings:
+            availability_status = getattr(user.settings, "availability_status", None)
 
         return {
             "id": str(user.id),
@@ -60,6 +90,11 @@ async def search_talent(
             "hourly_rate_max": _pget(profile, "hourly_rate_max"),
             "rating": _pget(profile, "rating") or stats_get("client_satisfaction"),
             "review_count": _pget(profile, "review_count") or stats_get("projects_completed"),
+            # Stage 4 additions
+            "etf_level": etf_level if isinstance(etf_level, str) else "bronze",
+            "availability_status": availability_status or "available",
+            "portfolio_has_video": portfolio_has_video,
+            "portfolio_item_count": portfolio_item_count,
         }
 
-    return {"talent": [serialize(u) for u in results]}
+    return {"talent": [serialize(u, etf_levels[i]) for i, u in enumerate(results)]}

@@ -665,6 +665,10 @@ export interface TalentItem {
   hourly_rate_max?: number;
   rating?: number;
   review_count?: number;
+  etf_level?: string;
+  availability_status?: string;
+  portfolio_has_video?: boolean;
+  portfolio_item_count?: number;
 }
 
 export const talent = {
@@ -1431,6 +1435,8 @@ export interface SmartCreativeProfile {
   /** ETF Points level — bronze/silver/gold/platinum. Inline so cards
    *  don't need an N+1 fetch to render the badge. */
   etf_level?: EtfLevelName;
+  portfolio_item_count?: number;
+  portfolio_has_video?: boolean;
 }
 
 export interface SmartMatchResultItem {
