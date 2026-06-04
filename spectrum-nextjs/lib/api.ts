@@ -1055,7 +1055,7 @@ export const escrow = {
     description?: string;
     currency?: string;
   }): Promise<{ escrow_id: string; status: string; total_amount: number; milestones: Array<{ milestone_id: string; title: string; amount: number; status: string }> }> =>
-    request('/escrow/', { method: 'POST', body: JSON.stringify(data) }),
+    request('/escrow', { method: 'POST', body: JSON.stringify(data) }),
 
   fundMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; funded_amount: number; transaction_id?: string; mock_transaction_id?: string }> =>
     request(`/escrow/${escrowId}/fund-milestone`, {

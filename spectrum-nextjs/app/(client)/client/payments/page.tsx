@@ -418,9 +418,12 @@ function FundProjectModal({
         currency: 'USD',
       });
 
-      // Step 2: Fund the milestone (simulated)
-      const milestoneId = created.milestones[0]?.milestone_id;
+      // Step 2: Fetch escrow detail to get milestone IDs (create only returns escrow_id)
+      const detail = await escrow.getById(created.escrow_id);
+      const milestoneId = detail.milestones[0]?.milestone_id;
       if (!milestoneId) throw new Error('Milestone not created');
+
+      // Step 3: Fund the milestone (simulated)
       await escrow.fundMilestone(created.escrow_id, milestoneId);
 
       // Generate mock transaction ID

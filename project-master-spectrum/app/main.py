@@ -79,6 +79,9 @@ app = FastAPI(
     # reachable via /openapi.json if explicitly enabled).
     docs_url="/docs" if not settings.is_production() else None,
     redoc_url="/redoc" if not settings.is_production() else None,
+    # Disable automatic trailing-slash redirects — they return 307 for POST
+    # requests, which browsers refuse to follow, causing "Failed to fetch".
+    redirect_slashes=False,
 )
 
 # Build CORS allowlist from configuration only — no hardcoded preview URLs.
