@@ -5,107 +5,81 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { jobs, JobCreatePayload } from '@/lib/api';
 
-const DEPARTMENTS = [
+const CATEGORIES = [
   'Design', 'Film & Video', 'Writing & Content', 'Marketing & Strategy',
-  'Music & Audio', 'Digital & Interactive', 'Other',
+  'Music & Audio', 'Digital & Interactive', 'Photography', 'Branding', 'Other',
 ];
 
 const SKILLS_SUGGESTIONS = [
-  // Design
-  'Graphic Designer', 'UI/UX Designer', 'Product Designer', 'Motion Designer', '3D Designer', 'Brand Identity Designer',
-  // Film & Video
-  'Video Editor', 'Videographer', 'Animator', 'VFX Artist', 'Film Director', 'Sound Designer',
-  // Writing & Content
-  'Copywriter', 'Scriptwriter / Screenwriter', 'Content Writer', 'Editor',
-  // Marketing & Strategy
-  'Creative Director', 'Art Director', 'Brand Strategist', 'Social Media Manager',
-  // Music & Audio
-  'Music Producer', 'Voice Actor', 'Composer',
-  // Digital & Interactive
-  'Game Designer', '3D Modeler', 'AR/VR Designer',
-];
-
-const EXPERIENCE_LEVELS = [
-  { val: 'student',      label: 'Student',       desc: 'Learning & growing' },
-  { val: 'entry',        label: 'Entry Level',    desc: '0–2 years' },
-  { val: 'intermediate', label: 'Mid Level',      desc: '2–5 years' },
-  { val: 'expert',       label: 'Senior / Expert', desc: '5+ years' },
-];
-
-const CREW_SIZES = [
-  { val: 'individual', label: 'Solo',       desc: '1 person' },
-  { val: 'small_crew', label: 'Small Crew', desc: '2–10 people' },
-  { val: 'full_crew',  label: 'Full Crew',  desc: '10+ people' },
-];
-
-const COMPLEXITY_LEVELS = [
-  { val: 'simple',       label: 'Simple',   icon: 'fa-circle',             desc: 'Straightforward task' },
-  { val: 'intermediate', label: 'Moderate', icon: 'fa-circle-half-stroke', desc: 'Some complexity' },
-  { val: 'complex',      label: 'Complex',  icon: 'fa-circle-dot',         desc: 'Multi-faceted project' },
+  'Video Editing', 'Videography', 'Graphic Design', 'UI/UX Design', 'Motion Graphics',
+  'Animation', 'VFX', 'Copywriting', 'Scriptwriting', 'Photography',
+  'Music Production', 'Sound Design', 'Brand Strategy', 'Social Media',
+  'Film Direction', 'Creative Direction', '3D Modeling', 'Voice Acting',
 ];
 
 const BUDGET_TYPES = [
-  { val: 'fixed', label: 'Fixed Price' },
-  { val: 'hourly', label: 'Hourly Rate' },
-  { val: 'daily', label: 'Day Rate' },
-  { val: 'weekly', label: 'Weekly Rate' },
-  { val: 'negotiable', label: 'Negotiable' },
+  { val: 'fixed',      label: 'Fixed Price',  desc: 'One total payment' },
+  { val: 'hourly',     label: 'Hourly Rate',  desc: 'Per hour worked' },
+  { val: 'daily',      label: 'Day Rate',     desc: 'Per day worked' },
+  { val: 'negotiable', label: 'Negotiable',   desc: 'Open to discuss' },
 ];
+
+const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400 text-sm';
 
 export default function CreateProjectPage() {
   const router = useRouter();
 
-  // Basics
-  const [title, setTitle] = useState('');
+  // ── Step 1: Project Info ────────────────────────────────────────────────
+  const [title, setTitle]       = useState('');
   const [description, setDescription] = useState('');
-  const [department, setDepartment] = useState('');
-  const [role, setRole] = useState('');
+  const [category, setCategory] = useState('');
 
-  // Budget
+  // ── Step 2: Goals & Deliverables ───────────────────────────────────────
+  const [goals, setGoals]               = useState<string[]>([]);
+  const [goalInput, setGoalInput]       = useState('');
+  const [deliverables, setDeliverables] = useState<string[]>([]);
+  const [delivInput, setDelivInput]     = useState('');
+
+  // ── Step 3: Budget ──────────────────────────────────────────────────────
   const [budgetType, setBudgetType] = useState('fixed');
-  const [budgetMin, setBudgetMin] = useState('');
-  const [budgetMax, setBudgetMax] = useState('');
+  const [budgetMin, setBudgetMin]   = useState('');
+  const [budgetMax, setBudgetMax]   = useState('');
 
-  // Scope
-  const [crewSize, setCrewSize] = useState('small_crew');
-  const [complexity, setComplexity] = useState('intermediate');
-  const [experienceLevel, setExperienceLevel] = useState('intermediate');
-  const [estimatedDuration, setEstimatedDuration] = useState('');
-
-  // Skills & Tags
-  const [skills, setSkills] = useState<string[]>([]);
+  // ── Step 4: Timeline & Skills ──────────────────────────────────────────
+  const [timeline, setTimeline]   = useState('');
+  const [skills, setSkills]       = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
 
-  // Submission
+  // ── Submit ──────────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // Use a ref so the value is available synchronously when handleSubmit fires
-  const publishDraftRef = useRef<'open' | 'draft'>('open');
-  const [publishDraft, setPublishDraft] = useState<'open' | 'draft'>('open');
+  const publishRef = useRef<'open' | 'draft'>('open');
 
-  const addSkill = (s: string) => {
-    const val = s.trim();
-    if (val && !skills.includes(val)) setSkills(prev => [...prev, val]);
-    setSkillInput('');
+  // ── helpers ─────────────────────────────────────────────────────────────
+  const addItem = (
+    val: string,
+    list: string[],
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    inputSetter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const v = val.trim();
+    if (v && !list.includes(v)) setter(p => [...p, v]);
+    inputSetter('');
   };
 
-  const addTag = (t: string) => {
-    const val = t.trim();
-    if (val && !tags.includes(val)) setTags(prev => [...prev, val]);
-    setTagInput('');
-  };
+  const removeItem = (
+    val: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>
+  ) => setter(p => p.filter(x => x !== val));
 
-  const buildRateField = () => {
+  const buildRate = () => {
     const min = budgetMin ? Number(budgetMin) : undefined;
     const max = budgetMax ? Number(budgetMax) : undefined;
     if (!min && !max) return {};
     const obj = { min, max };
-    if (budgetType === 'fixed') return { budget: obj };
+    if (budgetType === 'fixed')  return { budget: obj };
     if (budgetType === 'hourly') return { hourly_rate: obj };
-    if (budgetType === 'daily') return { daily_rate: obj };
-    if (budgetType === 'weekly') return { weekly_rate: obj };
+    if (budgetType === 'daily')  return { daily_rate: obj };
     return {};
   };
 
@@ -113,34 +87,28 @@ export default function CreateProjectPage() {
     e.preventDefault();
     setSubmitError(null);
 
-    // Client-side validation
-    const errors: string[] = [];
-    if (title.trim().length < 10) errors.push('Title must be at least 10 characters');
-    if (description.trim().length < 50) errors.push('Description must be at least 50 characters');
-    if (!department) errors.push('Please select a department');
-    if (skills.length === 0) errors.push('Add at least one required skill');
-    if (tags.length === 0) errors.push('Add at least one project tag');
-    if (errors.length > 0) {
-      setSubmitError(errors.join('\n'));
-      return;
-    }
+    const errs: string[] = [];
+    if (title.trim().length < 5)  errs.push('Project title is required (min 5 characters)');
+    if (!description.trim())       errs.push('Project description is required');
+    if (!category)                 errs.push('Please select a category');
+    if (errs.length) { setSubmitError(errs.join('\n')); return; }
 
     setSubmitting(true);
-
-    const payload: JobCreatePayload = {
-      title: title.trim(),
+    const payload: JobCreatePayload & { goals?: string[]; deliverables?: string[] } = {
+      title:       title.trim(),
       description: description.trim(),
-      department,
-      role: role.trim() || undefined,
-      tags,
-      skills,
-      crew_size: crewSize,
-      complexity,
+      department:  category,
+      duration:    timeline.trim() || undefined,
+      skills:      skills.length ? skills : [],
+      tags:        [],
+      crew_size:   'individual',
+      complexity:  'intermediate',
       budget_type: budgetType,
-      experience_level: experienceLevel,
-      estimated_duration: estimatedDuration ? Number(estimatedDuration) : undefined,
-      status: publishDraftRef.current,
-      ...buildRateField(),
+      experience_level: 'intermediate',
+      goals:        goals.length ? goals : undefined,
+      deliverables: deliverables.length ? deliverables : undefined,
+      status: publishRef.current,
+      ...buildRate(),
     };
 
     try {
@@ -152,281 +120,244 @@ export default function CreateProjectPage() {
     }
   };
 
+  const sectionHeader = (icon: string, iconBg: string, title: string, subtitle: string) => (
+    <div className="flex items-center gap-4 mb-6">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+        <i className={`fa-solid ${icon}`}></i>
+      </div>
+      <div>
+        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        <p className="text-sm text-gray-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+
+  const tagInput = (
+    value: string,
+    onChange: (v: string) => void,
+    onAdd: () => void,
+    placeholder: string
+  ) => (
+    <div className="flex gap-2">
+      <input type="text" value={value} onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onAdd(); } }}
+        placeholder={placeholder}
+        className={`${inp} flex-1`} />
+      <button type="button" onClick={onAdd}
+        className="px-4 py-3 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition flex-shrink-0">
+        Add
+      </button>
+    </div>
+  );
+
+  const chips = (
+    items: string[],
+    onRemove: (v: string) => void,
+    color = 'bg-blue-50 text-cobalt border-blue-100'
+  ) => items.length > 0 && (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {items.map(s => (
+        <span key={s} className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full font-medium border ${color}`}>
+          {s}
+          <button type="button" onClick={() => onRemove(s)} className="hover:opacity-60 transition">
+            <i className="fa-solid fa-xmark text-xs"></i>
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      {/* Header */}
-      <section className="mb-10">
-        <div className="flex items-center space-x-4 mb-6">
-          <Link href="/client/projects"
-            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition">
-            <i className="fa-solid fa-arrow-left text-gray-600"></i>
-          </Link>
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900">Create New Project</h1>
-            <p className="text-gray-600 mt-1">Post a job and connect with verified film & creative professionals</p>
-          </div>
+      {/* Back + title */}
+      <div className="flex items-center gap-4 mb-8">
+        <Link href="/client/projects"
+          className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition flex-shrink-0">
+          <i className="fa-solid fa-arrow-left text-gray-600 text-sm"></i>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Create a Project</h1>
+          <p className="text-gray-500 text-sm mt-0.5">Fill in your project details and publish to start receiving proposals</p>
         </div>
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-          <div className="flex items-start space-x-4">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
-              <i className="fa-solid fa-lightbulb text-cobalt text-xl"></i>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+
+        {/* ── 1. Project Information ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('circle-info', 'bg-blue-100 text-cobalt', 'Project Information', 'What are you working on?')}
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Project Title <span className="text-red-500">*</span>
+              </label>
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="e.g. Logo Design for Tech Startup"
+                className={inp} />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">Reach the right creators</h3>
-              <p className="text-sm text-gray-600">
-                The more detail you provide, the better your matches. Be specific about your vision, timeline, and crew requirements.
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORIES.map(c => (
+                  <button key={c} type="button" onClick={() => setCategory(c)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+                      category === c
+                        ? 'border-cobalt bg-blue-50 text-cobalt'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Project Description <span className="text-red-500">*</span>
+              </label>
+              <textarea rows={5} value={description} onChange={e => setDescription(e.target.value)}
+                placeholder="Describe your project in detail — what you need, your vision, any important context…"
+                className={`${inp} resize-none`} />
+              <p className={`text-xs mt-1 ${description.length < 50 ? 'text-gray-400' : 'text-emerald-600'}`}>
+                {description.length} characters{description.length < 50 ? ' — aim for at least 50' : ' ✓'}
               </p>
             </div>
           </div>
         </div>
-      </section>
 
-      <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl">
-
-        {/* ── Project Basics ── */}
-        <section className="bg-white rounded-3xl border border-gray-200 p-10 shadow-lg">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-              <i className="fa-solid fa-info-circle text-cobalt text-lg"></i>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Project Basics</h2>
-          </div>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Project Title *</label>
-              <input type="text" required value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="e.g., Documentary Film – Cinematographer Needed"
-                className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400" />
-            </div>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Department *</label>
-                <select required value={department} onChange={e => setDepartment(e.target.value)}
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900">
-                  <option value="">Select department</option>
-                  {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Specific Role <span className="text-gray-400 font-normal">(optional)</span></label>
-                <input type="text" value={role} onChange={e => setRole(e.target.value)}
-                  placeholder="e.g., Director of Photography"
-                  className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Project Description *</label>
-              <textarea rows={6} required value={description} onChange={e => setDescription(e.target.value)}
-                placeholder="Describe your project vision, goals, location, deliverables, and what you're looking to create. Be as specific as possible."
-                className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400 resize-none" />
-              <p className="text-xs text-gray-500 mt-2">{description.length} characters — aim for at least 200</p>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Budget ── */}
-        <section className="bg-white rounded-3xl border border-gray-200 p-10 shadow-lg">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-              <i className="fa-solid fa-dollar-sign text-green-600 text-lg"></i>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Budget</h2>
-          </div>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Budget Type *</label>
-              <div className="flex flex-wrap gap-3">
-                {BUDGET_TYPES.map(b => (
-                  <button key={b.val} type="button" onClick={() => setBudgetType(b.val)}
-                    className={`px-5 py-2.5 rounded-xl text-sm font-semibold border-2 transition ${budgetType === b.val ? 'border-cobalt bg-blue-50 text-cobalt' : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300'}`}>
-                    {b.label}
+        {/* ── 2. Project Goals ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('bullseye', 'bg-purple-100 text-purple-600', 'Project Goals', 'What are you trying to achieve?')}
+          <div className="space-y-2">
+            {tagInput(goalInput, setGoalInput, () => addItem(goalInput, goals, setGoals, setGoalInput), 'e.g. Increase brand awareness, Launch product — press Enter')}
+            {chips(goals, v => removeItem(v, setGoals), 'bg-purple-50 text-purple-700 border-purple-100')}
+            {goals.length === 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['Increase brand awareness', 'Launch a product', 'Drive website traffic', 'Grow social media', 'Tell our story'].map(s => (
+                  <button key={s} type="button" onClick={() => addItem(s, goals, setGoals, setGoalInput)}
+                    className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-purple-50 hover:text-purple-700 transition">
+                    + {s}
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 3. Deliverables ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('box-open', 'bg-emerald-100 text-emerald-600', 'Deliverables', 'What should the creator produce?')}
+          <div className="space-y-2">
+            {tagInput(delivInput, setDelivInput, () => addItem(delivInput, deliverables, setDeliverables, setDelivInput), 'e.g. 60-second video, 3 logo concepts — press Enter')}
+            {chips(deliverables, v => removeItem(v, setDeliverables), 'bg-emerald-50 text-emerald-700 border-emerald-100')}
+            {deliverables.length === 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {['Edited video', 'Logo files (SVG, PNG)', 'Social media graphics', 'Written content', 'Brand guidelines'].map(s => (
+                  <button key={s} type="button" onClick={() => addItem(s, deliverables, setDeliverables, setDelivInput)}
+                    className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-emerald-50 hover:text-emerald-700 transition">
+                    + {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 4. Budget ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Budget', 'How much are you willing to pay?')}
+          <div className="space-y-5">
+            <div className="flex flex-wrap gap-3">
+              {BUDGET_TYPES.map(b => (
+                <button key={b.val} type="button" onClick={() => setBudgetType(b.val)}
+                  className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 transition min-w-[110px] ${
+                    budgetType === b.val
+                      ? 'border-cobalt bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                  <span className={`font-bold text-sm ${budgetType === b.val ? 'text-cobalt' : 'text-gray-700'}`}>{b.label}</span>
+                  <span className="text-xs text-gray-400 mt-0.5">{b.desc}</span>
+                </button>
+              ))}
             </div>
             {budgetType !== 'negotiable' && (
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Minimum {budgetType === 'fixed' ? 'Budget' : budgetType === 'hourly' ? 'Hourly Rate' : budgetType === 'daily' ? 'Day Rate' : 'Weekly Rate'} ($)
-                  </label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Min ($)</label>
                   <input type="number" min="0" value={budgetMin} onChange={e => setBudgetMin(e.target.value)}
-                    placeholder="e.g., 500"
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400" />
+                    placeholder="e.g. 500" className={inp} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Maximum ($)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Max ($)</label>
                   <input type="number" min="0" value={budgetMax} onChange={e => setBudgetMax(e.target.value)}
-                    placeholder="e.g., 2000"
-                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400" />
+                    placeholder="e.g. 2000" className={inp} />
                 </div>
               </div>
             )}
           </div>
-        </section>
+        </div>
 
-        {/* ── Project Scope ── */}
-        <section className="bg-white rounded-3xl border border-gray-200 p-10 shadow-lg">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-              <i className="fa-solid fa-calendar text-purple-600 text-lg"></i>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Project Scope</h2>
-          </div>
-          <div className="space-y-8">
+        {/* ── 5. Timeline & Skills ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Crew Size *</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {CREW_SIZES.map(c => (
-                  <button key={c.val} type="button" onClick={() => setCrewSize(c.val)}
-                    className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition text-center ${crewSize === c.val ? 'border-cobalt bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}>
-                    <span className={`font-bold text-sm ${crewSize === c.val ? 'text-cobalt' : 'text-gray-700'}`}>{c.label}</span>
-                    <span className="text-xs text-gray-500">{c.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Complexity *</label>
-              <div className="grid grid-cols-3 gap-4">
-                {COMPLEXITY_LEVELS.map(c => (
-                  <button key={c.val} type="button" onClick={() => setComplexity(c.val)}
-                    className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition ${complexity === c.val ? 'border-cobalt bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}>
-                    <i className={`fa-solid ${c.icon} text-xl ${complexity === c.val ? 'text-cobalt' : 'text-gray-400'}`}></i>
-                    <span className={`font-semibold text-sm ${complexity === c.val ? 'text-cobalt' : 'text-gray-700'}`}>{c.label}</span>
-                    <span className="text-xs text-gray-500">{c.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Estimated Duration <span className="text-gray-400 font-normal">(days, optional)</span>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Timeline <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <input type="number" min="1" value={estimatedDuration} onChange={e => setEstimatedDuration(e.target.value)}
-                placeholder="e.g., 30"
-                className="w-full max-w-xs px-5 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400" />
+              <input type="text" value={timeline} onChange={e => setTimeline(e.target.value)}
+                placeholder="e.g. 2 weeks, by end of July, ASAP, ongoing"
+                className={inp} />
             </div>
-          </div>
-        </section>
-
-        {/* ── Team Requirements ── */}
-        <section className="bg-white rounded-3xl border border-gray-200 p-10 shadow-lg">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-              <i className="fa-solid fa-users text-amber-600 text-lg"></i>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">Team Requirements</h2>
-          </div>
-          <div className="space-y-8">
             <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">Experience Level *</label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {EXPERIENCE_LEVELS.map(e => (
-                  <button key={e.val} type="button" onClick={() => setExperienceLevel(e.val)}
-                    className={`flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition text-center ${experienceLevel === e.val ? 'border-cobalt bg-blue-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}>
-                    <span className={`font-bold text-sm ${experienceLevel === e.val ? 'text-cobalt' : 'text-gray-700'}`}>{e.label}</span>
-                    <span className="text-xs text-gray-500">{e.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Skills */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Required Skills</label>
-              <div className="flex gap-2 mb-3">
-                <input type="text" value={skillInput} onChange={e => setSkillInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSkill(skillInput); } }}
-                  placeholder="Type a skill and press Enter"
-                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400 text-sm" />
-                <button type="button" onClick={() => addSkill(skillInput)}
-                  className="px-4 py-3 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-                  Add
-                </button>
-              </div>
-              {/* Suggestions */}
-              <div className="flex flex-wrap gap-2 mb-3">
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Required Skills <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              {tagInput(skillInput, setSkillInput, () => addItem(skillInput, skills, setSkills, setSkillInput), 'Type a skill and press Enter')}
+              <div className="flex flex-wrap gap-2 mt-3">
                 {SKILLS_SUGGESTIONS.filter(s => !skills.includes(s)).slice(0, 8).map(s => (
-                  <button key={s} type="button" onClick={() => addSkill(s)}
+                  <button key={s} type="button" onClick={() => addItem(s, skills, setSkills, setSkillInput)}
                     className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-blue-50 hover:text-cobalt transition">
                     + {s}
                   </button>
                 ))}
               </div>
-              {skills.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {skills.map(s => (
-                    <span key={s} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-cobalt text-white rounded-full font-medium">
-                      {s}
-                      <button type="button" onClick={() => setSkills(prev => prev.filter(x => x !== s))}
-                        className="hover:text-blue-200 transition">
-                        <i className="fa-solid fa-xmark text-xs"></i>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">Project Tags</label>
-              <div className="flex gap-2 mb-3">
-                <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput); } }}
-                  placeholder="e.g., 4K, drone, short-film — press Enter"
-                  className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400 text-sm" />
-                <button type="button" onClick={() => addTag(tagInput)}
-                  className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
-                  Add
-                </button>
-              </div>
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {tags.map(t => (
-                    <span key={t} className="flex items-center gap-1.5 text-sm px-3 py-1.5 bg-blue-50 text-cobalt rounded-full font-medium border border-blue-100">
-                      {t}
-                      <button type="button" onClick={() => setTags(prev => prev.filter(x => x !== t))}
-                        className="hover:text-red-400 transition">
-                        <i className="fa-solid fa-xmark text-xs"></i>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              {chips(skills, v => removeItem(v, setSkills))}
             </div>
           </div>
-        </section>
+        </div>
 
         {/* ── Error ── */}
         {submitError && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-red-700 text-sm flex items-start gap-3">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm flex items-start gap-3">
             <i className="fa-solid fa-circle-exclamation mt-0.5 flex-shrink-0"></i>
             <ul className="space-y-1">
-              {submitError.split('\n').map((line, i) => (
-                <li key={i} className="font-medium">{line}</li>
-              ))}
+              {submitError.split('\n').map((line, i) => <li key={i}>{line}</li>)}
             </ul>
           </div>
         )}
 
-        {/* ── Submit ── */}
-        <div className="project-submit-row flex flex-wrap items-center justify-between gap-3 pt-4 pb-8">
-          <Link href="/client/projects" className="px-6 py-3 text-gray-600 font-semibold hover:text-gray-900 transition">
+        {/* ── Actions ── */}
+        <div className="flex items-center justify-between gap-3 pt-2 pb-8 flex-wrap">
+          <Link href="/client/projects"
+            className="text-sm text-gray-500 font-semibold hover:text-gray-800 transition">
             Cancel
           </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'draft'; setPublishDraft('draft'); }}
-              className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-              {submitting && publishDraft === 'draft' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Saving…</> : 'Save as Draft'}
+          <div className="flex items-center gap-3">
+            <button type="submit" disabled={submitting}
+              onClick={() => { publishRef.current = 'draft'; }}
+              className="px-5 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold text-sm hover:border-gray-400 transition disabled:opacity-50">
+              Save as Draft
             </button>
-            <button type="submit" disabled={submitting} onClick={() => { publishDraftRef.current = 'open'; setPublishDraft('open'); }}
-              className="bg-cobalt text-white px-8 py-3.5 rounded-xl font-bold text-base hover:bg-blue-700 transition shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
-              {submitting && publishDraft === 'open' ? <><i className="fa-solid fa-spinner fa-spin mr-2"></i>Publishing…</> : 'Publish Project'}
+            <button type="submit" disabled={submitting}
+              onClick={() => { publishRef.current = 'open'; }}
+              className="bg-cobalt text-white px-7 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-md disabled:opacity-50 flex items-center gap-2">
+              {submitting ? <><i className="fa-solid fa-spinner animate-spin"></i> Publishing…</> : <><i className="fa-solid fa-rocket"></i> Publish Project</>}
             </button>
           </div>
         </div>
+
       </form>
     </>
   );

@@ -80,6 +80,8 @@ class JobService:
             deadline=job_data.deadline,
             skills=job_data.skills,
             experience_level=job_data.experience_level,
+            goals=job_data.goals if hasattr(job_data, 'goals') else None,
+            deliverables=job_data.deliverables if hasattr(job_data, 'deliverables') else None,
             crew_call=crew_calls if crew_calls else None,
             visibility=job_data.visibility,
             invited_crew=invited_crew_ids,

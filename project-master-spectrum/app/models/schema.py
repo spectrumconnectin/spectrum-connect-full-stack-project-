@@ -547,6 +547,8 @@ class JobPost(Document):
     deadline: Optional[datetime] = None
     skills: Optional[List[str]] = None
     experience_level: Optional[str] = None # student, entry, intermediate, expert
+    goals: Optional[List[str]] = None        # project goals
+    deliverables: Optional[List[str]] = None # what will be delivered
     crew_call: Optional[List[CrewCall]] = None
     attachments: Optional[List[Attachment]] = None
     visibility: str = "public" # public, private, invited_only

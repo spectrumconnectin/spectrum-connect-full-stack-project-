@@ -126,32 +126,36 @@ class ScreeningQuestionRead(BaseModel):
 
 class JobPostCreate(BaseModel):
     """Create a new job post"""
-    title: str = Field(..., min_length=10, max_length=100, description="Job title")
-    description: str = Field(..., min_length=50, max_length=10000, description="Detailed job description")
-    department: str = Field(..., description="Film department (Camera, Sound, Lighting, etc.)")
-    role: Optional[str] = Field(None, description="Specific role (Cinematographer, Gaffer, etc.)")
-    tags: List[str] = Field(..., min_items=1, max_items=20, description="Job tags for search")
+    title: str = Field(..., min_length=5, max_length=200, description="Job title")
+    description: str = Field(..., min_length=20, max_length=10000, description="Detailed job description")
+    department: str = Field(..., description="Project category (Design, Film & Video, etc.)")
+    role: Optional[str] = Field(None, description="Specific role (optional)")
+    tags: Optional[List[str]] = Field(None, max_items=20, description="Job tags (optional)")
 
-    # Project scope
-    crew_size: str = Field(..., description="individual, small_crew, or full_crew")
-    complexity: str = Field(..., description="simple, intermediate, or complex")
+    # Goals & Deliverables (spec requirements)
+    goals: Optional[List[str]] = Field(None, max_items=20, description="Project goals")
+    deliverables: Optional[List[str]] = Field(None, max_items=20, description="What will be delivered")
+
+    # Project scope (optional — don't block posting)
+    crew_size: Optional[str] = Field(None, description="individual, small_crew, or full_crew")
+    complexity: Optional[str] = Field(None, description="simple, intermediate, or complex")
 
     # Budget & Rates
-    budget_type: str = Field(..., description="fixed, hourly, daily, or weekly")
+    budget_type: Optional[str] = Field(None, description="fixed, hourly, daily, weekly, or negotiable")
     budget: Optional[BudgetCreate] = Field(None, description="For fixed budget")
     hourly_rate: Optional[RateCreate] = Field(None, description="For hourly budget")
     daily_rate: Optional[RateCreate] = Field(None, description="For daily budget")
     weekly_rate: Optional[RateCreate] = Field(None, description="For weekly budget")
 
     # Timeline
-    duration: Optional[str] = Field(None, description="Project duration description")
+    duration: Optional[str] = Field(None, description="Timeline description e.g. '2 weeks', 'by end of July'")
     estimated_duration: Optional[int] = Field(None, ge=1, le=365, description="Estimated days")
     start_date: Optional[datetime] = None
     deadline: Optional[datetime] = None
 
     # Requirements
-    skills: List[str] = Field(..., min_items=1, max_items=30, description="Required skills")
-    experience_level: str = Field(..., description="student, entry, intermediate, or expert")
+    skills: Optional[List[str]] = Field(None, max_items=30, description="Required skills")
+    experience_level: Optional[str] = Field(None, description="student, entry, intermediate, or expert")
 
     # Crew calls
     crew_call: Optional[List[CrewCallCreate]] = Field(None, max_items=20)

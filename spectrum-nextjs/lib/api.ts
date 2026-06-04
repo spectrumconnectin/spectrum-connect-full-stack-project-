@@ -525,6 +525,8 @@ export interface JobPostItem {
   created_at?: string;
   workspace?: { progress: number; roles_required: number; roles_filled: number };
   location?: string;
+  goals?: string[];
+  deliverables?: string[];
 }
 
 export interface JobSearchResponse {
@@ -539,18 +541,20 @@ export interface JobCreatePayload {
   description: string;
   department: string;
   role?: string;
-  tags: string[];
-  crew_size: string;
-  complexity: string;
-  budget_type: string;
+  tags?: string[];
+  crew_size?: string;
+  complexity?: string;
+  budget_type?: string;
   budget?: { min?: number; max?: number };
   hourly_rate?: { min?: number; max?: number };
   daily_rate?: { min?: number; max?: number };
   weekly_rate?: { min?: number; max?: number };
   duration?: string;
   estimated_duration?: number;
-  skills: string[];
-  experience_level: string;
+  skills?: string[];
+  experience_level?: string;
+  goals?: string[];
+  deliverables?: string[];
   status?: string;
 }
 
