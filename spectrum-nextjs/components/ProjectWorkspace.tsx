@@ -242,9 +242,7 @@ function MilestonesTab({ escrowDetail, role, onRefresh, onRequestRevision }: {
     if (!escrowDetail) return;
     setActing(milestoneId);
     try {
-      if (action === 'deliver') {
-        await escrow.deliverMilestone(escrowDetail.escrow_id, milestoneId);
-      } else if (action === 'approve') {
+      if (action === 'approve') {
         await escrow.approveMilestone(escrowDetail.escrow_id, milestoneId);
       } else if (action === 'release') {
         await escrow.releaseMilestone(escrowDetail.escrow_id, milestoneId);
@@ -501,6 +499,8 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<EscrowMilestone | null>(null);
   const [deliveryNote, setDeliveryNote] = useState('');
+  const [deliveryDriveLink, setDeliveryDriveLink] = useState('');
+  const [driveLinkError, setDriveLinkError] = useState<string | null>(null);
   const [deliveryFiles, setDeliveryFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -552,9 +552,18 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
   const openDeliveryModal = (m: EscrowMilestone) => {
     setSelectedMilestone(m);
     setDeliveryNote('');
+    setDeliveryDriveLink(m.google_drive_link || '');
+    setDriveLinkError(null);
     setDeliveryFiles([]);
     setSubmitted(false);
     setShowDeliveryModal(true);
+  };
+
+  const validateDriveLink = (link: string): string | null => {
+    if (!link.trim()) return 'A Google Drive link is required.';
+    const valid = ['https://drive.google.com/', 'https://docs.google.com/', 'https://sheets.google.com/', 'https://slides.google.com/'];
+    if (!valid.some(p => link.trim().startsWith(p))) return 'Link must start with https://drive.google.com/ or https://docs.google.com/';
+    return null;
   };
 
   const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -565,12 +574,14 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
 
   const submitDelivery = async () => {
     if (!selectedMilestone || !escrowDetail) return;
+    const linkErr = validateDriveLink(deliveryDriveLink);
+    if (linkErr) { setDriveLinkError(linkErr); return; }
     setSubmitting(true);
     try {
       // 1. Upload any attached files and build message
       const fileLines: string[] = [];
       for (const file of deliveryFiles) {
-        const uploaded = await messaging.uploadAttachment(file);
+        await messaging.uploadAttachment(file);
         fileLines.push(`📎 ${file.name}`);
         if (onSend) await onSend(`📎 Delivery file: ${file.name}`, file);
       }
@@ -579,13 +590,18 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
       const parts = [
         `📦 **Final Delivery: ${selectedMilestone.title}**`,
         '',
+        `🔗 Google Drive: ${deliveryDriveLink.trim()}`,
+        '',
         deliveryNote.trim() || 'Work completed as discussed.',
         ...fileLines,
       ];
       if (onSend) await onSend(parts.join('\n'));
 
-      // 3. Mark milestone as delivered via escrow endpoint
-      await escrow.deliverMilestone(escrowDetail.escrow_id, selectedMilestone.milestone_id);
+      // 3. Mark milestone as delivered via escrow endpoint (Google Drive link required)
+      await escrow.deliverMilestone(escrowDetail.escrow_id, selectedMilestone.milestone_id, {
+        google_drive_link: deliveryDriveLink.trim(),
+        delivery_notes: deliveryNote.trim() || undefined,
+      });
 
       setSubmitted(true);
       onRefresh();
@@ -767,11 +783,44 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                 </div>
 
                 <div className="space-y-4">
+                  {/* Google Drive link — REQUIRED */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Google Drive Link <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <i className="fa-brands fa-google-drive absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                      <input
+                        type="url"
+                        value={deliveryDriveLink}
+                        onChange={e => { setDeliveryDriveLink(e.target.value); setDriveLinkError(null); }}
+                        placeholder="https://drive.google.com/file/d/..."
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 transition ${
+                          driveLinkError
+                            ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+                            : 'border-gray-300 focus:border-cobalt focus:ring-blue-50'
+                        }`}
+                      />
+                    </div>
+                    {driveLinkError && (
+                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                        <i className="fa-solid fa-circle-exclamation"></i>{driveLinkError}
+                      </p>
+                    )}
+                    {deliveryDriveLink && !driveLinkError && validateDriveLink(deliveryDriveLink) === null && (
+                      <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                        <i className="fa-solid fa-circle-check"></i>Valid Google Drive link
+                      </p>
+                    )}
+                  </div>
+
                   {/* Delivery notes */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Delivery notes</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      Delivery notes <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
                     <textarea value={deliveryNote} onChange={e => setDeliveryNote(e.target.value)}
-                      rows={3} placeholder="Describe what you've delivered, any notes, and how to access the files…"
+                      rows={3} placeholder="Describe what you've delivered, any notes for the client…"
                       className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-cobalt resize-none" />
                   </div>
 

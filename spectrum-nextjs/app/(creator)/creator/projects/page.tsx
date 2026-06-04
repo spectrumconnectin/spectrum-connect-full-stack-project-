@@ -2,26 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { creatorProjects, proposals, messaging, escrow, ProjectItem, ProposalItem, EscrowListItem } from '@/lib/api';
-
-const STATUS_FILTERS = ['all', 'in_progress', 'active', 'on_hold', 'completed'];
-
-const STATUS_STYLE: Record<string, string> = {
-  in_progress: 'bg-green-100 text-green-700',
-  active:      'bg-green-100 text-green-700',
-  on_hold:     'bg-yellow-100 text-yellow-700',
-  completed:   'bg-blue-100 text-blue-700',
-  draft:       'bg-gray-100 text-gray-500',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  in_progress: 'Active',
-  active:      'Active',
-  on_hold:     'On Hold',
-  completed:   'Completed',
-  draft:       'Draft',
-};
+import { useRouter } from 'next/navigation';
+import { proposals, escrow, ProposalItem, EscrowListItem } from '@/lib/api';
 
 const APP_STATUS_TABS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected', 'withdrawn'];
 
@@ -43,6 +25,11 @@ const APP_STATUS_LABEL: Record<string, string> = {
   withdrawn:    'Withdrawn',
 };
 
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function formatRelative(dateStr?: string): string {
   if (!dateStr) return '—';
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -51,80 +38,21 @@ function formatRelative(dateStr?: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(dateStr);
 }
 
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function ProgressBar({ value }: { value: number }) {
-  return (
-    <div className="w-full bg-gray-100 rounded-full h-1.5">
-      <div className="bg-cobalt h-1.5 rounded-full transition-all" style={{ width: `${Math.min(value, 100)}%` }} />
-    </div>
-  );
-}
-
-type TopTab = 'projects' | 'applications';
-
+// ── Main inner component ──────────────────────────────────────────────────────
 function MyWorkInner() {
-  const searchParams = useSearchParams();
-  const initialTab: TopTab = searchParams.get('tab') === 'applications' ? 'applications' : 'projects';
-  const [topTab, setTopTab] = useState<TopTab>(initialTab);
+  const router = useRouter();
 
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    if (topTab === 'applications') url.searchParams.set('tab', 'applications');
-    else url.searchParams.delete('tab');
-    window.history.replaceState({}, '', url.toString());
-  }, [topTab]);
-
-  // --- Projects state ---
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [projectList, setProjectList] = useState<ProjectItem[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    if (topTab !== 'projects') return;
-    let cancelled = false;
-    setProjectsLoading(true);
-    setProjectsError(null);
-
-    const params: { status?: string; search?: string } = {};
-    if (filter !== 'all') params.status = filter;
-    if (search.trim()) params.search = search.trim();
-
-    creatorProjects.list(params)
-      .then(data => { if (!cancelled) setProjectList(data.projects || []); })
-      .catch(e => { if (!cancelled) setProjectsError((e as Error).message); })
-      .finally(() => { if (!cancelled) setProjectsLoading(false); });
-
-    return () => { cancelled = true; };
-  }, [filter, search, refreshKey, topTab]);
-
-  // --- Applications state ---
   const [appTab, setAppTab] = useState('All');
   const [appList, setAppList] = useState<ProposalItem[]>([]);
   const [appLoading, setAppLoading] = useState(true);
   const [appError, setAppError] = useState<string | null>(null);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
-  const [appsFetched, setAppsFetched] = useState(false);
-  // Escrow funding status keyed by job_id
   const [escrowByJob, setEscrowByJob] = useState<Record<string, EscrowListItem>>({});
-  // Submit-delivery modal state
-  const [deliveringApp, setDeliveringApp] = useState<ProposalItem | null>(null);
-  const [deliveryNote, setDeliveryNote] = useState('');
-  const [sendingDelivery, setSendingDelivery] = useState(false);
-  const [deliverySentIds, setDeliverySentIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (topTab !== 'applications' || appsFetched) return;
     let cancelled = false;
     setAppLoading(true);
     setAppError(null);
@@ -135,8 +63,6 @@ function MyWorkInner() {
       .then(([apps, esc]) => {
         if (cancelled) return;
         setAppList(apps || []);
-        setAppsFetched(true);
-        // Build job_id → escrow map for funded/active escrows
         const map: Record<string, EscrowListItem> = {};
         (esc.escrows || []).forEach((e: EscrowListItem) => {
           if (e.job_post_id && (e.status === 'active' || e.funded_amount > 0)) {
@@ -148,7 +74,7 @@ function MyWorkInner() {
       .catch(e => { if (!cancelled) setAppError((e as Error).message); })
       .finally(() => { if (!cancelled) setAppLoading(false); });
     return () => { cancelled = true; };
-  }, [topTab, appsFetched]);
+  }, []);
 
   const filteredApps = appTab === 'All'
     ? appList
@@ -161,14 +87,15 @@ function MyWorkInner() {
     accepted:     appList.filter(a => a.status === 'accepted').length,
   };
 
-  const handleWithdraw = async (id: string) => {
+  const handleWithdraw = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm('Withdraw this proposal? This cannot be undone.')) return;
     setWithdrawing(id);
     try {
       await proposals.withdraw(id);
       setAppList(prev => prev.filter(a => a.id !== id));
-    } catch (e) {
-      alert((e as Error).message);
+    } catch (err) {
+      alert((err as Error).message);
     } finally {
       setWithdrawing(null);
     }
@@ -176,367 +103,27 @@ function MyWorkInner() {
 
   return (
     <>
+      {/* Header */}
       <section className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Work</h1>
-        <p className="text-gray-600">Your active projects and outstanding applications, all in one place.</p>
-      </section>
-
-      {/* Top-level sub-tabs */}
-      <div className="bg-white rounded-xl border border-gray-200 p-1.5 inline-flex items-center gap-1 mb-8">
-        <button
-          onClick={() => setTopTab('projects')}
-          className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition ${topTab === 'projects' ? 'bg-cobalt text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
-        >
-          <i className="fa-solid fa-briefcase mr-2"></i>
-          Projects
-        </button>
-        <button
-          onClick={() => setTopTab('applications')}
-          className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition ${topTab === 'applications' ? 'bg-cobalt text-white shadow-sm' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
-        >
-          <i className="fa-solid fa-paper-plane mr-2"></i>
-          Applications
-          {appCounts.total > 0 && topTab !== 'applications' && (
-            <span className="ml-2 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{appCounts.total}</span>
-          )}
-        </button>
-      </div>
-
-      {topTab === 'projects' ? (
-        <ProjectsView
-          filter={filter} setFilter={setFilter}
-          search={search} setSearch={setSearch}
-          projectList={projectList}
-          loading={projectsLoading}
-          error={projectsError}
-          onRetry={() => setRefreshKey(k => k + 1)}
-        />
-      ) : (
-        <ApplicationsView
-          counts={appCounts}
-          tabs={APP_STATUS_TABS}
-          activeTab={appTab} setActiveTab={setAppTab}
-          appList={appList}
-          filtered={filteredApps}
-          loading={appLoading}
-          error={appError}
-          withdrawing={withdrawing}
-          onWithdraw={handleWithdraw}
-          deliverySentIds={deliverySentIds}
-          onDeliver={(app) => {
-            setDeliveryNote('');
-            setDeliveringApp(app);
-          }}
-          escrowByJob={escrowByJob}
-        />
-      )}
-
-      {/* ── Submit Delivery Modal ── */}
-      {deliveringApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => { if (!sendingDelivery) setDeliveringApp(null); }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
-            onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-8 py-6 text-white">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <i className="fa-solid fa-box-open text-lg"></i>
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold">Submit Delivery</h2>
-                  <p className="text-emerald-100 text-xs truncate max-w-xs">{deliveringApp.job_title}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-8 py-6">
-              {/* Info banner */}
-              <div className="flex gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5">
-                <i className="fa-solid fa-info-circle text-blue-500 mt-0.5 flex-shrink-0"></i>
-                <p className="text-xs text-blue-800 leading-relaxed">
-                  This will send the client a delivery notification and message. They&apos;ll review your work and release payment when satisfied.
-                </p>
-              </div>
-
-              {/* Delivery note */}
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Delivery notes <span className="text-gray-400 font-normal">(optional)</span>
-                </label>
-                <textarea
-                  value={deliveryNote}
-                  onChange={e => setDeliveryNote(e.target.value)}
-                  rows={5}
-                  maxLength={1000}
-                  placeholder="Describe what you've delivered — file locations, how to access the work, any notes for the client…"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
-                />
-                <p className="text-xs text-gray-400 mt-1 text-right">{deliveryNote.length}/1000</p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setDeliveringApp(null)}
-                  disabled={sendingDelivery}
-                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm disabled:opacity-50">
-                  Cancel
-                </button>
-                <button
-                  disabled={sendingDelivery}
-                  onClick={async () => {
-                    if (!deliveringApp.client_id) return;
-                    setSendingDelivery(true);
-                    try {
-                      const msg = [
-                        `✅ **Delivery submitted for: ${deliveringApp.job_title}**`,
-                        '',
-                        deliveryNote.trim() || 'The work has been completed and is ready for your review.',
-                        '',
-                        'Please review the deliverables and release payment when satisfied. Feel free to message me if you have any questions or need revisions.',
-                      ].join('\n');
-                      await messaging.createConversation(
-                        [deliveringApp.client_id],
-                        deliveringApp.job_id,
-                        msg,
-                      );
-                      setDeliverySentIds(prev => { const next = new Set(prev); next.add(deliveringApp.id); return next; });
-                      setDeliveringApp(null);
-                    } catch (e) {
-                      alert((e as Error).message);
-                    } finally {
-                      setSendingDelivery(false);
-                    }
-                  }}
-                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2">
-                  {sendingDelivery
-                    ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
-                    : <><i className="fa-solid fa-paper-plane"></i> Submit Delivery</>}
-                </button>
-              </div>
-            </div>
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">My Work</h1>
+            <p className="text-gray-600">Your applications and active projects, all in one place.</p>
           </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-function ProjectsView({
-  filter, setFilter, search, setSearch,
-  projectList, loading, error, onRetry,
-}: {
-  filter: string; setFilter: (v: string) => void;
-  search: string; setSearch: (v: string) => void;
-  projectList: ProjectItem[];
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-}) {
-  return (
-    <>
-      {/* Filter bar */}
-      <section className="mb-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {STATUS_FILTERS.map(f => (
-                <button key={f} onClick={() => setFilter(f)}
-                  className={`px-4 py-2 text-sm rounded-lg transition font-medium capitalize ${filter === f ? 'text-cobalt bg-blue-50 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  {f === 'all' ? 'All' : STATUS_LABEL[f] ?? f}
-                </button>
-              ))}
-            </div>
-            <div className="relative">
-              <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-              <input type="text" placeholder="Search projects…" value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-cobalt focus:outline-none w-56" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading projects…</p>
-        </div>
-      ) : error ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
-          <i className="fa-solid fa-circle-exclamation text-4xl text-red-300 mb-4 block"></i>
-          <p className="text-red-500 text-sm mb-4">{error}</p>
-          <button onClick={onRetry}
-            className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-            Try again
-          </button>
-        </div>
-      ) : projectList.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">
-          <i className="fa-solid fa-folder-open text-4xl text-gray-300 mb-4 block"></i>
-          <h3 className="font-semibold text-gray-600 mb-2">No projects found</h3>
-          <p className="text-gray-400 text-sm mb-6">
-            {filter === 'all' && !search
-              ? 'Once you are hired on a job, your projects will appear here.'
-              : 'Try adjusting your filter or search term.'}
-          </p>
           <Link href="/creator/find-projects"
-            className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-            Find Projects
+            className="inline-flex items-center px-5 py-2.5 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+            <i className="fa-solid fa-magnifying-glass mr-2"></i>Find More Work
           </Link>
         </div>
-      ) : (
-        <section className="space-y-4">
-          {projectList.map(p => {
-            const myRole = p.team_members.find(m => m.invitation_status === 'accepted')?.role || 'Collaborator';
-            const statusLabel = STATUS_LABEL[p.status] ?? p.status;
-            const statusStyle = STATUS_STYLE[p.status] ?? 'bg-gray-100 text-gray-600';
-
-            return (
-              <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-6 hover:border-cobalt transition">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h3 className="text-lg font-bold text-gray-900">{p.title}</h3>
-                      <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusStyle}`}>{statusLabel}</span>
-                      {p.category && (
-                        <span className="px-2.5 py-1 text-xs bg-gray-100 text-gray-600 rounded-full capitalize">{p.category}</span>
-                      )}
-                    </div>
-                    {p.description && (
-                      <p className="text-sm text-gray-500 line-clamp-1 mb-2">{p.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-                      <span className="flex items-center gap-1.5">
-                        <i className="fa-solid fa-user text-cobalt text-xs"></i>
-                        Role: <span className="font-medium text-gray-900">{myRole}</span>
-                      </span>
-                      <span className="text-gray-300">·</span>
-                      <span className="flex items-center gap-1.5">
-                        <i className="fa-solid fa-users text-cobalt text-xs"></i>
-                        {p.team_members.length} team member{p.team_members.length !== 1 ? 's' : ''}
-                      </span>
-                      {p.location && (
-                        <>
-                          <span className="text-gray-300">·</span>
-                          <span className="flex items-center gap-1">
-                            <i className="fa-solid fa-location-dot text-gray-400 text-xs"></i>{p.location}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <Link href={`/creator/projects/${p.id}`}
-                    className="px-5 py-2.5 bg-cobalt text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition flex-shrink-0 ml-4">
-                    View Project
-                  </Link>
-                </div>
-
-                {/* Progress */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-                    <span>Progress</span>
-                    <span className="font-semibold text-gray-700">{p.progress_percentage}%</span>
-                  </div>
-                  <ProgressBar value={p.progress_percentage} />
-                </div>
-
-                {/* Tags */}
-                {p.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {p.tags.slice(0, 5).map(t => (
-                      <span key={t} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full">{t}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100 flex-wrap gap-3">
-                  <div className="flex items-center gap-2">
-                    {p.team_members.slice(0, 4).map((m, i) => (
-                      m.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img key={i} src={m.avatar_url} alt={m.username}
-                          className="w-7 h-7 rounded-full border-2 border-white -ml-1 first:ml-0 object-cover" />
-                      ) : (
-                        <div key={i} className="w-7 h-7 rounded-full border-2 border-white -ml-1 first:ml-0 bg-blue-100 flex items-center justify-center text-cobalt text-xs font-bold">
-                          {m.username[0]?.toUpperCase()}
-                        </div>
-                      )
-                    ))}
-                    {p.team_members.length > 4 && (
-                      <span className="text-xs text-gray-500 ml-1">+{p.team_members.length - 4} more</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    {p.updated_at && <span className="text-xs">Updated {formatRelative(p.updated_at)}</span>}
-                    {(p.budget_min || p.budget_max) && (
-                      <span className="font-semibold text-gray-900 text-sm">
-                        ${p.budget_min?.toLocaleString()}{p.budget_max ? `–$${p.budget_max.toLocaleString()}` : '+'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      )}
-
-      {!loading && !error && projectList.length > 0 && (
-        <section className="mt-8 bg-blue-50 rounded-xl border border-blue-100 p-5">
-          <div className="flex items-start gap-4">
-            <div className="w-9 h-9 bg-cobalt rounded-lg flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-lightbulb text-white text-sm"></i>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Quick Tip</h3>
-              <p className="text-sm text-gray-600">Click a project to manage milestones, messages, and deliverables.</p>
-            </div>
-          </div>
-        </section>
-      )}
-    </>
-  );
-}
-
-function ApplicationsView({
-  counts, tabs, activeTab, setActiveTab,
-  appList, filtered, loading, error,
-  withdrawing, onWithdraw,
-  deliverySentIds, onDeliver,
-  escrowByJob,
-}: {
-  counts: { total: number; submitted: number; shortlisted: number; accepted: number };
-  tabs: string[];
-  activeTab: string; setActiveTab: (v: string) => void;
-  appList: ProposalItem[];
-  filtered: ProposalItem[];
-  loading: boolean;
-  error: string | null;
-  withdrawing: string | null;
-  onWithdraw: (id: string) => void;
-  deliverySentIds: Set<string>;
-  onDeliver: (app: ProposalItem) => void;
-  escrowByJob: Record<string, EscrowListItem>;
-}) {
-  return (
-    <>
-      <div className="flex items-center justify-end mb-6">
-        <Link href="/creator/find-projects"
-          className="inline-flex items-center px-5 py-2.5 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
-          <i className="fa-solid fa-magnifying-glass mr-2"></i>Find More Work
-        </Link>
-      </div>
+      </section>
 
       {/* Stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         {[
-          { label: 'Total Applied',  value: counts.total,       icon: 'fa-paper-plane', bg: 'bg-blue-50',   iconColor: 'text-cobalt' },
-          { label: 'Under Review',   value: counts.submitted,   icon: 'fa-clock',       bg: 'bg-amber-50',  iconColor: 'text-amber-600' },
-          { label: 'Shortlisted',    value: counts.shortlisted, icon: 'fa-star',        bg: 'bg-purple-50', iconColor: 'text-purple-600' },
-          { label: 'Hired',          value: counts.accepted,    icon: 'fa-circle-check',bg: 'bg-emerald-50',iconColor: 'text-emerald-600' },
+          { label: 'Total Applied',  value: appCounts.total,       icon: 'fa-paper-plane',  bg: 'bg-blue-50',    iconColor: 'text-cobalt' },
+          { label: 'Under Review',   value: appCounts.submitted,   icon: 'fa-clock',        bg: 'bg-amber-50',   iconColor: 'text-amber-600' },
+          { label: 'Shortlisted',    value: appCounts.shortlisted, icon: 'fa-star',         bg: 'bg-purple-50',  iconColor: 'text-purple-600' },
+          { label: 'Hired',          value: appCounts.accepted,    icon: 'fa-circle-check', bg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
         ].map(({ label, value, icon, bg, iconColor }) => (
           <div key={label} className="bg-white rounded-2xl p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
@@ -550,25 +137,28 @@ function ApplicationsView({
         ))}
       </div>
 
-      {loading ? (
+      {/* Application list */}
+      {appLoading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
           <p className="text-gray-500 text-sm">Loading applications…</p>
         </div>
-      ) : error ? (
+      ) : appError ? (
         <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
           <i className="fa-solid fa-circle-exclamation text-4xl text-red-300 mb-4 block"></i>
-          <p className="text-red-500 text-sm">{error}</p>
+          <p className="text-red-500 text-sm">{appError}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          {/* Status tabs */}
-          <div className="flex items-center border-b border-gray-200 px-2 overflow-x-auto no-scrollbar">
-            {tabs.map(tab => {
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          {/* Status sub-tabs */}
+          <div className="flex items-center border-b border-gray-200 px-2 overflow-x-auto">
+            {APP_STATUS_TABS.map(tab => {
               const count = tab === 'All' ? appList.length : appList.filter(a => a.status === tab).length;
               return (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-4 text-sm font-semibold whitespace-nowrap transition ${activeTab === tab ? 'text-cobalt border-b-2 border-cobalt' : 'text-gray-500 hover:text-gray-900'}`}>
+                <button key={tab} onClick={() => setAppTab(tab)}
+                  className={`px-5 py-4 text-sm font-semibold whitespace-nowrap transition border-b-2 ${
+                    appTab === tab ? 'text-cobalt border-cobalt' : 'text-gray-500 border-transparent hover:text-gray-900'
+                  }`}>
                   {tab === 'All' ? 'All' : (APP_STATUS_LABEL[tab] ?? tab)}
                   {count > 0 && (
                     <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{count}</span>
@@ -578,96 +168,113 @@ function ApplicationsView({
             })}
           </div>
 
-          {filtered.length === 0 ? (
+          {filteredApps.length === 0 ? (
             <div className="p-20 text-center">
               <i className="fa-solid fa-inbox text-4xl text-gray-300 mb-4 block"></i>
               <h3 className="font-semibold text-gray-600 mb-2">No applications here</h3>
               <p className="text-gray-400 text-sm">
-                {appList.length === 0 ? 'Start applying to jobs to see them here.' : 'No applications match this filter.'}
+                {appList.length === 0
+                  ? 'Start applying to jobs to see them here.'
+                  : 'No applications match this filter.'}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {filtered.map(app => (
-                <div key={app.id} className="p-6 hover:bg-gray-50 transition">
-                  <div className="flex items-start justify-between gap-6 flex-wrap">
-                    <div className="flex items-start gap-4 flex-1 min-w-0">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <i className="fa-solid fa-clapperboard text-cobalt"></i>
+              {filteredApps.map(app => {
+                const esc = escrowByJob[app.job_id];
+                const isFunded = esc && esc.funded_amount > 0;
+                const isHired = app.status === 'accepted';
+
+                return (
+                  // ── Entire card is clickable → workspace ──────────────────
+                  <div
+                    key={app.id}
+                    onClick={() => router.push(`/creator/workspace/${app.id}`)}
+                    className="p-6 hover:bg-gray-50 cursor-pointer transition group"
+                  >
+                    <div className="flex items-start gap-4 flex-wrap">
+                      {/* Icon */}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition ${
+                        isHired ? 'bg-gradient-to-br from-emerald-100 to-teal-100' : 'bg-gradient-to-br from-blue-100 to-purple-100'
+                      }`}>
+                        <i className={`fa-solid fa-clapperboard ${isHired ? 'text-emerald-600' : 'text-cobalt'}`}></i>
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="text-lg font-bold text-gray-900 mb-0.5">{app.job_title}</h3>
-                        <p className="text-sm text-gray-500 mb-2">
-                          {app.job_department}
-                          {app.proposed_budget ? ` · Proposed $${app.proposed_budget.toLocaleString()}` : ''}
-                          {app.role ? ` · ${app.role}` : ''}
-                        </p>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1 flex-wrap">
+                          <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition">{app.job_title}</h3>
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {APP_STATUS_LABEL[app.status] ?? app.status}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap mb-2">
+                          {app.job_department && <span>{app.job_department}</span>}
+                          {app.proposed_budget && (
+                            <><span className="text-gray-300">·</span>
+                            <span>Proposed ${app.proposed_budget.toLocaleString()}</span></>
+                          )}
+                          {app.role && (
+                            <><span className="text-gray-300">·</span>
+                            <span>{app.role}</span></>
+                          )}
+                        </div>
+
                         {app.cover_letter && (
-                          <p className="text-sm text-gray-400 line-clamp-1 italic">&ldquo;{app.cover_letter}&rdquo;</p>
+                          <p className="text-sm text-gray-400 line-clamp-1 italic mb-2">&ldquo;{app.cover_letter}&rdquo;</p>
                         )}
-                        <div className="flex items-center gap-3 text-xs text-gray-400 mt-2">
+
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
                           <span><i className="fa-regular fa-calendar mr-1"></i>Applied {formatDate(app.submitted_at)}</span>
-                          <span>·</span>
+                          <span className="text-gray-300">·</span>
                           <span>{formatRelative(app.submitted_at)}</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end">
-                      <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {APP_STATUS_LABEL[app.status] ?? app.status}
-                      </span>
-                      {/* Hired: show escrow status + actions */}
-                      {app.status === 'accepted' && (
-                        <>
-                          {/* Prominent Funds Secured indicator */}
-                          {escrowByJob[app.job_id] && escrowByJob[app.job_id].funded_amount > 0 ? (
-                            <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm">
-                              <i className="fa-solid fa-shield-halved text-base"></i>
-                              <div>
-                                <p className="text-xs font-bold leading-none">Funds Secured</p>
-                                <p className="text-[10px] text-emerald-100 mt-0.5">${escrowByJob[app.job_id].funded_amount.toLocaleString()} in escrow</p>
+                      {/* Right side — escrow status + actions */}
+                      <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end" onClick={e => e.stopPropagation()}>
+                        {isHired && (
+                          <>
+                            {isFunded ? (
+                              <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm">
+                                <i className="fa-solid fa-shield-halved text-base"></i>
+                                <div>
+                                  <p className="text-xs font-bold leading-none">Funds Secured</p>
+                                  <p className="text-[10px] text-emerald-100 mt-0.5">${esc!.funded_amount.toLocaleString()} in escrow</p>
+                                </div>
                               </div>
-                            </div>
-                          ) : escrowByJob[app.job_id] ? (
-                            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-                              <i className="fa-solid fa-clock"></i> Awaiting Funding
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl">
-                              <i className="fa-solid fa-hourglass-half"></i> Not Yet Funded
-                            </span>
-                          )}
-                          <Link
-                            href={`/creator/projects/${app.job_id}/plan`}
-                            className="px-3 py-1.5 text-xs font-semibold text-cobalt bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition flex items-center gap-1.5">
-                            <i className="fa-solid fa-calendar-days"></i> Plan Timeline
-                          </Link>
-                          {deliverySentIds.has(app.id) ? (
-                            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg">
-                              <i className="fa-solid fa-circle-check"></i> Delivery sent
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => onDeliver(app)}
-                              className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition flex items-center gap-1.5">
-                              <i className="fa-solid fa-box-open"></i> Submit Delivery
-                            </button>
-                          )}
-                        </>
-                      )}
-                      {['submitted', 'shortlisted', 'interviewing'].includes(app.status) && (
-                        <button
-                          onClick={() => onWithdraw(app.id)}
-                          disabled={withdrawing === app.id}
-                          className="px-3 py-1.5 text-xs font-semibold text-red-500 border border-red-100 rounded-lg hover:bg-red-50 transition disabled:opacity-50">
-                          {withdrawing === app.id ? 'Withdrawing…' : 'Withdraw'}
-                        </button>
-                      )}
+                            ) : esc ? (
+                              <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+                                <i className="fa-solid fa-clock"></i> Awaiting Funding
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-100 px-3 py-2 rounded-xl">
+                                <i className="fa-solid fa-hourglass-half"></i> Not Yet Funded
+                              </span>
+                            )}
+                          </>
+                        )}
+
+                        {/* Withdraw (non-hired) */}
+                        {['submitted', 'shortlisted', 'interviewing'].includes(app.status) && (
+                          <button
+                            onClick={(e) => handleWithdraw(app.id, e)}
+                            disabled={withdrawing === app.id}
+                            className="px-3 py-1.5 text-xs font-semibold text-red-500 border border-red-100 rounded-lg hover:bg-red-50 transition disabled:opacity-50">
+                            {withdrawing === app.id ? 'Withdrawing…' : 'Withdraw'}
+                          </button>
+                        )}
+
+                        {/* Open workspace arrow */}
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-cobalt group-hover:text-white transition text-gray-400">
+                          <i className="fa-solid fa-arrow-right text-xs"></i>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -24,7 +24,7 @@ PATCH /disputes/{dispute_id}/resolve [Admin] – admin resolves
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.schema import User
 from app.auth.auth import get_current_user, get_admin_user
@@ -580,6 +580,23 @@ async def resolve_dispute(
 
 # ── Milestone delivery status endpoints ─────────────────────────────────────
 
+class DeliverMilestoneRequest(BaseModel):
+    google_drive_link: str = Field(..., description="Google Drive link to deliverables (required)")
+    delivery_notes: Optional[str] = Field(None, description="Optional notes to the client")
+
+
+def _validate_google_drive_link(link: str) -> bool:
+    """Return True if the link looks like a valid Google Drive / Google Docs URL."""
+    import re
+    patterns = [
+        r"^https://drive\.google\.com/",
+        r"^https://docs\.google\.com/",
+        r"^https://sheets\.google\.com/",
+        r"^https://slides\.google\.com/",
+    ]
+    return any(re.match(p, link.strip()) for p in patterns)
+
+
 @escrow_router.post(
     "/{escrow_id}/milestone/{milestone_id}/deliver",
     summary="Creator marks milestone as delivered",
@@ -587,11 +604,28 @@ async def resolve_dispute(
 async def deliver_milestone(
     escrow_id: str,
     milestone_id: str,
+    body: DeliverMilestoneRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Creator marks a funded milestone as delivered (awaiting client review)."""
+    """Creator marks a funded milestone as delivered.
+    A valid Google Drive link is **required** — submission is blocked without it.
+    """
     from app.models.escrow import Escrow as EscrowDoc
     from beanie import PydanticObjectId
+    from datetime import datetime
+
+    # Validate Google Drive link before touching the DB
+    if not body.google_drive_link or not body.google_drive_link.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="A Google Drive link is required to submit delivery. Please upload your work to Google Drive and share the link."
+        )
+    if not _validate_google_drive_link(body.google_drive_link):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Google Drive link. The link must start with https://drive.google.com/ or https://docs.google.com/"
+        )
+
     esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
     if not esc:
         raise HTTPException(status_code=404, detail="Escrow not found")
@@ -602,7 +636,11 @@ async def deliver_milestone(
         raise HTTPException(status_code=404, detail="Milestone not found")
     if milestone.status not in ("funded", "revision_requested"):
         raise HTTPException(status_code=400, detail=f"Cannot deliver a milestone with status '{milestone.status}'")
+
     milestone.status = "delivered"
+    milestone.google_drive_link = body.google_drive_link.strip()
+    milestone.delivery_notes = body.delivery_notes
+    milestone.delivered_at = datetime.utcnow()
     await esc.save()
 
     # Check if ALL milestones are now delivered/approved/released → job status = "delivered"

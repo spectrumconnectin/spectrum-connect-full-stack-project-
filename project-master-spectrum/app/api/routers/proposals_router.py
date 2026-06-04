@@ -147,6 +147,112 @@ async def get_my_proposals(
 
 
 @router.get(
+    "/{proposal_id}/detail",
+    summary="Get a single proposal by ID (creator or client)",
+)
+async def get_proposal_detail(
+    proposal_id: str = Path(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch a single proposal/application with full job + escrow context.
+    Used by the creator workspace page.
+    """
+    from beanie import PydanticObjectId
+    from app.models.escrow import Escrow as EscrowDoc
+
+    try:
+        app = await Application.get(PydanticObjectId(proposal_id))
+    except Exception:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    if not app:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    # Only the creator or the client can view
+    if str(app.crew_id) != str(current_user.id):
+        job_check = await JobPost.get(app.project_id)
+        if not job_check or str(job_check.client_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorised")
+
+    job = await JobPost.get(app.project_id)
+
+    # Get escrow for this job (if any)
+    escrow = None
+    try:
+        escs = await EscrowDoc.find(EscrowDoc.job_post_id == app.project_id).to_list()
+        # prefer the one belonging to this creator
+        for e in escs:
+            if str(e.creator_id) == str(app.crew_id):
+                escrow = e
+                break
+        if escrow is None and escs:
+            escrow = escs[0]
+    except Exception:
+        pass
+
+    # Client info
+    client_info = None
+    if job:
+        try:
+            client = await User.get(job.client_id)
+            if client:
+                client_info = {
+                    "id": str(client.id),
+                    "username": client.username,
+                    "display_name": client.profile.display_name if client.profile else None,
+                    "avatar": client.profile.profile_picture if client.profile else None,
+                }
+        except Exception:
+            pass
+
+    # Build escrow summary
+    escrow_data = None
+    if escrow:
+        escrow_data = {
+            "escrow_id": str(escrow.id),
+            "status": escrow.status,
+            "total_amount": float(escrow.total_amount or 0),
+            "funded_amount": float(escrow.funded_amount or 0),
+            "released_amount": float(escrow.released_amount or 0),
+            "milestones": [
+                {
+                    "milestone_id": m.milestone_id,
+                    "title": m.title,
+                    "amount": float(m.amount),
+                    "status": m.status,
+                    "google_drive_link": m.google_drive_link,
+                    "delivery_notes": m.delivery_notes,
+                    "delivered_at": m.delivered_at.isoformat() if m.delivered_at else None,
+                    "funded_at": m.funded_at.isoformat() if m.funded_at else None,
+                    "released_at": m.released_at.isoformat() if m.released_at else None,
+                }
+                for m in escrow.milestones
+            ],
+        }
+
+    return {
+        "id": str(app.id),
+        "job_id": str(app.project_id),
+        "job_title": job.title if job else "Unknown",
+        "job_description": job.description if job else None,
+        "job_department": job.department if job else "",
+        "job_status": job.status if job else "",
+        "job_budget_min": job.budget_min if job else None,
+        "job_budget_max": job.budget_max if job else None,
+        "job_location": job.location if job else None,
+        "job_skills": job.required_skills if job else [],
+        "job_deadline": job.deadline.isoformat() if job and job.deadline else None,
+        "client_id": str(job.client_id) if job else None,
+        "client": client_info,
+        "cover_letter": app.cover_letter,
+        "proposed_budget": app.proposed_budget,
+        "role": app.role,
+        "status": app.status,
+        "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
+        "escrow": escrow_data,
+    }
+
+
+@router.get(
     "/job/{job_id}",
     summary="Get all proposals for a job (client/owner)",
 )

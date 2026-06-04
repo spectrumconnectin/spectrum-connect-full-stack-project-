@@ -923,6 +923,35 @@ export interface JobProposalItem {
   submitted_at?: string;
 }
 
+export interface ProposalDetail {
+  id: string;
+  job_id: string;
+  job_title: string;
+  job_description?: string;
+  job_department: string;
+  job_status: string;
+  job_budget_min?: number;
+  job_budget_max?: number;
+  job_location?: string;
+  job_skills?: string[];
+  job_deadline?: string;
+  client_id?: string;
+  client?: { id: string; username: string; display_name?: string; avatar?: string };
+  cover_letter: string;
+  proposed_budget?: number;
+  role?: string;
+  status: string;
+  submitted_at?: string;
+  escrow?: {
+    escrow_id: string;
+    status: string;
+    total_amount: number;
+    funded_amount: number;
+    released_amount: number;
+    milestones: EscrowMilestone[];
+  };
+}
+
 export interface ProposalSubmitPayload {
   cover_letter: string;
   proposed_budget?: number;
@@ -936,6 +965,9 @@ export const proposals = {
 
   getMe: (): Promise<ProposalItem[]> =>
     request<ProposalItem[]>('/proposals/me'),
+
+  getDetail: (proposalId: string): Promise<ProposalDetail> =>
+    request<ProposalDetail>(`/proposals/${proposalId}/detail`),
 
   getForJob: (jobId: string): Promise<JobProposalItem[]> =>
     request<JobProposalItem[]>(`/proposals/job/${jobId}`),
@@ -983,12 +1015,16 @@ export interface EscrowMilestone {
   milestone_id: string;
   title: string;
   amount: number;
-  status: string; // pending | funded | released | disputed | refunded
+  status: string; // pending | funded | delivered | revision_requested | approved | released | disputed | refunded
   funded_at?: string;
+  delivered_at?: string;
   released_at?: string;
   refunded_at?: string;
   release_transaction_id?: string;
   deadline_id?: string;
+  /** Delivery fields set by creator when submitting work */
+  google_drive_link?: string;
+  delivery_notes?: string;
   /** Per-milestone fee breakdown (v1 8/4 commission). */
   fees?: CommissionBreakdown;
 }
@@ -1089,8 +1125,8 @@ export const escrow = {
       body: JSON.stringify({ milestone_id: milestoneId }),
     }),
 
-  deliverMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
-    request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST' }),
+  deliverMilestone: (escrowId: string, milestoneId: string, data: { google_drive_link: string; delivery_notes?: string }): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST', body: JSON.stringify(data) }),
 
   approveMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
     request(`/escrow/${escrowId}/milestone/${milestoneId}/approve`, { method: 'POST' }),

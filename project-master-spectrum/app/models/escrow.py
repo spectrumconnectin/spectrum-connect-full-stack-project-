@@ -60,6 +60,11 @@ class EscrowMilestone(BaseModel):
     released_at: Optional[datetime] = None
     refunded_at: Optional[datetime] = None
 
+    # Delivery details — set when creator calls deliver_milestone
+    google_drive_link: Optional[str] = None   # REQUIRED when submitting delivery
+    delivery_notes:    Optional[str] = None   # optional message from creator
+    delivered_at:      Optional[datetime] = None
+
     # Optional link to a ProjectDeadline document
     deadline_id: Optional[str] = None
 
