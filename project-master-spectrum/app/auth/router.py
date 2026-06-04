@@ -282,15 +282,26 @@ async def login_for_access_token(
             detail="Incorrect username or email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"message": "Please verify your email before logging in", "email": user.email}
         )
-    
+
+    user.last_login = datetime.utcnow()
+    await user.save()
+
     access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "id": str(user.id),
+        "user_role": user.user_role,
+        "is_admin": user.user_role in {"admin", "moderator"},
+        "account_type": user.account_type,
+        "username": user.username,
+    }
 
 @router.get("/google_callback")
 async def google_callback(code: str, state: str | None = None):

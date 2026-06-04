@@ -281,8 +281,11 @@ class User(Document):
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None
-    deleted_at: Optional[datetime] = None # Soft delete
+    deleted_at: Optional[datetime] = None   # Soft delete (GDPR erasure)
+    is_active: bool = True                  # False = suspended
+    suspended_at: Optional[datetime] = None # Set when admin suspends account
     spectrum_id: Optional[SpectrumID] = Field(default_factory=SpectrumID)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "users"

@@ -75,12 +75,25 @@ async def get_current_user_optional(token: str = Depends(oauth2_scheme)):
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
     """
-    Dependency that ensures the current user has admin or moderator role.
-    Used to protect all /admin/* endpoints.
+    Allows both admin and moderator roles.
+    Used for read and standard moderation endpoints.
     """
     if current_user.user_role not in {"admin", "moderator"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required.",
+        )
+    return current_user
+
+
+async def get_superadmin_user(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Allows admin role only — moderators are blocked.
+    Used for sensitive actions: role changes, bulk deletes, refunds.
+    """
+    if current_user.user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action requires full admin privileges.",
         )
     return current_user
