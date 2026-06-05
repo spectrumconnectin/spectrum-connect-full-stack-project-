@@ -721,6 +721,8 @@ export interface PublicProfile {
     profile_views?: number;
     total_connections?: number;
     completed_credits?: number;
+    client_satisfaction?: number;
+    total_earnings?: number;
   };
   completed_projects?: number;
 }

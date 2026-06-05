@@ -84,8 +84,6 @@ def _skill_set(user: User) -> set[str]:
 
 @router.get("", response_model=CreatorDashboardResponse)
 async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
-    # Stats
-    stats = current_user.stats or {}
     name = (
         (current_user.profile.display_name if current_user.profile else None)
         or (
@@ -95,13 +93,75 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
         )
         or current_user.username
     )
+
+    # ── Compute stats live from real data ────────────────────────────────────
+    active_projects_count = 0
+    projects_completed_count = 0
+    total_earnings = 0.0
+
+    try:
+        # All accepted applications for this creator
+        all_apps = await Application.find(
+            {"crew_id": current_user.id, "status": "accepted"}
+        ).to_list()
+
+        for app in all_apps:
+            if not app.project_id:
+                continue
+            try:
+                job = await JobPost.get(app.project_id)
+                if not job:
+                    continue
+                if job.status == "completed":
+                    projects_completed_count += 1
+                elif job.status in ("in_progress", "delivered", "approved", "pending_funding"):
+                    active_projects_count += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        from app.models.schema import Transaction as TxModel
+        txns = await TxModel.find({
+            "recipient_id": current_user.id,
+            "status": "completed",
+        }).to_list()
+        total_earnings = round(sum(float(t.net_amount or t.amount or 0) for t in txns), 2)
+    except Exception:
+        total_earnings = 0.0
+
+    # client_satisfaction comes from User.rating (updated on every review)
+    satisfaction = getattr(current_user, "rating", None) or 0.0
+    # Convert 0–5 star rating to a 0–100% value for the UI
+    satisfaction_pct = round(satisfaction * 20, 1) if satisfaction else 0.0
+
+    # response_time is stored on user.stats if set
+    response_time_h = 0
+    if current_user.stats and getattr(current_user.stats, "response_time", None):
+        response_time_h = current_user.stats.response_time
+
+    # Persist computed stats back to user.stats so other views (public profile) also benefit
+    try:
+        from app.models.schema import UserStats
+        if not current_user.stats:
+            current_user.stats = UserStats()
+        current_user.stats.active_projects = active_projects_count
+        current_user.stats.projects_completed = projects_completed_count
+        current_user.stats.completed_credits = projects_completed_count
+        current_user.stats.total_earnings = total_earnings
+        current_user.stats.client_satisfaction = satisfaction_pct
+        await current_user.save()
+    except Exception:
+        pass
+
     dashboard_stats = DashboardStats(
         name=name,
-        total_earnings=stats.total_earnings if hasattr(stats, "total_earnings") else 0,
-        active_projects=stats.active_projects if hasattr(stats, "active_projects") else 0,
-        projects_completed=getattr(stats, "projects_completed", 0),
-        client_satisfaction=getattr(stats, "client_satisfaction", 0),
-        response_time_hours=stats.response_time if hasattr(stats, "response_time") else 0,
+        total_earnings=total_earnings,
+        active_projects=active_projects_count,
+        projects_completed=projects_completed_count,
+        client_satisfaction=satisfaction_pct if satisfaction_pct else None,
+        response_time_hours=response_time_h,
     )
 
     # Opportunities (simple match using overlap of skills with open jobs)

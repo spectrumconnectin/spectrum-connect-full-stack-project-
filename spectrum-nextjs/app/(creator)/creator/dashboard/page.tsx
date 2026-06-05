@@ -76,17 +76,44 @@ export default function CreatorDashboardPage() {
       {/* Stats strip */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {[
-          { label: 'Total Earnings', value: `$${(stats?.total_earnings ?? 0).toLocaleString()}`, icon: 'fa-wallet', color: 'bg-green-100 text-green-600' },
-          { label: 'Active Projects', value: String(stats?.active_projects ?? 0), icon: 'fa-briefcase', color: 'bg-blue-100 text-cobalt' },
-          { label: 'Completed', value: String(stats?.projects_completed ?? 0), icon: 'fa-check-circle', color: 'bg-purple-100 text-purple-600' },
-          { label: 'Satisfaction', value: stats?.client_satisfaction ? `${stats.client_satisfaction}%` : '—', icon: 'fa-star', color: 'bg-amber-100 text-amber-600' },
+          {
+            label: 'Total Earnings',
+            value: `$${(stats?.total_earnings ?? 0).toLocaleString()}`,
+            sub: stats?.total_earnings ? 'after platform fees' : 'No payouts yet',
+            icon: 'fa-wallet',
+            color: 'bg-green-100 text-green-600',
+          },
+          {
+            label: 'Active Projects',
+            value: String(stats?.active_projects ?? 0),
+            sub: stats?.active_projects ? `project${(stats.active_projects ?? 0) !== 1 ? 's' : ''} in progress` : 'None active',
+            icon: 'fa-briefcase',
+            color: 'bg-blue-100 text-cobalt',
+          },
+          {
+            label: 'Completed',
+            value: String(stats?.projects_completed ?? 0),
+            sub: stats?.projects_completed ? `project${(stats.projects_completed ?? 0) !== 1 ? 's' : ''} delivered` : 'None yet',
+            icon: 'fa-circle-check',
+            color: 'bg-purple-100 text-purple-600',
+          },
+          {
+            label: 'Satisfaction',
+            value: stats?.client_satisfaction
+              ? `${stats.client_satisfaction.toFixed(0)}%`
+              : '—',
+            sub: stats?.client_satisfaction ? 'client rating' : 'No reviews yet',
+            icon: 'fa-star',
+            color: 'bg-amber-100 text-amber-600',
+          },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
             <div className={`w-12 h-12 ${s.color} rounded-xl flex items-center justify-center mb-4`}>
               <i className={`fa-solid ${s.icon} text-xl`} />
             </div>
             <div className="text-3xl font-bold text-gray-900 mb-1">{s.value}</div>
-            <div className="text-sm text-gray-500">{s.label}</div>
+            <div className="text-sm font-medium text-gray-600">{s.label}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
           </div>
         ))}
       </section>

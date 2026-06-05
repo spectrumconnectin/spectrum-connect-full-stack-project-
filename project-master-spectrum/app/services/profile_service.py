@@ -229,22 +229,66 @@ class ProfileService:
 
             public_data["profile"] = profile_data
 
+        # ── Compute live stats from real data ────────────────────────────────
+        active_projects_count = 0
+        projects_completed_count = 0
+        try:
+            from app.models.schema import Application, JobPost
+            apps = await Application.find(
+                {"crew_id": user.id, "status": "accepted"}
+            ).to_list()
+            for app in apps:
+                if not app.project_id:
+                    continue
+                try:
+                    job = await JobPost.get(app.project_id)
+                    if not job:
+                        continue
+                    if job.status == "completed":
+                        projects_completed_count += 1
+                    elif job.status in ("in_progress", "delivered", "approved", "pending_funding"):
+                        active_projects_count += 1
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Use pre-computed values if live calc returns 0 (e.g. rare edge cases)
+        if projects_completed_count == 0 and user.stats:
+            projects_completed_count = user.stats.completed_credits or user.stats.projects_completed or 0
+
+        # Persist back so other surfaces see fresh data
+        try:
+            if not user.stats:
+                from app.models.schema import UserStats
+                user.stats = UserStats()
+            user.stats.active_projects = active_projects_count
+            user.stats.completed_credits = projects_completed_count
+            user.stats.projects_completed = projects_completed_count
+            user.stats.client_satisfaction = round((getattr(user, "rating", 0) or 0) * 20, 1)
+            await user.save()
+        except Exception:
+            pass
+
+        # Override completed_projects in public_data with live value
+        public_data["completed_projects"] = projects_completed_count
+
         # Add stats (respecting privacy)
-        if user.stats:
-            stats_data = {
-                "total_credits": user.stats.total_credits,
-                "completed_credits": user.stats.completed_credits,
-                "success_rate": user.stats.success_rate,
-                "response_time": user.stats.response_time,
-                "profile_views": user.stats.profile_views,
-                "total_connections": user.stats.total_connections,
-            }
+        stats_data = {
+            "active_projects": active_projects_count,
+            "completed_credits": projects_completed_count,
+            "success_rate": (user.stats.success_rate if user.stats else None) or 0,
+            "response_time": (user.stats.response_time if user.stats else None) or 0,
+            "profile_views": (user.stats.profile_views if user.stats else None) or 0,
+            "total_connections": (user.stats.total_connections if user.stats else None) or 0,
+            "client_satisfaction": round((getattr(user, "rating", 0) or 0) * 20, 1),
+        }
 
-            # Show earnings only if user allows
-            if user.settings and user.settings.show_earnings:
-                stats_data["total_earnings"] = user.stats.total_earnings
+        # Show earnings only if user allows
+        if user.settings and user.settings.show_earnings:
+            stats_data["total_earnings"] = user.stats.total_earnings if user.stats else 0
 
-            public_data["stats"] = stats_data
+        public_data["stats"] = stats_data
 
         return public_data
 

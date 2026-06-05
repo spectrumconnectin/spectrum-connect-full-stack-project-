@@ -507,10 +507,10 @@ export default function CollaboratorProfilePage() {
             </div>
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
               {[
-                { label: 'Completed', value: completedProjects > 0 ? `${completedProjects} projects` : '—', icon: 'fa-check-circle', color: 'text-emerald-600' },
-                { label: 'Success rate', value: stats?.success_rate ? `${stats.success_rate.toFixed(0)}%` : '—', icon: 'fa-chart-line', color: 'text-cobalt' },
-                { label: 'Response', value: stats?.response_time ? `~${stats.response_time}h` : '—', icon: 'fa-clock', color: 'text-amber-600' },
-                { label: 'Active now', value: stats?.active_projects != null ? `${stats.active_projects}` : '—', icon: 'fa-briefcase', color: 'text-purple-600' },
+                { label: 'Completed', value: completedProjects > 0 ? String(completedProjects) : '0', icon: 'fa-circle-check', color: 'text-emerald-600' },
+                { label: 'Satisfaction', value: stats?.client_satisfaction ? `${stats.client_satisfaction.toFixed(0)}%` : (creator.rating ? `${(creator.rating * 20).toFixed(0)}%` : '—'), icon: 'fa-star', color: 'text-amber-500' },
+                { label: 'Response time', value: stats?.response_time && stats.response_time > 0 ? `~${stats.response_time}h` : '—', icon: 'fa-clock', color: 'text-cobalt' },
+                { label: 'Active projects', value: stats?.active_projects != null ? String(stats.active_projects) : '0', icon: 'fa-briefcase', color: 'text-purple-600' },
               ].map(({ label, value, icon, color }) => (
                 <div key={label} className="text-center p-2.5 bg-gray-50 rounded-xl">
                   <i className={`fa-solid ${icon} ${color} text-lg mb-1 block`}></i>
