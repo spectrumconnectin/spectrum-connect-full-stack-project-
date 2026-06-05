@@ -162,8 +162,9 @@ export default function DeliveryReviewPage() {
       setDelivery(deliveryData);
 
       // Get hired creator info
-      const appList = await proposals.getForJob(jobId);
-      const accepted = appList.find(a => a.status === 'accepted');
+      const appData = await proposals.getForJob(jobId);
+      const appList = appData?.proposals ?? (Array.isArray(appData) ? appData : []);
+      const accepted = appList.find((a: { status: string }) => a.status === 'accepted');
       if (accepted) setHiredCreator(accepted);
     } catch (e) {
       setError((e as Error).message);

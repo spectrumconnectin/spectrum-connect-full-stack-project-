@@ -357,7 +357,8 @@ class JobService:
 
     @staticmethod
     async def delete_job(job: JobPost, user: User):
-        """Delete job post (owner only, only if draft or no proposals)"""
+        """Delete job post (owner only, only if draft or no proposals).
+        Cascades to orphaned Applications and Conversations."""
         # Verify ownership
         if job.client_id != user.id:
             raise HTTPException(
@@ -366,11 +367,23 @@ class JobService:
             )
 
         # Can only delete draft jobs or jobs with no proposals
-        if job.status != 'draft' and job.proposal_count > 0:
+        if job.status != 'draft' and (job.proposal_count or 0) > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete job post with proposals. Cancel it instead."
             )
+
+        # Cascade: remove orphaned applications and conversations
+        try:
+            from app.models.schema import Application
+            await Application.find({"project_id": job.id}).delete()
+        except Exception:
+            pass
+        try:
+            from app.models.message import Conversation
+            await Conversation.find({"job_id": str(job.id)}).delete()
+        except Exception:
+            pass
 
         await job.delete()
 

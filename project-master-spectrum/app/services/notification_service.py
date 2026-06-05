@@ -43,6 +43,9 @@ async def _get_user_name(user_id: str) -> tuple[str, Optional[str]]:
         return "Someone", None
 
 
+_DEDUP_WINDOW_SECONDS = 300  # 5 minutes — identical notifications within this window are collapsed
+
+
 async def send(
     *,
     user_id: str,
@@ -56,18 +59,49 @@ async def send(
     actor_name: Optional[str] = None,
     actor_image: Optional[str] = None,
 ) -> None:
-    """Create and insert a single Notification document. Never raises."""
+    """Create and insert a single Notification document.
+    Deduplicates: if an identical (user, type, actor) notification was inserted
+    within the last 5 minutes, the count is incremented instead of a new doc created.
+    Never raises.
+    """
     try:
+        from datetime import datetime, timedelta
         from app.models.schema import Notification, NotificationChannels
+        from beanie import PydanticObjectId as _OID
+
+        uid = _OID(user_id)
+        aid = _OID(actor_id) if actor_id else None
+        window_start = datetime.utcnow() - timedelta(seconds=_DEDUP_WINDOW_SECONDS)
+
+        # Check for a recent duplicate
+        existing = await Notification.find_one({
+            "user_id": uid,
+            "type": type,
+            "actor_id": aid,
+            "is_read": False,
+            "created_at": {"$gte": window_start},
+        })
+
+        if existing:
+            # Collapse: increment count and refresh the title so the badge shows e.g. "(3 new)"
+            count = (getattr(existing, "count", None) or 1) + 1
+            await existing.update({"$set": {
+                "count": count,
+                "title": title,   # refresh with latest
+                "message": message,
+                "created_at": datetime.utcnow(),  # bump so it stays within window
+            }})
+            return
+
         notif = Notification(
-            user_id=PydanticObjectId(user_id),
+            user_id=uid,
             type=type,
             category=category,
             title=title,
             message=message,
             action_url=action_url,
             action_text=action_text,
-            actor_id=PydanticObjectId(actor_id) if actor_id else None,
+            actor_id=aid,
             actor_name=actor_name,
             actor_image=actor_image,
             is_read=False,

@@ -993,8 +993,10 @@ export const proposals = {
   getDetail: (proposalId: string): Promise<ProposalDetail> =>
     request<ProposalDetail>(`/proposals/${proposalId}/detail`),
 
-  getForJob: (jobId: string): Promise<JobProposalItem[]> =>
-    request<JobProposalItem[]>(`/proposals/job/${jobId}`),
+  getForJob: (jobId: string, params?: { limit?: number; skip?: number; sort_by?: string }): Promise<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }> =>
+    request<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }>(
+      `/proposals/job/${jobId}${buildQS(params as Record<string, string | number | undefined> || {})}`
+    ),
 
   updateStatus: (proposalId: string, status: string): Promise<{ id: string; status: string }> =>
     request(`/proposals/${proposalId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),

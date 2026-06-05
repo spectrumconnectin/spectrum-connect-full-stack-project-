@@ -8,7 +8,7 @@ Model used: Application (schema.py)
   - status      : submitted | shortlisted | interviewing | accepted | rejected | withdrawn
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Path
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from bson import ObjectId
@@ -94,11 +94,11 @@ async def submit_proposal(
     )
     await app.insert()
 
-    # increment proposal count and move job to in_review
-    job.proposal_count = (job.proposal_count or 0) + 1
+    # Atomically increment proposal count to avoid race conditions under high load.
+    # Also flip status to in_review if the job is still open.
+    await job.update({"$inc": {"proposal_count": 1}})
     if job.status == "open":
-        job.status = "in_review"
-    await job.save()
+        await job.update({"$set": {"status": "in_review"}})
 
     # Notify the client that a new application arrived
     try:
@@ -258,10 +258,13 @@ async def get_proposal_detail(
 
 @router.get(
     "/job/{job_id}",
-    summary="Get all proposals for a job (client/owner)",
+    summary="Get proposals for a job (client/owner) — paginated",
 )
 async def get_job_proposals(
     job_id: str = Path(...),
+    limit: int = Query(default=50, ge=1, le=200),
+    skip: int = Query(default=0, ge=0),
+    sort_by: str = Query(default="newest", description="newest | price_asc | price_desc"),
     current_user: User = Depends(get_current_user),
 ):
     job = await JobPost.get(_oid(job_id))
@@ -270,11 +273,16 @@ async def get_job_proposals(
     if str(job.client_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorised")
 
-    apps = (
-        await Application.find(Application.project_id == _oid(job_id))
-        .sort(-Application.submitted_at)
-        .to_list()
-    )
+    query = Application.find(Application.project_id == _oid(job_id))
+    if sort_by == "price_asc":
+        query = query.sort(+Application.proposed_budget)
+    elif sort_by == "price_desc":
+        query = query.sort(-Application.proposed_budget)
+    else:
+        query = query.sort(-Application.submitted_at)
+
+    total = await Application.find(Application.project_id == _oid(job_id)).count()
+    apps = await query.skip(skip).limit(limit).to_list()
 
     results = []
     for app in apps:
@@ -305,13 +313,15 @@ async def get_job_proposals(
             "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
         })
 
-    # Mark unviewed as viewed
-    for app in apps:
-        if not app.client_viewed:
-            app.client_viewed = True
-            await app.save()
+    # Mark unviewed as viewed (batch update to avoid N+1 saves)
+    unviewed_ids = [app.id for app in apps if not app.client_viewed]
+    if unviewed_ids:
+        from beanie.operators import In as BIn
+        await Application.find({"_id": {"$in": unviewed_ids}}).update(
+            {"$set": {"client_viewed": True}}
+        )
 
-    return results
+    return {"proposals": results, "total": total, "skip": skip, "limit": limit}
 
 
 @router.patch(
@@ -473,6 +483,9 @@ async def rate_proposal(
 
     # ── Creator rates client ──────────────────────────────────────────────────
     if is_creator:
+        # Block duplicate reviews — each party can only review once per project
+        if getattr(app, "creator_rating_of_client", None):
+            raise HTTPException(status_code=409, detail="You have already submitted a review for this project")
         if not data.ratings:
             raise HTTPException(status_code=400, detail="At least one rating is required")
         overall = round(sum(data.ratings.values()) / len(data.ratings), 2)
@@ -509,6 +522,10 @@ async def rate_proposal(
         except Exception:
             pass
         return {"success": True, "reviewer": "creator", "overall": overall}
+
+    # Block duplicate reviews from client
+    if getattr(app, "client_rating", None):
+        raise HTTPException(status_code=409, detail="You have already submitted a review for this project")
 
     if not data.ratings:
         raise HTTPException(status_code=400, detail="At least one rating is required")
@@ -759,9 +776,7 @@ async def direct_hire(
     )
     await app.insert()
 
-    job.proposal_count = (job.proposal_count or 0) + 1
-    job.status = "pending_funding"
-    await job.save()
+    await job.update({"$inc": {"proposal_count": 1}, "$set": {"status": "pending_funding"}})
 
     # Notify creator
     try:

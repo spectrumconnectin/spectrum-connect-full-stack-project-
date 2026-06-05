@@ -45,7 +45,8 @@ export default function ReviewPage() {
     ]).then(([jobRes, propRes]) => {
       if (jobRes.status === 'fulfilled') setJob(jobRes.value);
       if (propRes.status === 'fulfilled') {
-        const accepted = propRes.value.find(p => p.status === 'accepted') ?? propRes.value[0] ?? null;
+        const list = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
+        const accepted = list.find((p: { status: string }) => p.status === 'accepted') ?? list[0] ?? null;
         setCreator(accepted);
       }
     }).finally(() => setLoadingData(false));

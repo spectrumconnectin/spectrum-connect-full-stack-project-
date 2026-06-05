@@ -50,7 +50,7 @@ export default function ApplicantsPage() {
       profileApi.getMe(),
     ])
       .then(([data, me]) => {
-        setApplicants(data || []);
+        setApplicants((data?.proposals ?? data ?? []) as JobProposalItem[]);
         setMyUserId(me.id ?? null);
       })
       .catch(e => setError((e as Error).message))

@@ -145,17 +145,21 @@ class MessageService:
         prev_sender_id = conversation.last_message_sender_id
         prev_sent_at   = conversation.last_message_at
 
-        # Update conversation last message
-        conversation.last_message = content[:100]  # Truncate for preview
-        conversation.last_message_at = message.sent_at
-        conversation.last_message_sender_id = sender_id
-
-        # Increment unread count for all participants except sender
-        for participant_id in conversation.participants:
-            if participant_id != sender_id:
-                conversation.increment_unread(participant_id)
-
-        await conversation.save()
+        # Update last_message fields and atomically increment unread counts.
+        # Using $inc avoids the read-modify-write race condition that would cause
+        # lost increments when 90+ messages arrive concurrently.
+        recipients = [p for p in conversation.participants if p != sender_id]
+        inc_ops = {f"unread_counts.{uid}": 1 for uid in recipients}
+        update_payload: dict = {
+            "$set": {
+                "last_message": content[:100],
+                "last_message_at": message.sent_at,
+                "last_message_sender_id": sender_id,
+            },
+        }
+        if inc_ops:
+            update_payload["$inc"] = inc_ops
+        await conversation.update(update_payload)
 
         # Record response time on sender's stats (fire-and-forget, non-blocking)
         if (

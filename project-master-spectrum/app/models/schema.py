@@ -281,7 +281,15 @@ class User(Document):
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None
-    deleted_at: Optional[datetime] = None # Soft delete
+    deleted_at: Optional[datetime] = None # Soft delete — use get_active_user() helper, never User.get() directly
+
+    @classmethod
+    async def get_active(cls, user_id) -> "Optional[User]":
+        """Fetch user by ID, returning None if the user has been soft-deleted."""
+        user = await cls.get(user_id)
+        if user and user.deleted_at:
+            return None
+        return user
     spectrum_id: Optional[SpectrumID] = Field(default_factory=SpectrumID)
 
     class Settings:

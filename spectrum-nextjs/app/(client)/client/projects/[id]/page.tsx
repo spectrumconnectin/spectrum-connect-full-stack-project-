@@ -94,8 +94,8 @@ export default function ClientProjectDetailPage() {
         setError('Project not found.');
       }
       if (propRes.status === 'fulfilled') {
-        const accepted = (Array.isArray(propRes.value) ? propRes.value : [])
-          .find((p: JobProposalItem) => p.status === 'accepted');
+        const propList = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
+        const accepted = propList.find((p: JobProposalItem) => p.status === 'accepted');
         if (accepted) setHiredCreator(accepted);
       }
       if (escRes.status === 'fulfilled') {

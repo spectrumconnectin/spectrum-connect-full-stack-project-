@@ -34,11 +34,21 @@ export function usePresence() {
       });
     }, 30 * 1000);
 
-    // Mark user as offline when leaving the page or tab is hidden
+    // Mark user as offline when the page/tab unloads.
+    // fetch() is cancelled before unload completes — navigator.sendBeacon() is
+    // the only reliable mechanism because browsers guarantee it finishes even
+    // after the page has been destroyed (spec: https://w3c.github.io/beacon/).
     const handleBeforeUnload = () => {
-      presence.setOffline().catch(() => {
-        // Silently fail
-      });
+      const token = tokenStore.get();
+      const url = `${window.location.origin}/backend/presence/offline`;
+      if (navigator.sendBeacon) {
+        // sendBeacon sends as text/plain; include auth token in body so the
+        // backend can identify the user without a header.
+        navigator.sendBeacon(url, token ?? '');
+      } else {
+        // Fallback for very old browsers — best effort only.
+        presence.setOffline().catch(() => {});
+      }
     };
 
     const handleVisibilityChange = () => {

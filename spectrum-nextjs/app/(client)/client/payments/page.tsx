@@ -702,7 +702,8 @@ export default function PaymentsPage() {
                     // Get the hired creator from the applicants
                     try {
                       const { proposals: proposalsApi } = await import('@/lib/api');
-                      const applicants = await proposalsApi.getForJob(job.id);
+                      const appData = await proposalsApi.getForJob(job.id);
+                      const applicants = appData?.proposals ?? (Array.isArray(appData) ? appData : []);
                       const hired = applicants.find((a: {status: string; creator_id?: string}) =>
                         a.status === 'accepted'
                       );
