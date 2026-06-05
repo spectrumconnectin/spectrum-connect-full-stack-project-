@@ -25,6 +25,44 @@ const APP_STATUS_LABEL: Record<string, string> = {
   withdrawn:    'Withdrawn',
 };
 
+// When the app is "accepted" (hired), the meaningful status is the job's status
+// not the application status. Map job_status to creator-facing labels.
+const JOB_STATUS_LABEL: Record<string, string> = {
+  in_progress:        'Active',
+  pending_funding:    'Awaiting Funding',
+  delivered:          'Delivered — Awaiting Review',
+  revision_requested: 'Revision Requested',
+  approved:           'Approved',
+  completed:          'Completed',
+  cancelled:          'Cancelled',
+  closed:             'Closed',
+};
+
+const JOB_STATUS_STYLE: Record<string, string> = {
+  in_progress:        'bg-emerald-50 text-emerald-700',
+  pending_funding:    'bg-amber-50 text-amber-700',
+  delivered:          'bg-indigo-50 text-indigo-700',
+  revision_requested: 'bg-orange-50 text-orange-700',
+  approved:           'bg-teal-50 text-teal-700',
+  completed:          'bg-gray-100 text-gray-600',
+  cancelled:          'bg-red-50 text-red-600',
+  closed:             'bg-gray-100 text-gray-500',
+};
+
+function getStatusBadge(app: ProposalItem): { label: string; style: string } {
+  // For hired creators, show the actual project stage from job_status
+  if (app.status === 'accepted' && app.job_status && JOB_STATUS_LABEL[app.job_status]) {
+    return {
+      label: JOB_STATUS_LABEL[app.job_status],
+      style: JOB_STATUS_STYLE[app.job_status] ?? 'bg-gray-100 text-gray-600',
+    };
+  }
+  return {
+    label: APP_STATUS_LABEL[app.status] ?? app.status,
+    style: APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600',
+  };
+}
+
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -184,6 +222,8 @@ function MyWorkInner() {
                 const esc = escrowByJob[app.job_id];
                 const isFunded = esc && esc.funded_amount > 0;
                 const isHired = app.status === 'accepted';
+                const isCompleted = app.status === 'accepted' && app.job_status === 'completed';
+                const { label: statusLabel, style: statusStyle } = getStatusBadge(app);
 
                 return (
                   // ── Entire card is clickable → workspace ──────────────────
@@ -195,17 +235,19 @@ function MyWorkInner() {
                     <div className="flex items-start gap-4 flex-wrap">
                       {/* Icon */}
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition ${
-                        isHired ? 'bg-gradient-to-br from-emerald-100 to-teal-100' : 'bg-gradient-to-br from-blue-100 to-purple-100'
+                        isCompleted ? 'bg-gradient-to-br from-gray-100 to-gray-200' :
+                        isHired ? 'bg-gradient-to-br from-emerald-100 to-teal-100' :
+                        'bg-gradient-to-br from-blue-100 to-purple-100'
                       }`}>
-                        <i className={`fa-solid fa-clapperboard ${isHired ? 'text-emerald-600' : 'text-cobalt'}`}></i>
+                        <i className={`fa-solid ${isCompleted ? 'fa-trophy text-gray-500' : isHired ? 'fa-clapperboard text-emerald-600' : 'fa-clapperboard text-cobalt'}`}></i>
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-1 flex-wrap">
                           <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition">{app.job_title}</h3>
-                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${APP_STATUS_STYLE[app.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                            {APP_STATUS_LABEL[app.status] ?? app.status}
+                          <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusStyle}`}>
+                            {statusLabel}
                           </span>
                         </div>
 
@@ -234,7 +276,12 @@ function MyWorkInner() {
 
                       {/* Right side — escrow status + actions */}
                       <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-end" onClick={e => e.stopPropagation()}>
-                        {isHired && (
+                        {isCompleted && (
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-2 rounded-xl">
+                            <i className="fa-solid fa-circle-check text-emerald-500"></i>Project Completed
+                          </span>
+                        )}
+                        {isHired && !isCompleted && (
                           <>
                             {isFunded ? (
                               <div className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-sm">

@@ -48,28 +48,41 @@ function statusLabel(status: string) {
   return map[status] ?? status;
 }
 
-function appStatusColor(status: string) {
-  const map: Record<string, string> = {
-    submitted:    'bg-blue-50 text-blue-700',
-    shortlisted:  'bg-purple-50 text-purple-700',
-    interviewing: 'bg-amber-50 text-amber-700',
-    accepted:     'bg-emerald-50 text-emerald-700',
-    rejected:     'bg-rose-50 text-rose-700',
-    withdrawn:    'bg-gray-100 text-gray-500',
+// Returns badge colour based on the combo of application status + job status
+function getWorkspaceBadge(appStatus: string, jobStatus?: string): { label: string; style: string } {
+  // For hired creators, job_status is the real current stage
+  if (appStatus === 'accepted' && jobStatus) {
+    const jobLabels: Record<string, string> = {
+      in_progress:        'Active',
+      pending_funding:    'Awaiting Funding',
+      delivered:          'Delivered — Awaiting Review',
+      revision_requested: 'Revision Requested',
+      approved:           'Approved',
+      completed:          'Completed',
+      cancelled:          'Cancelled',
+    };
+    const jobStyles: Record<string, string> = {
+      in_progress:        'bg-emerald-50 text-emerald-700',
+      pending_funding:    'bg-amber-50 text-amber-700',
+      delivered:          'bg-indigo-50 text-indigo-700',
+      revision_requested: 'bg-orange-50 text-orange-700',
+      approved:           'bg-teal-50 text-teal-700',
+      completed:          'bg-gray-100 text-gray-600',
+      cancelled:          'bg-red-50 text-red-600',
+    };
+    if (jobLabels[jobStatus]) {
+      return { label: jobLabels[jobStatus], style: jobStyles[jobStatus] ?? 'bg-gray-100 text-gray-600' };
+    }
+  }
+  const appMap: Record<string, { label: string; style: string }> = {
+    submitted:    { label: 'Under Review',  style: 'bg-blue-50 text-blue-700' },
+    shortlisted:  { label: 'Shortlisted',   style: 'bg-purple-50 text-purple-700' },
+    interviewing: { label: 'Interviewing',  style: 'bg-amber-50 text-amber-700' },
+    accepted:     { label: 'Hired',         style: 'bg-emerald-50 text-emerald-700' },
+    rejected:     { label: 'Declined',      style: 'bg-rose-50 text-rose-700' },
+    withdrawn:    { label: 'Withdrawn',     style: 'bg-gray-100 text-gray-500' },
   };
-  return map[status] ?? 'bg-gray-100 text-gray-600';
-}
-
-function appStatusLabel(status: string) {
-  const map: Record<string, string> = {
-    submitted:    'Under Review',
-    shortlisted:  'Shortlisted',
-    interviewing: 'Interviewing',
-    accepted:     'Hired',
-    rejected:     'Declined',
-    withdrawn:    'Withdrawn',
-  };
-  return map[status] ?? status;
+  return appMap[appStatus] ?? { label: appStatus, style: 'bg-gray-100 text-gray-600' };
 }
 
 // ── Delivery Modal ────────────────────────────────────────────────────────────
@@ -264,6 +277,8 @@ export default function CreatorWorkspacePage() {
   const deliveredMilestones = escrow?.milestones.filter(m => ['delivered','revision_requested'].includes(m.status)) ?? [];
   const releasedMilestones = escrow?.milestones.filter(m => m.status === 'released') ?? [];
   const canDeliver = fundedMilestones.length > 0 || deliveredMilestones.some(m => m.status === 'revision_requested');
+  const isJobCompleted = data.job_status === 'completed';
+  const { label: statusBadgeLabel, style: statusBadgeStyle } = getWorkspaceBadge(data.status, data.job_status);
 
   return (
     <>
@@ -275,14 +290,29 @@ export default function CreatorWorkspacePage() {
         </Link>
       </div>
 
+      {/* Completion banner */}
+      {isJobCompleted && (
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-trophy text-white text-xl"></i>
+          </div>
+          <div>
+            <p className="font-bold text-emerald-900 text-lg">Project Completed!</p>
+            <p className="text-emerald-700 text-sm mt-1">
+              This project has been marked as complete by the client. Payment has been released to your account.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900">{data.job_title}</h1>
-              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${appStatusColor(data.status)}`}>
-                {appStatusLabel(data.status)}
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${statusBadgeStyle}`}>
+                {statusBadgeLabel}
               </span>
               {data.job_department && (
                 <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full capitalize">{data.job_department}</span>

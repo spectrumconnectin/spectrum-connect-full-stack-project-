@@ -299,3 +299,4 @@ yarn.lock
 .elasticbeanstalk/*
 !.elasticbeanstalk/*.cfg.yml
 !.elasticbeanstalk/*.global.yml
+.vercel
