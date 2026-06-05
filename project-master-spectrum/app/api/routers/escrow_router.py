@@ -704,6 +704,9 @@ async def deliver_milestone(
     from datetime import timedelta
     milestone.auto_release_at = now + timedelta(hours=48)
     milestone.auto_released = False
+    # Reset review-gating fields on each new delivery — client must re-open and re-confirm
+    milestone.drive_link_opened_at = None
+    milestone.client_reviewed_at = None
     await esc.save()
 
     # Check if ALL milestones are now delivered/approved/released → job status = "delivered"
@@ -778,6 +781,25 @@ async def approve_milestone(
         raise HTTPException(status_code=404, detail="Milestone not found")
     if milestone.status not in ("delivered",):
         raise HTTPException(status_code=400, detail=f"Only delivered milestones can be approved (current: '{milestone.status}')")
+
+    # ── Review-gate: client must have opened the Drive link AND confirmed review ─
+    if not milestone.drive_link_opened_at:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "You must open and review the Google Drive delivery link before approving. "
+                "Click 'Open Drive Link' on the delivery page first."
+            ),
+        )
+    if not milestone.client_reviewed_at:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "You must confirm that you have reviewed the delivered work before approving. "
+                "Check the review confirmation box on the delivery page."
+            ),
+        )
+
     milestone.status = "approved"
     await esc.save()
 
@@ -829,6 +851,98 @@ async def approve_milestone(
         pass
 
     return {"success": True, "milestone_id": milestone_id, "status": "approved"}
+
+
+@escrow_router.post(
+    "/{escrow_id}/milestone/{milestone_id}/mark-opened",
+    summary="Client records that they opened the Drive delivery link",
+)
+async def mark_drive_link_opened(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Records the timestamp when the client first opened the Google Drive delivery link.
+    This is step 1 of the payment-protection review gate — must happen before
+    the client can confirm review or approve the milestone.
+
+    Idempotent: calling multiple times only records the first open time.
+    """
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    from datetime import datetime as _dt
+
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if str(esc.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the client can record a link open")
+
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if milestone.status not in ("delivered", "revision_requested"):
+        raise HTTPException(status_code=400, detail=f"Milestone is not in a deliverable state (current: '{milestone.status}')")
+
+    # Idempotent: only record the first open
+    if not milestone.drive_link_opened_at:
+        milestone.drive_link_opened_at = _dt.utcnow()
+        await esc.save()
+
+    return {
+        "success": True,
+        "milestone_id": milestone_id,
+        "drive_link_opened_at": milestone.drive_link_opened_at.isoformat(),
+    }
+
+
+@escrow_router.post(
+    "/{escrow_id}/milestone/{milestone_id}/confirm-review",
+    summary="Client confirms they have reviewed the delivered work",
+)
+async def confirm_review(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Records the timestamp when the client explicitly confirms they have reviewed
+    the delivered work. This is step 2 of the payment-protection review gate.
+
+    Requires the Drive link to have been opened first (drive_link_opened_at must be set).
+    After this, the client can choose to Approve or Request Revisions.
+    """
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    from datetime import datetime as _dt
+
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if str(esc.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the client can confirm review")
+
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+    if milestone.status not in ("delivered",):
+        raise HTTPException(status_code=400, detail=f"Can only confirm review on delivered milestones (current: '{milestone.status}')")
+
+    if not milestone.drive_link_opened_at:
+        raise HTTPException(
+            status_code=400,
+            detail="You must open the Google Drive link before confirming review.",
+        )
+
+    milestone.client_reviewed_at = _dt.utcnow()
+    await esc.save()
+
+    return {
+        "success": True,
+        "milestone_id": milestone_id,
+        "client_reviewed_at": milestone.client_reviewed_at.isoformat(),
+    }
 
 
 class RevisionRequest(BaseModel):
@@ -976,6 +1090,9 @@ async def get_delivery_status(
         "revision_count": milestone.revision_count,
         "revision_notes": milestone.revision_notes,
         "delivery_history": milestone.delivery_history or [],
+        # Review-gating audit trail
+        "drive_link_opened_at": milestone.drive_link_opened_at.isoformat() if milestone.drive_link_opened_at else None,
+        "client_reviewed_at": milestone.client_reviewed_at.isoformat() if milestone.client_reviewed_at else None,
         "escrow_id": str(esc.id),
         "client_id": str(esc.client_id),
         "creator_id": str(esc.creator_id),

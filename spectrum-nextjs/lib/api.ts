@@ -1248,11 +1248,27 @@ export const escrow = {
       delivery_notes?: string;
       submitted_at?: string;
     }>;
+    /** Timestamp when client first opened the Drive link (null = not opened yet) */
+    drive_link_opened_at?: string | null;
+    /** Timestamp when client confirmed they reviewed the work (null = not confirmed yet) */
+    client_reviewed_at?: string | null;
     escrow_id: string;
     client_id: string;
     creator_id: string;
   }> =>
     request(`/escrow/${escrowId}/delivery-status?milestone_id=${milestoneId}`),
+
+  /** Step 1: Records that the client opened the Drive delivery link. */
+  markDriveLinkOpened: (escrowId: string, milestoneId: string): Promise<{
+    success: boolean; milestone_id: string; drive_link_opened_at: string;
+  }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/mark-opened`, { method: 'POST' }),
+
+  /** Step 2: Client confirms they have reviewed the delivered work. */
+  confirmReview: (escrowId: string, milestoneId: string): Promise<{
+    success: boolean; milestone_id: string; client_reviewed_at: string;
+  }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/confirm-review`, { method: 'POST' }),
 
   requestRevision: (escrowId: string, milestoneId: string, feedback?: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
     request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, {

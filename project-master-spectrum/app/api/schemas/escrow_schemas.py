@@ -35,6 +35,9 @@ class MilestoneDetail(BaseModel):
     delivered_at: Optional[datetime] = None
     auto_release_at: Optional[datetime] = None
     auto_released: bool = False
+    # Review-gating audit trail
+    drive_link_opened_at: Optional[datetime] = None
+    client_reviewed_at: Optional[datetime] = None
 
 
 class UserBrief(BaseModel):

@@ -175,15 +175,23 @@ export default function ClientProjectDetailPage() {
     if (!escrowDetailForRelease) return;
     setReleasingFunds(true);
     try {
+      // Only release milestones that are already approved (went through the full review gate).
+      // Milestones still in 'delivered' state require the client to go through the
+      // dedicated delivery review page (open link → confirm review → approve) first.
       const eligibleMilestones = escrowDetailForRelease.milestones.filter(
-        m => ['delivered', 'approved'].includes(m.status)
+        m => m.status === 'approved'
       );
-      for (const m of eligibleMilestones) {
-        // Approve first if the milestone is in 'delivered' state
-        if (m.status === 'delivered') {
-          await escrow.approveMilestone(escrowDetailForRelease.escrow_id, m.milestone_id);
+
+      if (eligibleMilestones.length === 0) {
+        // All eligible milestones are still in 'delivered' — redirect to review page
+        const deliveredM = escrowDetailForRelease.milestones.find(m => m.status === 'delivered');
+        if (deliveredM) {
+          router.push(`/client/projects/${id}/delivery/${deliveredM.milestone_id}`);
+          return;
         }
-        // Then release funds
+      }
+
+      for (const m of eligibleMilestones) {
         await escrow.releaseMilestone(escrowDetailForRelease.escrow_id, m.milestone_id);
       }
       setReleaseFundsSuccess(true);

@@ -67,6 +67,12 @@ class EscrowMilestone(BaseModel):
     auto_release_at:   Optional[datetime] = None  # delivered_at + 48h
     auto_released:     bool = False                # True if system auto-released
 
+    # ── Review-gating audit trail ─────────────────────────────────────────────
+    # Funds cannot be released until the client has actively opened the Drive link
+    # AND explicitly confirmed they have reviewed the delivered work.
+    drive_link_opened_at: Optional[datetime] = None  # first time client clicked "Open Drive Link"
+    client_reviewed_at:   Optional[datetime] = None  # client confirmed review via the review checkbox
+
     # Revision tracking
     revision_count:    int = 0                     # number of revisions requested
     revision_notes:    Optional[str] = None        # latest revision feedback from client

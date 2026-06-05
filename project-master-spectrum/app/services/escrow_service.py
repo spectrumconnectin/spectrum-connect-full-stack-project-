@@ -226,13 +226,37 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        # Allow 'delivered' for both manual and auto-release (auto-approves internally)
+        # Allow 'delivered' for auto-release only, 'approved' for manual release.
+        # Funded milestones cannot be released without delivery.
         allowed_statuses = ("funded", "approved", "delivered")
         if milestone.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
-                detail=f"Milestone must be funded or delivered before release (current: '{milestone.status}').",
+                detail=f"Milestone must be approved or delivered before release (current: '{milestone.status}').",
             )
+
+        # Payment-protection gate: manual releases from 'delivered' state require the
+        # client to have opened the Drive link AND confirmed the review.
+        # Auto-releases (is_auto_release=True) bypass this guard — the 48h window
+        # gives the client ample time; auto-release is a fallback, not a shortcut.
+        if milestone.status == "delivered" and not is_auto_release:
+            if not getattr(milestone, "drive_link_opened_at", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Payment cannot be released without reviewing the delivery. "
+                        "Open the Google Drive link on the Delivery Review page first."
+                    ),
+                )
+            if not getattr(milestone, "client_reviewed_at", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Please confirm you have reviewed the delivered work before releasing payment. "
+                        "Go to the Delivery Review page and confirm your review."
+                    ),
+                )
+
         # If in 'delivered' state, auto-approve before release
         if milestone.status == "delivered":
             milestone.status = "approved"

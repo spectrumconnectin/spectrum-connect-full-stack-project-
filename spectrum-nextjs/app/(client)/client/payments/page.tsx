@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
@@ -62,6 +63,7 @@ const TAB_LABEL: Record<string, string> = {
 // ── Flat row derived from escrow detail ───────────────────────────────────────
 type PaymentRow = {
   escrow_id: string;
+  job_post_id?: string | null;
   milestone: EscrowMilestone;
   milestone_num: number;
   total_milestones: number;
@@ -750,6 +752,7 @@ export default function PaymentsPage() {
   const rows: PaymentRow[] = details.flatMap(d =>
     d.milestones.map((m, i) => ({
       escrow_id: d.escrow_id,
+      job_post_id: (d as EscrowDetail & { job_post_id?: string }).job_post_id,
       milestone: m,
       milestone_num: i + 1,
       total_milestones: d.milestones.length,
@@ -982,17 +985,29 @@ export default function PaymentsPage() {
 
                     {/* Action */}
                     <div className="flex-shrink-0 flex justify-end gap-2">
-                      {row.milestone.status === 'funded' ? (
-                        <>
-                          <button onClick={() => setRequestingRevisions(row)}
-                            className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-semibold rounded-xl hover:bg-amber-100 transition border border-amber-200 shadow-sm">
-                            <i className="fa-solid fa-pen-to-square mr-1"></i>Revisions
-                          </button>
-                          <button onClick={() => setReleasing(row)}
-                            className="px-4 py-2 bg-cobalt text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow-md">
-                            <i className="fa-solid fa-unlock mr-1.5"></i>Release
-                          </button>
-                        </>
+                      {row.milestone.status === 'delivered' ? (
+                        /* Delivered: client must go through the review gate first */
+                        row.job_post_id ? (
+                          <Link
+                            href={`/client/projects/${row.job_post_id}/delivery/${row.milestone.milestone_id}`}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition shadow-sm">
+                            <i className="fa-solid fa-magnifying-glass text-[10px]"></i>Review Delivery
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-indigo-600 font-semibold">Awaiting review</span>
+                        )
+                      ) : row.milestone.status === 'approved' ? (
+                        /* Approved: safe to release — review gate already passed */
+                        <button onClick={() => setReleasing(row)}
+                          className="px-4 py-2 bg-emerald-600 text-white text-xs font-semibold rounded-xl hover:bg-emerald-700 transition shadow-sm hover:shadow-md">
+                          <i className="fa-solid fa-coins mr-1.5"></i>Release
+                        </button>
+                      ) : row.milestone.status === 'funded' ? (
+                        /* Funded but not delivered yet — only revisions possible from here */
+                        <button onClick={() => setRequestingRevisions(row)}
+                          className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-semibold rounded-xl hover:bg-amber-100 transition border border-amber-200 shadow-sm">
+                          <i className="fa-solid fa-pen-to-square mr-1"></i>Revisions
+                        </button>
                       ) : row.milestone.status === 'released' ? (
                         <span className="text-xs text-emerald-600 font-semibold">
                           <i className="fa-solid fa-check mr-1"></i>Released
