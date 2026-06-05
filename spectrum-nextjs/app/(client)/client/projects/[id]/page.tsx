@@ -77,6 +77,8 @@ export default function ClientProjectDetailPage() {
   const [releasingFunds, setReleasingFunds] = useState(false);
   const [releaseFundsSuccess, setReleaseFundsSuccess] = useState(false);
   const [escrowDetailForRelease, setEscrowDetailForRelease] = useState<EscrowDetail | null>(null);
+  // Delivery review — milestone ID of the first delivered milestone
+  const [deliveredMilestoneId, setDeliveredMilestoneId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -136,7 +138,33 @@ export default function ClientProjectDetailPage() {
       const detail = await escrow.getById(projectEscrow.escrow_id);
       setEscrowDetailForRelease(detail);
       setReleaseFundsSuccess(false);
+      // Store the first delivered milestone ID for the review page link
+      const deliveredM = detail.milestones.find(m => ['delivered', 'approved'].includes(m.status));
+      if (deliveredM) setDeliveredMilestoneId(deliveredM.milestone_id);
       setShowReleaseFundsModal(true);
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  // Navigate to the delivery review page — loads escrow detail first to get milestone ID
+  const handleReviewDelivery = async () => {
+    if (!projectEscrow) return;
+    if (deliveredMilestoneId) {
+      router.push(`/client/projects/${id}/delivery/${deliveredMilestoneId}`);
+      return;
+    }
+    try {
+      const detail = await escrow.getById(projectEscrow.escrow_id);
+      const deliveredM = detail.milestones.find(m => ['delivered', 'approved'].includes(m.status));
+      if (deliveredM) {
+        router.push(`/client/projects/${id}/delivery/${deliveredM.milestone_id}`);
+      } else {
+        // Fallback: open release funds modal
+        setEscrowDetailForRelease(detail);
+        setReleaseFundsSuccess(false);
+        setShowReleaseFundsModal(true);
+      }
     } catch (e) {
       alert((e as Error).message);
     }
@@ -356,23 +384,13 @@ export default function ClientProjectDetailPage() {
               The creator has submitted their work with a Google Drive link. Review it, then release payment or request revisions.
               <span className="font-semibold"> Payment auto-releases in 48 hours if no action is taken.</span>
             </p>
-            {/* Find the delivered milestone and link to its review page */}
             {projectEscrow && (
               <div className="flex gap-3 mt-3 flex-wrap">
-                <Link
-                  href={`/client/projects/${id}/delivery/${
-                    // We don't have milestone ID here, so link to deliverables tab
-                    projectEscrow.escrow_id ? `#deliverables` : '#'
-                  }`}
-                  onClick={e => {
-                    // Navigate to the workspace and open ProjectWorkspace deliverables tab
-                    // For now, just use the release funds flow as it handles escrow detail
-                    e.preventDefault();
-                    handleOpenReleaseFunds();
-                  }}
+                <button
+                  onClick={handleReviewDelivery}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition">
                   <i className="fa-solid fa-magnifying-glass text-xs"></i>Review Delivery
-                </Link>
+                </button>
                 {canReleaseFunds && (
                   <button onClick={handleOpenReleaseFunds}
                     className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-indigo-300 text-indigo-700 text-sm font-bold rounded-xl hover:bg-indigo-50 transition">

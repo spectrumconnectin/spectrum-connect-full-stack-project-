@@ -667,25 +667,38 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                     <p className="font-semibold text-gray-900">{m.title}</p>
                     <p className="text-sm font-bold text-gray-700">${m.amount.toLocaleString()}</p>
 
-                    {/* Google Drive delivery link — shown to both client and creator */}
+                    {/* Google Drive delivery link — prominent for client */}
                     {m.google_drive_link && (
-                      <div className="mt-2 bg-white border border-indigo-200 rounded-lg px-3 py-2">
-                        <p className="text-xs font-semibold text-indigo-700 mb-1 flex items-center gap-1.5">
-                          <i className="fa-brands fa-google-drive"></i>Deliverables
-                        </p>
-                        <a href={m.google_drive_link} target="_blank" rel="noopener noreferrer"
-                          className="text-xs text-cobalt underline break-all hover:text-blue-700 transition">
-                          {m.google_drive_link}
-                        </a>
+                      <div className={`mt-3 rounded-xl border overflow-hidden ${
+                        role === 'client' && m.status === 'delivered'
+                          ? 'bg-indigo-50 border-indigo-300'
+                          : 'bg-white border-indigo-200'
+                      }`}>
+                        <div className="px-3 py-2 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <i className="fa-brands fa-google-drive text-indigo-600 text-base flex-shrink-0"></i>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-indigo-800">Deliverables</p>
+                              <p className="text-xs text-indigo-600 truncate max-w-[160px]">{m.google_drive_link}</p>
+                            </div>
+                          </div>
+                          <a href={m.google_drive_link} target="_blank" rel="noopener noreferrer"
+                            className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition">
+                            <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            Open Drive
+                          </a>
+                        </div>
                         {m.delivery_notes && (
-                          <p className="text-xs text-gray-600 mt-1.5 italic border-t border-indigo-100 pt-1.5">
-                            &ldquo;{m.delivery_notes}&rdquo;
-                          </p>
+                          <div className="px-3 py-2 border-t border-indigo-200 bg-white/60">
+                            <p className="text-xs text-gray-600 italic">&ldquo;{m.delivery_notes}&rdquo;</p>
+                          </div>
                         )}
                         {m.delivered_at && (
-                          <p className="text-xs text-gray-400 mt-1">
-                            <i className="fa-regular fa-clock mr-1"></i>Submitted {fmtDate(m.delivered_at)}
-                          </p>
+                          <div className="px-3 py-1.5 border-t border-indigo-100 bg-white/40">
+                            <p className="text-[11px] text-gray-400">
+                              <i className="fa-regular fa-clock mr-1"></i>Submitted {fmtDate(m.delivered_at)}
+                            </p>
+                          </div>
                         )}
                       </div>
                     )}
@@ -696,28 +709,34 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                       </p>
                     )}
                   </div>
-                  {role === 'client' && m.status === 'delivered' && (
-                    <div className="flex flex-col gap-2">
-                      <button onClick={() => doAction('approve', m.milestone_id)} disabled={acting === m.milestone_id}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition disabled:opacity-60">
-                        {acting === m.milestone_id ? 'Approving…' : '✓ Approve Work'}
+                  {/* Client actions — shown when delivered or approved */}
+                  {role === 'client' && (m.status === 'delivered' || m.status === 'approved') && (
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      {/* Release Payment = approve + release in one click */}
+                      <button
+                        onClick={async () => {
+                          if (acting) return;
+                          if (m.status === 'delivered') await doAction('approve', m.milestone_id);
+                          await doAction('release', m.milestone_id);
+                        }}
+                        disabled={acting === m.milestone_id}
+                        className="px-3 py-2 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition disabled:opacity-60 flex items-center gap-1.5">
+                        {acting === m.milestone_id
+                          ? <><i className="fa-solid fa-spinner animate-spin"></i>Processing…</>
+                          : <><i className="fa-solid fa-coins text-[10px]"></i>Release Payment</>}
                       </button>
-                      <button onClick={() => { setRevisionTarget(m); setRevisionFeedback(''); }}
-                        className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
-                        ↩ Request Revision
-                      </button>
-                    </div>
-                  )}
-                  {role === 'client' && m.status === 'approved' && (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200">
-                        <i className="fa-solid fa-circle-check text-teal-600"></i>
-                        <span className="font-semibold">Approved</span>
-                      </div>
-                      <button onClick={() => doAction('release', m.milestone_id)} disabled={acting === m.milestone_id}
-                        className="px-3 py-1.5 text-xs font-semibold text-white bg-cobalt rounded-lg hover:bg-blue-700 transition disabled:opacity-60">
-                        {acting === m.milestone_id ? 'Releasing…' : '💸 Release Payment'}
-                      </button>
+                      {m.status === 'delivered' && (
+                        <button onClick={() => { setRevisionTarget(m); setRevisionFeedback(''); }}
+                          className="px-3 py-1.5 text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition">
+                          <i className="fa-solid fa-rotate-left text-[10px] mr-1"></i>Revision
+                        </button>
+                      )}
+                      {m.status === 'approved' && (
+                        <div className="flex items-center gap-1 text-[11px] text-teal-700 bg-teal-50 px-2 py-1.5 rounded-lg border border-teal-200">
+                          <i className="fa-solid fa-circle-check text-teal-600 text-[10px]"></i>
+                          <span className="font-semibold">Approved</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

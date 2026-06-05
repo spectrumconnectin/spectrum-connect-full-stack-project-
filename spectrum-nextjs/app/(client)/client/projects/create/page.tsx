@@ -166,23 +166,16 @@ const SKILLS_SUGGESTIONS = [
   'Film Direction', 'Creative Direction', '3D Modeling', 'Voice Acting',
 ];
 
-const BUDGET_TYPES = [
-  { val: 'fixed',      label: 'Fixed Price',  desc: 'One total payment' },
-  { val: 'hourly',     label: 'Hourly Rate',  desc: 'Per hour worked' },
-  { val: 'daily',      label: 'Day Rate',     desc: 'Per day worked' },
-  { val: 'negotiable', label: 'Negotiable',   desc: 'Open to discuss' },
-];
+const QUICK_BUDGETS = [5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+const MIN_BUDGET = 5;
 
 const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400 text-sm';
 
-function FeePreview({ min, max }: { min: string; max: string }) {
+function FeePreview({ budget }: { budget: string }) {
   const amount = useMemo(() => {
-    const maxN = parseFloat(max);
-    const minN = parseFloat(min);
-    if (!isNaN(maxN) && maxN > 0) return maxN;
-    if (!isNaN(minN) && minN > 0) return minN;
-    return null;
-  }, [min, max]);
+    const n = parseFloat(budget);
+    return !isNaN(n) && n >= MIN_BUDGET ? n : null;
+  }, [budget]);
 
   if (!amount) return (
     <div className="mt-1 p-4 bg-blue-50 border border-blue-100 rounded-xl">
@@ -271,10 +264,8 @@ export default function CreateProjectPage() {
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [delivInput, setDelivInput]     = useState('');
 
-  // ── Step 3: Budget ──────────────────────────────────────────────────────
-  const [budgetType, setBudgetType] = useState('fixed');
-  const [budgetMin, setBudgetMin]   = useState('');
-  const [budgetMax, setBudgetMax]   = useState('');
+  // ── Step 3: Budget (single fixed price, min $5) ─────────────────────────
+  const [budget, setBudget] = useState('');
 
   // ── Step 4: Timeline & Skills ──────────────────────────────────────────
   const [timeline, setTimeline]   = useState('');
@@ -295,12 +286,11 @@ export default function CreateProjectPage() {
     setGoals(tpl.goals);
     setDeliverables(tpl.deliverables);
     setSkills(tpl.skills);
-    setBudgetType(tpl.budgetType);
-    setBudgetMin(tpl.budgetMin);
-    setBudgetMax(tpl.budgetMax);
+    // Use the midpoint of the template's budget range as the default
+    const mid = Math.round((parseInt(tpl.budgetMin) + parseInt(tpl.budgetMax)) / 2);
+    setBudget(String(mid));
     setTimeline(tpl.timeline);
     setAppliedTemplate(tpl.id);
-    // Scroll to top of form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -322,14 +312,9 @@ export default function CreateProjectPage() {
   ) => setter(p => p.filter(x => x !== val));
 
   const buildRate = () => {
-    const min = budgetMin ? Number(budgetMin) : undefined;
-    const max = budgetMax ? Number(budgetMax) : undefined;
-    if (!min && !max) return {};
-    const obj = { min, max };
-    if (budgetType === 'fixed')  return { budget: obj };
-    if (budgetType === 'hourly') return { hourly_rate: obj };
-    if (budgetType === 'daily')  return { daily_rate: obj };
-    return {};
+    const amount = parseFloat(budget);
+    if (isNaN(amount) || amount < MIN_BUDGET) return {};
+    return { budget: { min: amount, max: amount }, budget_type: 'fixed' };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -340,6 +325,9 @@ export default function CreateProjectPage() {
     if (title.trim().length < 5)  errs.push('Project title is required (min 5 characters)');
     if (!description.trim())       errs.push('Project description is required');
     if (!category)                 errs.push('Please select a category');
+    const budgetNum = parseFloat(budget);
+    if (!budget || isNaN(budgetNum))         errs.push('Project budget is required');
+    else if (budgetNum < MIN_BUDGET)         errs.push(`Projects must have a minimum budget of $${MIN_BUDGET}.`);
     if (errs.length) { setSubmitError(errs.join('\n')); return; }
 
     setSubmitting(true);
@@ -352,7 +340,7 @@ export default function CreateProjectPage() {
       tags:        [],
       crew_size:   'individual',
       complexity:  'intermediate',
-      budget_type: budgetType,
+      budget_type: 'fixed',
       experience_level: 'intermediate',
       goals:        goals.length ? goals : undefined,
       deliverables: deliverables.length ? deliverables : undefined,
@@ -599,39 +587,53 @@ export default function CreateProjectPage() {
 
         {/* ── 4. Budget ── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
-          {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Budget', 'How much are you willing to pay?')}
+          {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Project Budget', 'Fixed price — what is this project worth?')}
           <div className="space-y-5">
-            <div className="flex flex-wrap gap-3">
-              {BUDGET_TYPES.map(b => (
-                <button key={b.val} type="button" onClick={() => setBudgetType(b.val)}
-                  className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 transition min-w-[110px] ${
-                    budgetType === b.val
-                      ? 'border-cobalt bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}>
-                  <span className={`font-bold text-sm ${budgetType === b.val ? 'text-cobalt' : 'text-gray-700'}`}>{b.label}</span>
-                  <span className="text-xs text-gray-400 mt-0.5">{b.desc}</span>
-                </button>
-              ))}
+            {/* Quick-select chips */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick select</label>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_BUDGETS.map(b => (
+                  <button key={b} type="button" onClick={() => setBudget(String(b))}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
+                      budget === String(b)
+                        ? 'border-cobalt bg-cobalt text-white'
+                        : 'border-gray-200 text-gray-700 hover:border-cobalt hover:bg-blue-50'
+                    }`}>
+                    ${b.toLocaleString()}
+                  </button>
+                ))}
+              </div>
             </div>
-            {budgetType !== 'negotiable' && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Min ($)</label>
-                    <input type="number" min="0" value={budgetMin} onChange={e => setBudgetMin(e.target.value)}
-                      placeholder="e.g. 500" className={inp} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Max ($)</label>
-                    <input type="number" min="0" value={budgetMax} onChange={e => setBudgetMax(e.target.value)}
-                      placeholder="e.g. 2000" className={inp} />
-                  </div>
-                </div>
-                {/* Live fee preview */}
-                <FeePreview min={budgetMin} max={budgetMax} />
-              </>
-            )}
+
+            {/* Manual input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Project Budget <span className="text-red-500">*</span>
+                <span className="text-gray-400 font-normal ml-2 text-xs">(minimum ${MIN_BUDGET})</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">$</span>
+                <input
+                  type="number"
+                  min={MIN_BUDGET}
+                  step="1"
+                  value={budget}
+                  onChange={e => setBudget(e.target.value)}
+                  placeholder="Enter amount, e.g. 250"
+                  className={`${inp} pl-8`}
+                />
+              </div>
+              {budget && parseFloat(budget) < MIN_BUDGET && (
+                <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
+                  <i className="fa-solid fa-circle-exclamation"></i>
+                  Projects must have a minimum budget of ${MIN_BUDGET}.
+                </p>
+              )}
+            </div>
+
+            {/* Live fee preview */}
+            <FeePreview budget={budget} />
           </div>
         </div>
 

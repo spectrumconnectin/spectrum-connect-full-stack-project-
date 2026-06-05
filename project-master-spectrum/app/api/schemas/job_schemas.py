@@ -147,6 +147,18 @@ class JobPostCreate(BaseModel):
     daily_rate: Optional[RateCreate] = Field(None, description="For daily budget")
     weekly_rate: Optional[RateCreate] = Field(None, description="For weekly budget")
 
+    @validator('budget', always=True)
+    def budget_minimum(cls, v):
+        """Enforce $5 minimum on fixed budgets."""
+        if v is None:
+            return v
+        min_val = v.min or 0
+        max_val = v.max or 0
+        effective = max_val or min_val
+        if effective > 0 and effective < 5:
+            raise ValueError('Projects must have a minimum budget of $5.')
+        return v
+
     # Timeline
     duration: Optional[str] = Field(None, description="Timeline description e.g. '2 weeks', 'by end of July'")
     estimated_duration: Optional[int] = Field(None, ge=1, le=365, description="Estimated days")
