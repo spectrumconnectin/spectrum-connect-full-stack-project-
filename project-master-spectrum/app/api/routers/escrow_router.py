@@ -241,15 +241,44 @@ async def release_milestone(
                 amount=m_amount,
             )
 
-            # Update job to 'completed' once all escrow milestones are released
+            # Update job to 'completed' + stamp completed_at once all milestones released
             if esc.status == "completed" and esc.job_post_id:
+                from datetime import datetime as _dt
+                # Stamp completed_at on escrow
+                esc.completed_at = _dt.utcnow()
+                await esc.save()
+
                 job = await JobPost.get(esc.job_post_id)
                 if job:
                     job.status = "completed"
                     if hasattr(job, "closed_at"):
-                        from datetime import datetime as _dt
                         job.closed_at = _dt.utcnow()
                     await job.save()
+
+                # Update creator stats: increment projects_completed + total_earnings
+                try:
+                    creator = await User.get(esc.creator_id)
+                    if creator:
+                        if not creator.stats:
+                            from app.models.schema import UserStats
+                            creator.stats = UserStats()
+                        creator.stats.projects_completed = (creator.stats.projects_completed or 0) + 1
+                        creator.stats.total_earnings = (creator.stats.total_earnings or 0.0) + float(esc.released_amount or 0)
+                        await creator.save()
+                except Exception:
+                    pass
+
+                # Send project_completed notification to both parties
+                try:
+                    from app.services.notification_service import NotificationService
+                    await NotificationService.project_completed(
+                        creator_id=str(esc.creator_id),
+                        client_id=str(esc.client_id),
+                        job_title=job.title if job else "Your project",
+                        job_id=str(esc.job_post_id),
+                    )
+                except Exception:
+                    pass
 
             # Post a payment confirmation message to project conversation
             try:
@@ -790,6 +819,8 @@ async def request_revision(
     if milestone.status != "delivered":
         raise HTTPException(status_code=400, detail="Can only request revision on delivered milestones")
     milestone.status = "revision_requested"
+    milestone.revision_count = (milestone.revision_count or 0) + 1
+    milestone.revision_notes = body.feedback or None
     await esc.save()
 
     # Update job status to revision_requested if not all milestones still delivered

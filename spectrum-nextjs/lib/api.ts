@@ -923,6 +923,7 @@ export interface ProposalItem {
   client_id?: string;
   cover_letter: string;
   proposed_budget?: number;
+  portfolio_url?: string;
   role?: string;
   status: string; // submitted | shortlisted | interviewing | accepted | rejected | withdrawn
   submitted_at?: string;
@@ -938,6 +939,7 @@ export interface JobProposalItem {
   creator_skills: string[];
   cover_letter: string;
   proposed_budget?: number;
+  portfolio_url?: string;
   role?: string;
   status: string;
   client_viewed: boolean;
@@ -978,6 +980,7 @@ export interface ProposalSubmitPayload {
   proposed_budget?: number;
   role?: string;
   proposed_duration?: number;
+  portfolio_url?: string;
 }
 
 export const proposals = {

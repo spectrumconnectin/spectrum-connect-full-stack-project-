@@ -27,6 +27,7 @@ class ProposalSubmit(BaseModel):
     proposed_budget: Optional[float] = None
     role: Optional[str] = None
     proposed_duration: Optional[int] = None  # days
+    portfolio_url: Optional[str] = None      # Google Drive or portfolio link
 
 
 class ProposalStatusUpdate(BaseModel):
@@ -88,6 +89,7 @@ async def submit_proposal(
         proposed_budget=data.proposed_budget,
         role=data.role,
         proposed_duration=data.proposed_duration,
+        portfolio_url=data.portfolio_url,
         status="submitted",
     )
     await app.insert()
@@ -138,6 +140,7 @@ async def get_my_proposals(
             "client_id": str(job.client_id) if job else None,
             "cover_letter": app.cover_letter,
             "proposed_budget": app.proposed_budget,
+            "portfolio_url": app.portfolio_url,
             "role": app.role,
             "status": app.status,
             "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
@@ -289,11 +292,13 @@ async def get_job_proposals(
             "creator_avatar": profile.profile_picture if profile else None,
             "creator_title": profile.headline if profile else None,
             "creator_location": (
-                profile.location.get("city") if profile and isinstance(profile.location, dict) else None
+                profile.location.city if profile and profile.location and hasattr(profile.location, "city")
+                else (profile.location.get("city") if profile and isinstance(profile.location, dict) else None)
             ),
             "creator_skills": skills[:6],
             "cover_letter": app.cover_letter,
             "proposed_budget": app.proposed_budget,
+            "portfolio_url": app.portfolio_url,
             "role": app.role,
             "status": app.status,
             "client_viewed": app.client_viewed,
@@ -336,6 +341,18 @@ async def update_proposal_status(
     if data.status == "accepted" and str(app.crew_id) == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot hire yourself")
 
+    # Prevent multiple accepted proposals for the same job
+    if data.status == "accepted":
+        already_accepted = await Application.find_one(
+            Application.project_id == job.id,
+            Application.status == "accepted",
+        )
+        if already_accepted and str(already_accepted.id) != proposal_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This project already has an accepted proposal. Withdraw or reject it first.",
+            )
+
     app.status = data.status
     await app.save()
 
@@ -371,6 +388,23 @@ async def update_proposal_status(
             )
     except Exception:
         pass
+
+    # Auto-create project conversation when creator is hired
+    if data.status == "accepted":
+        try:
+            from app.services.messaging_service import MessagingService
+            welcome = (
+                f"🎉 You've been hired for **{job.title}**!\n\n"
+                "This is your project workspace. Use this chat to coordinate, share files, and discuss deliverables."
+            )
+            await MessagingService.create_or_get_conversation(
+                participants=[str(current_user.id), str(app.crew_id)],
+                job_id=str(job.id),
+                initial_message=welcome,
+                sender_id=str(current_user.id),
+            )
+        except Exception:
+            pass
 
     # ETF: award client points for hiring a creator
     if data.status == "accepted":
@@ -732,11 +766,10 @@ async def direct_hire(
     # Notify creator
     try:
         from app.services.notification_service import NotificationService
-        await NotificationService.proposal_status_updated(
+        await NotificationService.proposal_accepted(
             creator_id=data.creator_id,
             client_id=str(current_user.id),
             job_title=job.title,
-            new_status="accepted",
             job_id=data.job_id,
         )
     except Exception:

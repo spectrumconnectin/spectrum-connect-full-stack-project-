@@ -186,6 +186,18 @@ export default function ApplicantsPage() {
                       <p className="text-sm text-gray-600 line-clamp-3 italic">&ldquo;{a.cover_letter}&rdquo;</p>
                     </div>
                   )}
+
+                  {/* Portfolio / Drive link */}
+                  {a.portfolio_url && (
+                    <div className="mt-2">
+                      <a href={a.portfolio_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-cobalt font-semibold hover:underline bg-blue-50 px-3 py-1.5 rounded-lg">
+                        <i className="fa-brands fa-google-drive text-xs"></i>
+                        View Portfolio / Work Samples
+                        <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 

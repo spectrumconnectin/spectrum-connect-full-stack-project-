@@ -201,15 +201,14 @@ class JobService:
         if filters.budget_type:
             query["budget_type"] = filters.budget_type
 
-        # Budget range filter
+        # Budget range filter — match jobs whose budget.max >= creator min AND budget.min <= creator max
         if filters.min_budget or filters.max_budget:
-            budget_query = {}
             if filters.min_budget:
-                budget_query["$gte"] = filters.min_budget
+                # Job budget must reach at least the creator's minimum
+                query["budget.max"] = {"$gte": filters.min_budget}
             if filters.max_budget:
-                budget_query["$lte"] = filters.max_budget
-            if budget_query:
-                query["budget.min"] = budget_query
+                # Job budget must not start above the creator's maximum
+                query["budget.min"] = {"$lte": filters.max_budget}
 
         # Experience level filter
         if filters.experience_level:

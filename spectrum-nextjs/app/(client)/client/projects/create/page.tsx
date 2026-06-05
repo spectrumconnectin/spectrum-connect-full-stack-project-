@@ -331,11 +331,35 @@ export default function CreateProjectPage() {
     if (errs.length) { setSubmitError(errs.join('\n')); return; }
 
     setSubmitting(true);
-    const payload: JobCreatePayload & { goals?: string[]; deliverables?: string[] } = {
+
+    // Compute a real deadline datetime from the timeline text
+    const timelineDeadline = (() => {
+      if (!timeline.trim()) return undefined;
+      const t = timeline.toLowerCase();
+      let days = 0;
+      if (t.includes('1 week') || t === '1–2 weeks') days = 7;
+      else if (t.includes('2') && t.includes('week')) days = 14;
+      else if (t.includes('3') && t.includes('week')) days = 21;
+      else if (t.includes('4') && t.includes('week')) days = 28;
+      else if (t.includes('5') || t.includes('6') && t.includes('week')) days = 42;
+      else if (t.includes('7') || t.includes('8') && t.includes('week')) days = 56;
+      else if (t.includes('2') && t.includes('month')) days = 60;
+      else if (t.includes('3') && t.includes('month')) days = 90;
+      else if (t.includes('6') && t.includes('month')) days = 180;
+      if (days > 0) {
+        const d = new Date();
+        d.setDate(d.getDate() + days);
+        return d.toISOString();
+      }
+      return undefined;
+    })();
+
+    const payload: JobCreatePayload & { goals?: string[]; deliverables?: string[]; deadline?: string } = {
       title:       title.trim(),
       description: description.trim(),
       department:  category,
       duration:    timeline.trim() || undefined,
+      deadline:    timelineDeadline,
       skills:      skills.length ? skills : [],
       tags:        [],
       crew_size:   'individual',

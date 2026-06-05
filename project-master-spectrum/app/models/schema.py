@@ -596,6 +596,7 @@ class Application(Document):
     cover_letter: str
     proposed_budget: Optional[float] = None
     proposed_duration: Optional[int] = None # in days
+    portfolio_url: Optional[str] = None      # Google Drive / portfolio link
     hourly_rate: Optional[float] = None
     estimated_hours: Optional[int] = None
     team_members: Optional[List[dict]] = None

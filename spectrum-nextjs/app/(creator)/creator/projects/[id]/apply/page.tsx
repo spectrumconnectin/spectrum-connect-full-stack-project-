@@ -48,6 +48,7 @@ export default function ProjectApplicationPage() {
   const [coverLetter, setCoverLetter] = useState('');
   const [proposedBudget, setProposedBudget] = useState('');
   const [proposedDuration, setProposedDuration] = useState('');
+  const [portfolioUrl, setPortfolioUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +77,7 @@ export default function ProjectApplicationPage() {
         cover_letter: coverLetter,
         proposed_budget: proposedBudget ? Number(proposedBudget) : undefined,
         proposed_duration: proposedDuration ? Number(proposedDuration) : undefined,
+        portfolio_url: portfolioUrl.trim() || undefined,
       });
       setSubmitted(true);
       setTimeout(() => router.push('/creator/projects?tab=applications'), 1800);
@@ -213,20 +215,26 @@ export default function ProjectApplicationPage() {
               </div>
             </div>
 
-            {/* Portfolio note */}
+            {/* Portfolio / Drive link */}
             <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <i className="fa-solid fa-images text-purple-600 text-sm"></i>
+                  <i className="fa-brands fa-google-drive text-purple-600 text-sm"></i>
                 </div>
-                <h2 className="text-lg font-bold text-gray-900">Portfolio</h2>
+                <h2 className="text-lg font-bold text-gray-900">Portfolio / Work Samples</h2>
               </div>
-              <p className="text-sm text-gray-500">
-                Your profile portfolio is automatically shared with the client.{' '}
-                <Link href="/creator/profile" className="text-cobalt font-semibold hover:underline">
-                  Update your portfolio
-                </Link>{' '}
-                to make the best impression.
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Google Drive or Portfolio Link <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={portfolioUrl}
+                onChange={e => setPortfolioUrl(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/..."
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Paste a link to your Google Drive folder, Vimeo reel, Behance, or any portfolio that showcases your relevant work. Clients can click it directly from your proposal.
               </p>
             </div>
 

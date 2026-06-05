@@ -67,6 +67,10 @@ class EscrowMilestone(BaseModel):
     auto_release_at:   Optional[datetime] = None  # delivered_at + 48h
     auto_released:     bool = False                # True if system auto-released
 
+    # Revision tracking
+    revision_count:    int = 0                     # number of revisions requested
+    revision_notes:    Optional[str] = None        # latest revision feedback from client
+
     # Optional link to a ProjectDeadline document
     deadline_id: Optional[str] = None
 
