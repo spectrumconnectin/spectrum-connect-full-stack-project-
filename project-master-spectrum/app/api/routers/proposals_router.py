@@ -416,7 +416,7 @@ async def withdraw_proposal(
 
 @router.post(
     "/{proposal_id}/rate",
-    summary="Submit a rating/review for a creator after project completion (client)",
+    summary="Submit a rating/review after project completion (client rates creator, creator rates client)",
 )
 async def rate_proposal(
     proposal_id: str = Path(...),
@@ -428,8 +428,49 @@ async def rate_proposal(
         raise HTTPException(status_code=404, detail="Proposal not found")
 
     job = await JobPost.get(app.project_id)
-    if not job or str(job.client_id) != str(current_user.id):
-        raise HTTPException(status_code=403, detail="Only the project client can leave a review")
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_client  = str(job.client_id) == str(current_user.id)
+    is_creator = str(app.crew_id)   == str(current_user.id)
+    if not is_client and not is_creator:
+        raise HTTPException(status_code=403, detail="Only project participants can leave a review")
+
+    # ── Creator rates client ──────────────────────────────────────────────────
+    if is_creator:
+        if not data.ratings:
+            raise HTTPException(status_code=400, detail="At least one rating is required")
+        overall = round(sum(data.ratings.values()) / len(data.ratings), 2)
+        await app.update({"$set": {
+            "creator_rating_of_client": {
+                "ratings": data.ratings,
+                "overall": overall,
+                "review": data.review,
+                "tags": data.tags or [],
+                "reviewed_at": datetime.utcnow().isoformat(),
+            }
+        }})
+        # Update client's aggregate rating
+        client = await User.get(job.client_id)
+        if client:
+            old_count  = getattr(client, "review_count", None) or 0
+            old_rating = getattr(client, "rating", None) or 0.0
+            new_count  = old_count + 1
+            new_rating = round((old_rating * old_count + overall) / new_count, 2)
+            await client.update({"$set": {"rating": new_rating, "review_count": new_count}})
+        try:
+            from app.services.notification_service import NotificationService
+            await NotificationService.send(
+                user_id=str(job.client_id),
+                type="review",
+                category="info",
+                title=f"⭐ New review from your creator",
+                message=f"You received a {overall:.1f}/5 review for '{job.title}'.",
+                actor_id=str(current_user.id),
+            )
+        except Exception:
+            pass
+        return {"success": True, "reviewer": "creator", "overall": overall}
 
     if not data.ratings:
         raise HTTPException(status_code=400, detail="At least one rating is required")
