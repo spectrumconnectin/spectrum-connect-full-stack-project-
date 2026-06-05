@@ -931,10 +931,11 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
 
       {/* Request Revision Modal (client) */}
       {revisionTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => { if (!requestingRevision) setRevisionTarget(null); }} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 p-6">
-            <div className="flex items-center justify-between mb-5">
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md z-10 flex flex-col max-h-[92vh]">
+            {/* Header — always visible */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Request Revision</h3>
                 <p className="text-sm text-gray-500 mt-0.5">{revisionTarget.title}</p>
@@ -945,22 +946,28 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
               </button>
             </div>
 
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-4 flex items-start gap-2">
-              <i className="fa-solid fa-lock text-orange-500 text-sm mt-0.5 flex-shrink-0"></i>
-              <p className="text-xs text-orange-700 leading-relaxed">
-                Funds remain locked in escrow until you approve. The creator will be notified and can resubmit.
-              </p>
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-start gap-2">
+                <i className="fa-solid fa-lock text-orange-500 text-sm mt-0.5 flex-shrink-0"></i>
+                <p className="text-xs text-orange-700 leading-relaxed">
+                  Funds remain locked in escrow until you approve. The creator will be notified and can resubmit.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  What needs to change? <span className="text-red-500">*</span>
+                </label>
+                <textarea value={revisionFeedback} onChange={e => setRevisionFeedback(e.target.value)}
+                  rows={5}
+                  placeholder="Be specific: describe exactly what needs to be changed, added, or removed…"
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none" />
+              </div>
             </div>
 
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              What needs to change? <span className="text-red-500">*</span>
-            </label>
-            <textarea value={revisionFeedback} onChange={e => setRevisionFeedback(e.target.value)}
-              rows={4}
-              placeholder="Be specific: describe exactly what needs to be changed, added, or removed…"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 resize-none mb-4" />
-
-            <div className="flex gap-3">
+            {/* Footer buttons — always visible at bottom */}
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
               <button onClick={() => setRevisionTarget(null)} disabled={requestingRevision}
                 className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
                 Cancel
