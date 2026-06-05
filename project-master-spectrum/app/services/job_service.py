@@ -433,11 +433,10 @@ class JobService:
 
     @staticmethod
     async def increment_views(job_id: str):
-        """Increment job post view count"""
+        """Increment job post view count atomically (prevents race conditions)."""
         try:
             job = await JobPost.get(PydanticObjectId(job_id))
             if job:
-                job.view_count += 1
-                await job.save()
+                await job.update({"$inc": {"view_count": 1}})
         except Exception:
             pass  # Silently fail for view counting

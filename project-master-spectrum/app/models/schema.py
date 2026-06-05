@@ -627,7 +627,9 @@ class Application(Document):
     client_viewed: bool = False
     client_viewed_at: Optional[datetime] = None
     client_notes: Optional[str] = None
-    client_rating: Optional[dict] = None  # Review submitted by client after project completion
+    client_rating: Optional[dict] = None             # Review submitted by client (client → creator)
+    creator_rating_of_client: Optional[dict] = None  # Review submitted by creator (creator → client), via /rate
+    creator_rating: Optional[dict] = None            # Review submitted by creator via /review-client
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None

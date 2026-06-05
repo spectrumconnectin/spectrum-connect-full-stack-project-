@@ -59,47 +59,86 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
     """Return headline metrics for the admin dashboard."""
     from app.models.etf_points import EtfPoints
 
-    # User counts — wrapped in try/except to shield against Beanie version differences
+    # User counts — use DB-level count queries instead of loading all documents.
+    import asyncio as _aio
     try:
-        all_users = await User.find_all().to_list()
-        total_users   = len(all_users)
-        creators      = sum(1 for u in all_users if getattr(u, "account_type", "") in ("crew", "both"))
-        clients       = sum(1 for u in all_users if getattr(u, "account_type", "") in ("producer", "both"))
-        admins        = sum(1 for u in all_users if getattr(u, "user_role", "") in ("admin", "moderator"))
-        verified      = sum(1 for u in all_users if getattr(u, "is_verified", False))
-        suspended     = sum(1 for u in all_users if not getattr(u, "is_active", True))
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        new_users_30d = sum(1 for u in all_users if u.id and u.id.generation_time.replace(tzinfo=None) >= thirty_days_ago)
+        # New-user cutoff is encoded in ObjectId generation time; use a filter
+        # on _id >= ObjectId.from_datetime(thirty_days_ago) if supported, else count docs.
+        (
+            total_users,
+            creators,
+            clients,
+            admins,
+            verified,
+            suspended,
+        ) = await _aio.gather(
+            User.find().count(),
+            User.find({"account_type": {"$in": ["crew", "both"]}}).count(),
+            User.find({"account_type": {"$in": ["producer", "both"]}}).count(),
+            User.find({"user_role": {"$in": ["admin", "moderator"]}}).count(),
+            User.find({"is_verified": True}).count(),
+            User.find({"is_active": False}).count(),
+        )
+        # Approximate new-user count via ObjectId timestamp prefix
+        from bson import ObjectId as _BsonOID
+        cutoff_id = _BsonOID.from_datetime(thirty_days_ago)
+        new_users_30d = await User.find({"_id": {"$gte": cutoff_id}}).count()
     except Exception:
         total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
-    # Financial stats — pull from Transaction records (the source of truth for
-    # completed payments).  Escrow model is used only for status counts.
+    # Financial stats — use MongoDB aggregation pipeline to sum amounts server-side.
     try:
         from app.models.schema import Transaction as TxModel
         from app.models.escrow import Escrow as EscrowModel
 
-        all_tx = await TxModel.find(TxModel.status == "completed").to_list()
-        total_volume    = round(sum(float(t.amount or 0)       for t in all_tx), 2)
-        total_fees      = round(sum(float(t.platform_fee or 0) for t in all_tx), 2)
-        client_fee_usd  = round(sum(float(t.client_fee or 0)   for t in all_tx), 2)
-        creator_fee_usd = round(sum(float(t.creator_fee or 0)  for t in all_tx), 2)
+        # Aggregate sums in one round-trip instead of loading all transactions
+        pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": None,
+                "total_volume":    {"$sum": "$amount"},
+                "total_fees":      {"$sum": "$platform_fee"},
+                "client_fee_usd":  {"$sum": "$client_fee"},
+                "creator_fee_usd": {"$sum": "$creator_fee"},
+            }},
+        ]
+        agg_result = await TxModel.aggregate(pipeline).to_list()
+        if agg_result:
+            total_volume    = round(agg_result[0].get("total_volume",    0), 2)
+            total_fees      = round(agg_result[0].get("total_fees",      0), 2)
+            client_fee_usd  = round(agg_result[0].get("client_fee_usd",  0), 2)
+            creator_fee_usd = round(agg_result[0].get("creator_fee_usd", 0), 2)
+        else:
+            total_volume = total_fees = client_fee_usd = creator_fee_usd = 0.0
 
-        # Counts come from the Escrow document statuses
-        all_escrows = await EscrowModel.find_all().to_list()
-        active_escrow    = sum(1 for e in all_escrows if e.status in ("active", "funded", "in_progress"))
-        completed_escrow = sum(1 for e in all_escrows if e.status == "completed")
-        disputed_escrow  = sum(1 for e in all_escrows if e.status == "disputed")
+        # Escrow status counts
+        active_escrow, completed_escrow, disputed_escrow = await _aio.gather(
+            EscrowModel.find({"status": {"$in": ["active", "funded", "in_progress"]}}).count(),
+            EscrowModel.find({"status": "completed"}).count(),
+            EscrowModel.find({"status": "disputed"}).count(),
+        )
     except Exception:
         total_volume = active_escrow = completed_escrow = disputed_escrow = 0
         total_fees = client_fee_usd = creator_fee_usd = 0
 
-    # ETF stats
+    # ETF stats — aggregate in DB
     try:
-        all_etf = await EtfPoints.find_all().to_list()
-        total_points_awarded = sum(int(e.lifetime_points or 0) for e in all_etf)
-        platinum_users = sum(1 for e in all_etf if e.level == "platinum")
-        gold_users = sum(1 for e in all_etf if e.level == "gold")
+        etf_pipeline = [
+            {"$group": {
+                "_id": None,
+                "total_lifetime": {"$sum": "$lifetime_points"},
+                "platinum_users": {"$sum": {"$cond": [{"$eq": ["$level", "platinum"]}, 1, 0]}},
+                "gold_users":     {"$sum": {"$cond": [{"$eq": ["$level", "gold"]},     1, 0]}},
+            }}
+        ]
+        etf_result = await EtfPoints.aggregate(etf_pipeline).to_list()
+        if etf_result:
+            total_points_awarded = int(etf_result[0].get("total_lifetime", 0))
+            platinum_users       = int(etf_result[0].get("platinum_users", 0))
+            gold_users           = int(etf_result[0].get("gold_users",     0))
+        else:
+            total_points_awarded = platinum_users = gold_users = 0
     except Exception:
         total_points_awarded = platinum_users = gold_users = 0
 
@@ -276,20 +315,20 @@ async def list_all_jobs(
 ):
     from app.models.schema import JobPost
     try:
-        all_jobs = await JobPost.find_all().to_list()
+        raw_filter: dict = {}
+        if job_status:
+            raw_filter["status"] = job_status
+        if search:
+            raw_filter["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+            ]
+        query = JobPost.find(raw_filter)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_jobs = await query.sort([("_id", -1)]).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "jobs": []}
-
-    if search:
-        q = search.lower()
-        all_jobs = [j for j in all_jobs if q in (j.title or "").lower() or q in (j.description or "").lower()]
-    if job_status:
-        all_jobs = [j for j in all_jobs if j.status == job_status]
-
-    all_jobs.sort(key=lambda j: j.id.generation_time if j.id else datetime.min, reverse=True)
-    total = len(all_jobs)
-    start = (page - 1) * page_size
-    page_jobs = all_jobs[start: start + page_size]
 
     return {
         "total": total,
@@ -336,18 +375,16 @@ async def list_all_disputes(
     dispute_status: Optional[str] = Query(None, alias="status"),
     admin: User = Depends(get_admin_user),
 ):
-    from app.models.escrow import DisputeCase
+    from app.models.escrow import Dispute as DisputeModel
     try:
-        all_disputes = await DisputeCase.find_all().to_list()
+        query = DisputeModel.find()
+        if dispute_status:
+            query = query.find(DisputeModel.status == dispute_status)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_disputes = await query.sort(-DisputeModel.created_at).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "disputes": []}
-
-    if dispute_status:
-        all_disputes = [d for d in all_disputes if d.status == dispute_status]
-
-    all_disputes.sort(key=lambda d: getattr(d, "created_at", None) or (d.id.generation_time if d.id else datetime.min), reverse=True)
-    total = len(all_disputes)
-    start = (page - 1) * page_size
 
     return {
         "total": total,
@@ -360,10 +397,10 @@ async def list_all_disputes(
                 "escrow_id": str(d.escrow_id) if d.escrow_id else None,
                 "status": d.status,
                 "reason": d.reason,
-                "opened_by": str(d.opened_by) if d.opened_by else None,
-                "created_at": (getattr(d, "created_at", None) or (d.id.generation_time if d.id else None) or datetime.min).isoformat(),
+                "raised_by": str(d.raised_by) if getattr(d, "raised_by", None) else None,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
             }
-            for d in all_disputes[start: start + page_size]
+            for d in page_disputes
         ],
     }
 
@@ -379,16 +416,15 @@ async def list_all_transactions(
 ):
     from app.models.schema import Transaction as TxModel
     try:
-        all_tx = await TxModel.find_all().to_list()
+        raw_filter: dict = {}
+        if tx_status:
+            raw_filter["status"] = tx_status
+        query = TxModel.find(raw_filter)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_tx = await query.sort(-TxModel.initiated_at).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "transactions": []}
-
-    if tx_status:
-        all_tx = [t for t in all_tx if t.status == tx_status]
-
-    all_tx.sort(key=lambda t: t.initiated_at or datetime.min, reverse=True)
-    total = len(all_tx)
-    start = (page - 1) * page_size
 
     return {
         "total": total,
@@ -410,7 +446,7 @@ async def list_all_transactions(
                 "creator_id": str(t.to_user_id) if t.to_user_id else None,
                 "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
             }
-            for t in all_tx[start: start + page_size]
+            for t in page_tx
         ],
     }
 
@@ -421,26 +457,37 @@ async def list_all_transactions(
 async def get_etf_stats(admin: User = Depends(get_admin_user)):
     from app.models.etf_points import EtfPoints
     try:
-        all_etf = await EtfPoints.find_all().to_list()
+        pipeline = [
+            {"$group": {
+                "_id": None,
+                "total_accounts":  {"$sum": 1},
+                "total_lifetime":  {"$sum": "$lifetime_points"},
+                "total_redeemed":  {"$sum": "$redeemed_points"},
+                "bronze":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "bronze"]},   1, 0]}},
+                "silver":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "silver"]},   1, 0]}},
+                "gold":     {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "gold"]},     1, 0]}},
+                "platinum": {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "platinum"]}, 1, 0]}},
+                "diamond":  {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "diamond"]},  1, 0]}},
+            }}
+        ]
+        result = await EtfPoints.aggregate(pipeline).to_list()
+        if not result:
+            return {"total_accounts": 0, "total_lifetime_points": 0, "total_redeemed_points": 0, "level_breakdown": {}}
+        r = result[0]
+        return {
+            "total_accounts":        r.get("total_accounts", 0),
+            "total_lifetime_points": int(r.get("total_lifetime", 0)),
+            "total_redeemed_points": int(r.get("total_redeemed", 0)),
+            "level_breakdown": {
+                "bronze":   r.get("bronze",   0),
+                "silver":   r.get("silver",   0),
+                "gold":     r.get("gold",     0),
+                "platinum": r.get("platinum", 0),
+                "diamond":  r.get("diamond",  0),
+            },
+        }
     except Exception:
         return {}
-
-    levels = {"bronze": 0, "silver": 0, "gold": 0, "platinum": 0}
-    total_lifetime = 0
-    total_redeemed = 0
-    for e in all_etf:
-        lvl = (e.level or "bronze").lower()
-        if lvl in levels:
-            levels[lvl] += 1
-        total_lifetime += int(e.lifetime_points or 0)
-        total_redeemed += int(e.redeemed_points or 0)
-
-    return {
-        "total_accounts": len(all_etf),
-        "total_lifetime_points": total_lifetime,
-        "total_redeemed_points": total_redeemed,
-        "level_breakdown": levels,
-    }
 
 
 # ── Revenue Reporting ──────────────────────────────────────────────────────────
@@ -456,65 +503,82 @@ async def get_revenue_report(admin: User = Depends(get_admin_user)):
     """
     from app.models.schema import Transaction as TxModel
     from app.services.commission_service import DEFAULT_COMMISSION_VERSION
-    from collections import defaultdict
-    from datetime import timezone
 
+    # ── Monthly aggregation — done in DB with $group, not in Python ──────────
     try:
-        all_tx = await TxModel.find(TxModel.status == "completed").to_list()
+        monthly_pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m", "date": "$initiated_at"}},
+                "client_fees":  {"$sum": "$client_fee"},
+                "creator_fees": {"$sum": "$creator_fee"},
+                "total_fees":   {"$sum": "$platform_fee"},
+                "volume":       {"$sum": "$amount"},
+                "count":        {"$sum": 1},
+            }},
+            {"$sort": {"_id": 1}},
+        ]
+        monthly_raw = await TxModel.aggregate(monthly_pipeline).to_list()
     except Exception:
-        all_tx = []
+        monthly_raw = []
 
-    # ── Monthly aggregation (last 12 months) ────────────────────────────────
-    monthly: dict = defaultdict(lambda: {"client_fees": 0.0, "creator_fees": 0.0, "total_fees": 0.0, "volume": 0.0, "count": 0})
-
-    for t in all_tx:
-        ts = t.initiated_at
-        if not ts:
-            continue
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        key = ts.strftime("%Y-%m")   # e.g. "2025-06"
-        monthly[key]["client_fees"]  = round(monthly[key]["client_fees"]  + float(t.client_fee  or 0), 2)
-        monthly[key]["creator_fees"] = round(monthly[key]["creator_fees"] + float(t.creator_fee or 0), 2)
-        monthly[key]["total_fees"]   = round(monthly[key]["total_fees"]   + float(t.platform_fee or 0), 2)
-        monthly[key]["volume"]       = round(monthly[key]["volume"]       + float(t.amount or 0), 2)
-        monthly[key]["count"]       += 1
-
-    # Sort and take last 12 months
-    sorted_months = sorted(monthly.keys())[-12:]
+    # Take last 12 months
     monthly_list = [
         {
-            "month": m,
-            **monthly[m],
+            "month": r["_id"],
+            "client_fees":  round(r.get("client_fees",  0), 2),
+            "creator_fees": round(r.get("creator_fees", 0), 2),
+            "total_fees":   round(r.get("total_fees",   0), 2),
+            "volume":       round(r.get("volume",       0), 2),
+            "count":        r.get("count", 0),
         }
-        for m in sorted_months
+        for r in monthly_raw[-12:]
     ]
 
-    # ── All-time totals ───────────────────────────────────────────────────────
-    totals = {
-        "client_fees":    round(sum(float(t.client_fee  or 0) for t in all_tx), 2),
-        "creator_fees":   round(sum(float(t.creator_fee or 0) for t in all_tx), 2),
-        "platform_total": round(sum(float(t.platform_fee or 0) for t in all_tx), 2),
-        "volume":         round(sum(float(t.amount or 0)       for t in all_tx), 2),
-        "transaction_count": len(all_tx),
-    }
-
-    # ── Top 10 projects by revenue (highest platform_fee per transaction) ────
-    sorted_by_fee = sorted(all_tx, key=lambda t: float(t.platform_fee or 0), reverse=True)[:10]
-    top_projects = [
-        {
-            "id": str(t.id),
-            "amount": float(t.amount or 0),
-            "platform_fee": float(t.platform_fee or 0),
-            "client_fee": float(t.client_fee or 0),
-            "creator_fee": float(t.creator_fee or 0),
-            "client_id": str(t.from_user_id) if t.from_user_id else None,
-            "creator_id": str(t.to_user_id) if t.to_user_id else None,
-            "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
-            "status": t.status,
+    # ── All-time totals — one aggregation query ───────────────────────────────
+    try:
+        totals_pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": None,
+                "client_fees":    {"$sum": "$client_fee"},
+                "creator_fees":   {"$sum": "$creator_fee"},
+                "platform_total": {"$sum": "$platform_fee"},
+                "volume":         {"$sum": "$amount"},
+                "count":          {"$sum": 1},
+            }},
+        ]
+        totals_raw = await TxModel.aggregate(totals_pipeline).to_list()
+        r = totals_raw[0] if totals_raw else {}
+        totals = {
+            "client_fees":       round(r.get("client_fees",    0), 2),
+            "creator_fees":      round(r.get("creator_fees",   0), 2),
+            "platform_total":    round(r.get("platform_total", 0), 2),
+            "volume":            round(r.get("volume",         0), 2),
+            "transaction_count": r.get("count", 0),
         }
-        for t in sorted_by_fee
-    ]
+    except Exception:
+        totals = {"client_fees": 0, "creator_fees": 0, "platform_total": 0, "volume": 0, "transaction_count": 0}
+
+    # ── Top 10 transactions by platform_fee ───────────────────────────────────
+    try:
+        top_tx = await TxModel.find({"status": "completed"}).sort(-TxModel.platform_fee).limit(10).to_list()
+        top_projects = [
+            {
+                "id": str(t.id),
+                "amount": float(t.amount or 0),
+                "platform_fee": float(t.platform_fee or 0),
+                "client_fee": float(t.client_fee or 0),
+                "creator_fee": float(t.creator_fee or 0),
+                "client_id": str(t.from_user_id) if t.from_user_id else None,
+                "creator_id": str(t.to_user_id) if t.to_user_id else None,
+                "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
+                "status": t.status,
+            }
+            for t in top_tx
+        ]
+    except Exception:
+        top_projects = []
 
     return {
         "monthly": monthly_list,

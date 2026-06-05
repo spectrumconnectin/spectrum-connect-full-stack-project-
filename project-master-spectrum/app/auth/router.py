@@ -33,6 +33,15 @@ _otp_store: Dict[str, Dict] = {}
 _OTP_MAX_ATTEMPTS = 5
 
 
+def _purge_expired_otps() -> None:
+    """Remove all expired OTP entries to prevent unbounded memory growth.
+    Called on every send_otp to amortise cleanup cost."""
+    now = datetime.utcnow()
+    expired = [k for k, v in _otp_store.items() if v.get("expires_at", now) < now]
+    for k in expired:
+        _otp_store.pop(k, None)
+
+
 def _is_dev_env() -> bool:
     """True only when ENVIRONMENT/ENV is not production. Used to gate OTP echo."""
     return not settings.is_production()
@@ -62,6 +71,9 @@ async def send_otp(
 
     Rate-limited to 5 sends per 5 minutes per IP to prevent OTP spam.
     """
+    # Purge expired entries on each send to keep the dict from growing forever.
+    _purge_expired_otps()
+
     # Use a cryptographically secure RNG instead of `random` for OTPs.
     otp = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)

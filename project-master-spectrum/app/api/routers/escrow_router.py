@@ -432,10 +432,11 @@ async def create_dispute(
     # Notify the other party
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(request.escrow_id)
-        if escrow:
-            other_id = str(escrow.creator_id) if str(escrow.client_id) == str(current_user.id) else str(escrow.client_id)
+        from app.models.escrow import Escrow as _EscrowModel
+        from beanie import PydanticObjectId as _OID
+        esc = await _EscrowModel.get(_OID(request.escrow_id))
+        if esc:
+            other_id = str(esc.creator_id) if str(esc.client_id) == str(current_user.id) else str(esc.client_id)
             await NotificationService.dispute_opened(
                 other_user_id=other_id,
                 opener_id=str(current_user.id),
@@ -606,10 +607,11 @@ async def resolve_dispute(
     # Notify both parties of the resolution
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import DisputeCase, EscrowTransaction
-        dispute = await DisputeCase.get(dispute_id)
+        from app.models.escrow import Dispute as _DisputeModel, Escrow as _EscrowResModel
+        from beanie import PydanticObjectId as _OIDRes
+        dispute = await _DisputeModel.get(_OIDRes(dispute_id))
         if dispute:
-            escrow = await EscrowTransaction.get(str(dispute.escrow_id))
+            escrow = await _EscrowResModel.get(dispute.escrow_id)
             outcome = request.resolution_type.replace("_", " ").title()
             if escrow:
                 for uid in [str(escrow.client_id), str(escrow.creator_id)]:

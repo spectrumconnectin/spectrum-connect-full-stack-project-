@@ -122,15 +122,23 @@ async def submit_proposal(
 async def get_my_proposals(
     current_user: User = Depends(get_current_user),
 ):
+    import asyncio
     apps = (
         await Application.find(Application.crew_id == current_user.id)
         .sort(-Application.submitted_at)
         .to_list()
     )
 
+    # Fetch all associated jobs in parallel — eliminates N+1 sequential DB calls.
+    jobs_list = await asyncio.gather(
+        *[JobPost.get(app.project_id) for app in apps],
+        return_exceptions=True,
+    )
+
     results = []
-    for app in apps:
-        job = await JobPost.get(app.project_id)
+    for app, job in zip(apps, jobs_list):
+        if isinstance(job, Exception):
+            job = None
         results.append({
             "id": str(app.id),
             "job_id": str(app.project_id),

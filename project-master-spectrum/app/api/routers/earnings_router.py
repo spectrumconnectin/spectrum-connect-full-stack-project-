@@ -11,7 +11,6 @@ Uses the Transaction model (schema.py).
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import PlainTextResponse
 from typing import Optional
-from bson import ObjectId
 from datetime import datetime
 
 from app.models.schema import User, Transaction
@@ -78,39 +77,60 @@ async def get_earnings_stats(
     current_user: User = Depends(get_current_user),
 ):
     uid = current_user.id
-
-    all_txns = await Transaction.find({"to_user_id": uid}).to_list()
-
-    total_earned  = sum(t.net_amount for t in all_txns if t.status == "completed")
-    pending       = sum(t.net_amount for t in all_txns if t.status in ("pending", "processing"))
-    this_month_txns = [
-        t for t in all_txns
-        if t.status == "completed" and t.initiated_at and t.initiated_at.month == __import__("datetime").datetime.utcnow().month
-    ]
-    this_month = sum(t.net_amount for t in this_month_txns)
-
-    # Monthly breakdown for chart (last 6 months)
-    from datetime import datetime, timedelta
     now = datetime.utcnow()
-    monthly: dict[str, float] = {}
-    for i in range(5, -1, -1):
-        month_dt = now.replace(day=1) - timedelta(days=i * 30)
-        key = month_dt.strftime("%b")
-        monthly[key] = 0.0
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    six_months_ago = now.replace(day=1) - __import__("datetime").timedelta(days=5 * 30)
 
-    for t in all_txns:
-        if t.status == "completed" and t.initiated_at:
-            age = (now - t.initiated_at).days
-            if age <= 180:
-                key = t.initiated_at.strftime("%b")
-                monthly[key] = monthly.get(key, 0.0) + t.net_amount
+    # Use aggregation pipeline — one DB round-trip instead of loading all transactions
+    pipeline = [
+        {"$match": {"to_user_id": uid}},
+        {"$group": {
+            "_id": None,
+            "total_earned":       {"$sum": {"$cond": [{"$eq": ["$status", "completed"]}, "$net_amount", 0]}},
+            "pending":            {"$sum": {"$cond": [{"$in": ["$status", ["pending", "processing"]]}, "$net_amount", 0]}},
+            "this_month":         {"$sum": {"$cond": [
+                {"$and": [{"$eq": ["$status", "completed"]}, {"$gte": ["$initiated_at", month_start]}]},
+                "$net_amount", 0
+            ]}},
+            "transaction_count":  {"$sum": 1},
+        }},
+    ]
+    agg = await Transaction.aggregate(pipeline).to_list()
+    if agg:
+        total_earned       = round(agg[0].get("total_earned", 0), 2)
+        pending            = round(agg[0].get("pending", 0), 2)
+        this_month         = round(agg[0].get("this_month", 0), 2)
+        transaction_count  = int(agg[0].get("transaction_count", 0))
+    else:
+        total_earned = pending = this_month = 0.0
+        transaction_count = 0
+
+    # Monthly breakdown for chart — aggregate per month label
+    monthly_pipeline = [
+        {"$match": {"to_user_id": uid, "status": "completed", "initiated_at": {"$gte": six_months_ago}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%b", "date": "$initiated_at"}},
+            "amount": {"$sum": "$net_amount"},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    monthly_raw = await Transaction.aggregate(monthly_pipeline).to_list()
+    monthly_map = {r["_id"]: round(r["amount"], 2) for r in monthly_raw}
+
+    # Ensure all 6 months are represented (even empty ones)
+    monthly_breakdown = []
+    for i in range(5, -1, -1):
+        import datetime as _dt_mod
+        month_dt = now.replace(day=1) - _dt_mod.timedelta(days=i * 30)
+        key = month_dt.strftime("%b")
+        monthly_breakdown.append({"month": key, "amount": monthly_map.get(key, 0.0)})
 
     return {
-        "total_earned": round(total_earned, 2),
-        "pending": round(pending, 2),
-        "this_month": round(this_month, 2),
-        "monthly_breakdown": [{"month": m, "amount": round(v, 2)} for m, v in monthly.items()],
-        "transaction_count": len(all_txns),
+        "total_earned":      total_earned,
+        "pending":           pending,
+        "this_month":        this_month,
+        "monthly_breakdown": monthly_breakdown,
+        "transaction_count": transaction_count,
     }
 
 
