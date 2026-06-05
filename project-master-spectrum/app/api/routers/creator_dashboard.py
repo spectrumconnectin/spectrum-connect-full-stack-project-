@@ -124,10 +124,14 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
     try:
         from app.models.schema import Transaction as TxModel
         txns = await TxModel.find({
-            "recipient_id": current_user.id,
+            "creator_id": current_user.id,
             "status": "completed",
         }).to_list()
-        total_earnings = round(sum(float(t.net_amount or t.amount or 0) for t in txns), 2)
+        # net_amount = amount minus creator's 8% fee; fall back to amount if not set
+        total_earnings = round(sum(
+            float(getattr(t, 'net_amount', None) or (float(t.amount or 0) * 0.92))
+            for t in txns
+        ), 2)
     except Exception:
         total_earnings = 0.0
 
