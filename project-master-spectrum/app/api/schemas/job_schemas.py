@@ -292,12 +292,12 @@ class JobPostRead(BaseModel):
     description: str
     department: str
     role: Optional[str] = None
-    tags: List[str]
+    tags: Optional[List[str]] = []
 
-    crew_size: str
-    complexity: str
+    crew_size: Optional[str] = None
+    complexity: Optional[str] = None
 
-    budget_type: str
+    budget_type: Optional[str] = None
     budget: Optional[dict] = None
     hourly_rate: Optional[dict] = None
     daily_rate: Optional[dict] = None
@@ -308,24 +308,24 @@ class JobPostRead(BaseModel):
     start_date: Optional[datetime] = None
     deadline: Optional[datetime] = None
 
-    skills: List[str]
-    experience_level: str
+    skills: Optional[List[str]] = []
+    experience_level: Optional[str] = None
 
     crew_call: Optional[List[CrewCallRead]] = None
     attachments: Optional[List[AttachmentRead]] = None
 
-    visibility: str
+    visibility: Optional[str] = "public"
     invited_crew: Optional[List[str]] = None
 
     proposal_settings: Optional[ProposalSettingsRead] = None
     questions: Optional[List[ScreeningQuestionRead]] = None
 
     status: str
-    proposal_count: int
-    view_count: int
+    proposal_count: int = 0
+    view_count: int = 0
     hired_crew: Optional[List[str]] = None
     cover_image: Optional[str] = None
-    workspace: Optional[dict] = None  # includes progress, roles_filled/required
+    workspace: Optional[dict] = None
 
     published_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
@@ -339,21 +339,21 @@ class JobPostListRead(BaseModel):
     title: str
     department: str
     role: Optional[str] = None
-    tags: List[str]
+    tags: Optional[List[str]] = []
 
-    crew_size: str
-    complexity: str
-    budget_type: str
+    crew_size: Optional[str] = None
+    complexity: Optional[str] = None
+    budget_type: Optional[str] = None
     budget: Optional[dict] = None
 
-    skills: List[str]
-    experience_level: str
+    skills: Optional[List[str]] = []
+    experience_level: Optional[str] = None
 
     status: str
-    proposal_count: int
-    view_count: int
+    proposal_count: int = 0
+    view_count: int = 0
     cover_image: Optional[str] = None
-    workspace: Optional[dict] = None  # includes progress, roles_filled/required
+    workspace: Optional[dict] = None
 
     published_at: Optional[datetime] = None
     deadline: Optional[datetime] = None
