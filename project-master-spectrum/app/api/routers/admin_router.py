@@ -57,14 +57,14 @@ def _user_summary(u: User) -> dict:
 @router.get("/stats", summary="Platform-wide metrics")
 async def get_platform_stats(admin: User = Depends(get_admin_user)):
     """Return headline metrics for the admin dashboard."""
-    from app.models.escrow import EscrowTransaction
     from app.models.etf_points import EtfPoints
 
     total_users = await User.count()
-    creators = await User.find(User.account_type == "creator").count()
-    clients = await User.find(User.account_type == "client").count()
-    admins = await User.find(User.user_role.in_(["admin", "moderator"])).count()
-    verified = await User.find(User.is_verified == True).count()
+    # account_type values: "crew" | "producer" | "both"
+    creators = await User.find({"account_type": {"$in": ["crew", "both"]}}).count()
+    clients  = await User.find({"account_type": {"$in": ["producer", "both"]}}).count()
+    admins   = await User.find({"user_role": {"$in": ["admin", "moderator"]}}).count()
+    verified  = await User.find(User.is_verified == True).count()
     suspended = await User.find(User.is_active == False).count()
 
     # Users joined in the last 30 days
