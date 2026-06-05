@@ -9,6 +9,9 @@ from datetime import datetime
 from beanie import PydanticObjectId
 
 from app.models.schema import MiyaInteraction, User
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -51,7 +54,7 @@ class AIService:
             }
 
         except Exception as e:
-            print(f"Error in AIService.create_interaction: {e}")
+            logger.error("Error in AIService.create_interaction: %s", e)
             return {}
 
     @staticmethod
@@ -91,7 +94,7 @@ class AIService:
             return history
 
         except Exception as e:
-            print(f"Error in AIService.get_conversation_history: {e}")
+            logger.error("Error in AIService.get_conversation_history: %s", e)
             return []
 
     @staticmethod
@@ -141,7 +144,7 @@ class AIService:
             return response
 
         except Exception as e:
-            print(f"Error in AIService.process_chat_message: {e}")
+            logger.error("Error in AIService.process_chat_message: %s", e)
             return "I'm sorry, I encountered an error processing your message. Please try again."
 
     @staticmethod
@@ -291,5 +294,5 @@ Could you provide more details about what you need help with? I'm here to make y
             return True
 
         except Exception as e:
-            print(f"Error in AIService.submit_feedback: {e}")
+            logger.error("Error in AIService.submit_feedback: %s", e)
             return False

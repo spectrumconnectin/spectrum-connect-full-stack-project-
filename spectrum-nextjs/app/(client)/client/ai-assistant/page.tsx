@@ -75,14 +75,22 @@ export default function ClientAiAssistantPage() {
     setInput('');
     setIsTyping(true);
 
-    // TODO: POST /ai/chat { message: content, conversation_history: messages, role: 'client' }
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 800));
+    let replyText: string;
+    try {
+      const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.text }));
+      const res = await aiChat.send(history);
+      replyText = res.response;
+    } catch {
+      // Fallback to local response if AI API is unavailable
+      await new Promise(r => setTimeout(r, 600));
+      replyText = getMiyaResponse(content);
+    }
 
     const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const aiMsg: Message = {
       id: Date.now() + 1,
       role: 'assistant',
-      text: getMiyaResponse(content),
+      text: replyText,
       time: replyTime,
     };
 

@@ -168,7 +168,7 @@ function VerifyEmailContent() {
 
           <div className="footer-note">
             Need help?{' '}
-            <Link href="/contact" className="ftr-link">Contact support</Link>
+            <a href="mailto:support@spectrumconect.com" className="ftr-link">Contact support</a>
             {' · '}
             <Link href="/login" className="ftr-link">Back to login</Link>
           </div>

@@ -32,6 +32,9 @@ from beanie import PydanticObjectId
 
 from app.models.schema import User, CrewProfile
 from app.services.workforce_balance_service import WorkforceBalanceService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -368,7 +371,7 @@ class SmartConnectService:
             }
 
         except Exception as e:
-            print(f"[SmartConnectService] smart_match error: {e}")
+            logger.error("[SmartConnectService] smart_match error: %s", e)
             return {"matches": [], "total_matches": 0, "search_criteria": {}}
 
     @staticmethod
@@ -494,7 +497,7 @@ class SmartConnectService:
             }
 
         except Exception as e:
-            print(f"[SmartConnectService] search_creatives error: {e}")
+            logger.error("[SmartConnectService] search_creatives error: %s", e)
             return {"creatives": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
 
     @staticmethod
@@ -552,7 +555,7 @@ class SmartConnectService:
             return creatives
 
         except Exception as e:
-            print(f"[SmartConnectService] get_featured_creatives error: {e}")
+            logger.error("[SmartConnectService] get_featured_creatives error: %s", e)
             return []
 
     @staticmethod
@@ -574,7 +577,7 @@ class SmartConnectService:
             return {"success": True, "message": "Profile saved successfully"}
 
         except Exception as e:
-            print(f"[SmartConnectService] save_profile error: {e}")
+            logger.error("[SmartConnectService] save_profile error: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -634,5 +637,5 @@ class SmartConnectService:
             return {"profiles": profiles, "total": len(profiles)}
 
         except Exception as e:
-            print(f"[SmartConnectService] get_saved_profiles error: {e}")
+            logger.error("[SmartConnectService] get_saved_profiles error: %s", e)
             return {"profiles": [], "total": 0}

@@ -9,6 +9,9 @@ from beanie import PydanticObjectId
 from passlib.context import CryptContext
 
 from app.models.schema import User, UserSettings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -81,7 +84,7 @@ class AccountService:
             }
 
         except Exception as e:
-            print(f"Error in AccountService.get_account_settings: {e}")
+            logger.error("Error in AccountService.get_account_settings: %s", e)
             return {
                 "profile": None,
                 "notifications": {},
@@ -120,7 +123,7 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.update_profile: {e}")
+            logger.error("Error in AccountService.update_profile: %s", e)
             return False
 
     @staticmethod
@@ -141,7 +144,7 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.update_email: {e}")
+            logger.error("Error in AccountService.update_email: %s", e)
             return False
 
     @staticmethod
@@ -162,7 +165,7 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.update_password: {e}")
+            logger.error("Error in AccountService.update_password: %s", e)
             return False
 
     @staticmethod
@@ -191,7 +194,7 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.update_notification_settings: {e}")
+            logger.error("Error in AccountService.update_notification_settings: %s", e)
             return False
 
     @staticmethod
@@ -220,7 +223,7 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.update_privacy_settings: {e}")
+            logger.error("Error in AccountService.update_privacy_settings: %s", e)
             return False
 
     @staticmethod
@@ -237,5 +240,5 @@ class AccountService:
             return True
 
         except Exception as e:
-            print(f"Error in AccountService.deactivate_account: {e}")
+            logger.error("Error in AccountService.deactivate_account: %s", e)
             return False

@@ -542,7 +542,7 @@ class ReviewQueueService:
         user = await User.get(rev.user_id)
         if user:
             # TODO: send_review_rejected_email(user.email, ...)
-            print(f"[ReviewQueue] Rejected: {user.email} — email deferred to Phase 2")
+            logger.info("[ReviewQueue] Rejected: {user.email} — email deferred to Phase 2")
 
         return {
             "success": True,

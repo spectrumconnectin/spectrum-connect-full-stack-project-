@@ -10,6 +10,8 @@ from beanie import PydanticObjectId
 import uuid
 
 from app.models.schema import User, Transaction, Subscription
+import logging
+logger = logging.getLogger(__name__)
 
 
 # Define available subscription plans
@@ -131,7 +133,7 @@ class BillingService:
             }
 
         except Exception as e:
-            print(f"Error in BillingService.get_checkout_info: {e}")
+            logger.error("Error in BillingService.get_checkout_info: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -223,7 +225,7 @@ class BillingService:
             }
 
         except Exception as e:
-            print(f"Error in BillingService.create_subscription: {e}")
+            logger.error("Error in BillingService.create_subscription: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -250,7 +252,7 @@ class BillingService:
             return True
 
         except Exception as e:
-            print(f"Error in BillingService.cancel_subscription: {e}")
+            logger.error("Error in BillingService.cancel_subscription: %s", e)
             return False
 
     @staticmethod
@@ -308,7 +310,7 @@ class BillingService:
             }
 
         except Exception as e:
-            print(f"Error in BillingService.get_billing_history: {e}")
+            logger.error("Error in BillingService.get_billing_history: %s", e)
             return {"transactions": [], "subscription": None}
 
     @staticmethod

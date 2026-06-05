@@ -4,6 +4,8 @@ Account API Routes
 Endpoints for user account settings and preferences
 """
 
+import logging
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.models.schema import User
@@ -41,7 +43,7 @@ async def get_account_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load account settings: {str(e)}"
+            detail="Unable to load account settings."
         )
 
 
@@ -75,7 +77,7 @@ async def update_profile(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -101,12 +103,12 @@ async def update_email(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -133,12 +135,12 @@ async def update_password(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -155,7 +157,7 @@ async def update_phone(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -181,7 +183,7 @@ async def update_notification_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -207,7 +209,7 @@ async def update_privacy_settings(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )
 
 
@@ -233,5 +235,5 @@ async def deactivate_account(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An unexpected error occurred. Please try again."
         )

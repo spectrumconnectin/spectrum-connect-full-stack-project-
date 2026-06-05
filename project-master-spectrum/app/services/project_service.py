@@ -203,7 +203,7 @@ class ProjectService:
                             _member.user_id
                         )
                 except Exception as _wf_err:
-                    print(f"[WorkforceBalance] update_project hook failed: {_wf_err}")
+                    logger.error("[WorkforceBalance] update_project hook failed: %s", _wf_err)
             # ───────────────────────────────────────────────────────────────
 
         return project
@@ -320,7 +320,7 @@ class ProjectService:
             for _member in project.team_members:
                 await WorkforceBalanceService.update_active_project_count(_member.user_id)
         except Exception as _wf_err:
-            print(f"[WorkforceBalance] delete_project hook failed: {_wf_err}")
+            logger.error("[WorkforceBalance] delete_project hook failed: %s", _wf_err)
         # ───────────────────────────────────────────────────────────────────
 
     # ==================== Team Management ====================
@@ -384,7 +384,7 @@ class ProjectService:
                 _cp.last_project_assigned_at = datetime.utcnow()
                 await _cp.save()
         except Exception as _wf_err:
-            print(f"[WorkforceBalance] add_team_member hook failed: {_wf_err}")
+            logger.error("[WorkforceBalance] add_team_member hook failed: %s", _wf_err)
         # ───────────────────────────────────────────────────────────────────
 
         # Log activity
@@ -428,7 +428,7 @@ class ProjectService:
         try:
             await WorkforceBalanceService.update_active_project_count(user_id)
         except Exception as _wf_err:
-            print(f"[WorkforceBalance] remove_team_member hook failed: {_wf_err}")
+            logger.error("[WorkforceBalance] remove_team_member hook failed: %s", _wf_err)
         # ───────────────────────────────────────────────────────────────────
 
         return project

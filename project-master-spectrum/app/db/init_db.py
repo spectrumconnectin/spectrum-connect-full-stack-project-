@@ -3,6 +3,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from app.models.schema import (
+import logging
+
+logger = logging.getLogger(__name__)
     User,
     CrewProfile,
     PortfolioItem,
@@ -67,7 +70,7 @@ async def init_database():
             SystemLog,
         ],
     )
-    print("Database initialized successfully.")
+    logger.info("Database initialized successfully.")
 
 if __name__ == "__main__":
     asyncio.run(init_database())
