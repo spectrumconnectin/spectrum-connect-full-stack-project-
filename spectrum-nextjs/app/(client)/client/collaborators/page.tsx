@@ -232,9 +232,13 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
                   {c.name[0]?.toUpperCase()}
                 </div>
               )}
-              {/* Real-time presence dot — only green when genuinely online (heartbeat within 2 min) */}
+              {/* Avatar corner dot — colour reflects online presence + availability setting */}
               {c.is_online && (
-                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white bg-green-500" title="Online now" />
+                <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                  c.availability_status === 'busy' ? 'bg-amber-400' :
+                  c.availability_status === 'not_available' ? 'bg-gray-400' :
+                  'bg-green-500'
+                }`} />
               )}
             </div>
             <div className="min-w-0">
@@ -274,12 +278,22 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
               size="xs"
             />
           )}
-          {/* Presence status — driven purely by real heartbeat data */}
+          {/* Status: combines real-time presence with the user's availability setting */}
           {c.is_online
-            ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                Online
-              </span>
+            ? c.availability_status === 'busy'
+              ? <span className="flex items-center gap-1 text-xs font-semibold text-amber-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                  Busy
+                </span>
+              : c.availability_status === 'not_available'
+                ? <span className="flex items-center gap-1 text-xs text-gray-500 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                    Not available
+                  </span>
+                : <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                    Online
+                  </span>
             : (() => {
                 const label = lastSeenLabel(c.last_seen);
                 return label
