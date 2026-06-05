@@ -29,6 +29,12 @@ class MilestoneDetail(BaseModel):
     refunded_at: Optional[datetime] = None
     release_transaction_id: Optional[str] = None
     deadline_id: Optional[str] = None
+    # Delivery fields — populated when creator submits work
+    google_drive_link: Optional[str] = None
+    delivery_notes: Optional[str] = None
+    delivered_at: Optional[datetime] = None
+    auto_release_at: Optional[datetime] = None
+    auto_released: bool = False
 
 
 class UserBrief(BaseModel):

@@ -189,23 +189,30 @@ async def register_user(
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already taken")
 
-    # Check if phone number is already registered
-    existing_phone = await User.find_one(User.phone_number == user.phone_number)
-    if existing_phone:
-        raise HTTPException(status_code=400, detail="Phone number already registered")
+    # Check if phone number is already registered (only if provided)
+    if user.phone_number:
+        existing_phone = await User.find_one(User.phone_number == user.phone_number)
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Phone number already registered")
 
     hashed_password = get_password_hash(user.password)
 
-    # Parse name into first_name and last_name if provided
+    # Build profile from name fields
     profile = None
-    if user.name:
+    # first_name/last_name take precedence over the legacy `name` field
+    if user.first_name or user.last_name:
+        fn = (user.first_name or '').strip()
+        ln = (user.last_name or '').strip()
+        display = f"{fn} {ln}".strip()
+        profile = Profile(first_name=fn or None, last_name=ln or None,
+                          display_name=display if display else None)
+    elif user.name:
         name_parts = user.name.strip().split(maxsplit=1)
         if len(name_parts) == 1:
-            # Only one name provided, use as display_name
             profile = Profile(display_name=name_parts[0])
         else:
-            # Split into first and last name
-            profile = Profile(first_name=name_parts[0], last_name=name_parts[1])
+            profile = Profile(first_name=name_parts[0], last_name=name_parts[1],
+                              display_name=user.name.strip())
 
     user_db = User(
         email=user.email,

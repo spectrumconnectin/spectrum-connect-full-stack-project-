@@ -6,17 +6,22 @@ class UserCreate(BaseModel):
     email: EmailStr
     username: str = Field(..., min_length=3, max_length=30)
     password: str = Field(..., min_length=8, max_length=128)
-    phone_number: str = Field(..., description="Phone number in E.164 format (e.g., +1234567890)")
+    # Phone is optional — User model stores it as Optional[str]
+    phone_number: Optional[str] = Field(None, description="Phone number in E.164 format (e.g., +1234567890)")
     phone_country_code: Optional[str] = Field(None, description="Country code (e.g., US, IN, GB)")
     account_type: str
-    name: Optional[str] = None  # Full name from signup form
+    name: Optional[str] = None        # Full name from signup form
+    first_name: Optional[str] = None  # Sent by frontend signup
+    last_name: Optional[str] = None   # Sent by frontend signup
 
-    @validator('phone_number')
+    @validator('phone_number', always=True)
     def validate_phone_number(cls, v):
+        if v is None or v in ('+', '+1', ''):
+            return None  # treat bare country-code stubs as "not provided"
         if not v.startswith('+'):
             raise ValueError('Phone number must start with + (E.164 format)')
-        if not re.match(r'^\+[1-9]\d{1,14}$', v):
-            raise ValueError('Invalid phone number format. Use E.164 format (e.g., +1234567890)')
+        if not re.match(r'^\+[1-9]\d{6,14}$', v):
+            raise ValueError('Invalid phone number format. Use E.164 format (e.g., +12025551234)')
         return v
 
     @validator('username')
