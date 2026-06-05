@@ -98,13 +98,19 @@ export default function CreatorDashboardPage() {
             color: 'bg-purple-100 text-purple-600',
           },
           {
-            label: 'Satisfaction',
-            value: stats?.client_satisfaction
-              ? `${stats.client_satisfaction.toFixed(0)}%`
-              : '—',
-            sub: stats?.client_satisfaction ? 'client rating' : 'No reviews yet',
-            icon: 'fa-star',
-            color: 'bg-amber-100 text-amber-600',
+            label: 'Response Time',
+            value: (() => {
+              const rt = stats?.response_time_hours;
+              if (!rt || rt === 0) return '—';
+              if (rt < 1) return '< 1h';
+              if (rt < 24) return `~${Math.round(rt)}h`;
+              return `~${Math.round(rt / 24)}d`;
+            })(),
+            sub: stats?.response_time_hours && stats.response_time_hours > 0
+              ? 'avg reply time'
+              : 'Send messages to track',
+            icon: 'fa-clock',
+            color: 'bg-sky-100 text-sky-600',
           },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">

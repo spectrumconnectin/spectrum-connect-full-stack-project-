@@ -139,6 +139,12 @@ class MessageService:
         )
         await message.insert()
 
+        # ── Response time tracking ────────────────────────────────────────────
+        # A "response" is: the sender is different from who sent the last message,
+        # and the gap is < 7 days (168 h) — longer gaps are new threads, not replies.
+        prev_sender_id = conversation.last_message_sender_id
+        prev_sent_at   = conversation.last_message_at
+
         # Update conversation last message
         conversation.last_message = content[:100]  # Truncate for preview
         conversation.last_message_at = message.sent_at
@@ -150,6 +156,34 @@ class MessageService:
                 conversation.increment_unread(participant_id)
 
         await conversation.save()
+
+        # Record response time on sender's stats (fire-and-forget, non-blocking)
+        if (
+            prev_sender_id
+            and prev_sent_at
+            and prev_sender_id != sender_id
+        ):
+            try:
+                from datetime import datetime as _dt
+                gap_hours = (_dt.utcnow() - prev_sent_at).total_seconds() / 3600
+                # Only track genuine replies (< 7 days, > 1 minute)
+                if 0.017 < gap_hours < 168:
+                    sender_user = await User.get(PydanticObjectId(sender_id))
+                    if sender_user:
+                        from app.models.schema import UserStats
+                        if not sender_user.stats:
+                            sender_user.stats = UserStats()
+                        old_rt = sender_user.stats.response_time or 0
+                        # Exponential moving average (α=0.25) — recent replies matter more
+                        # First-ever response: use raw value; subsequent: blend with history
+                        if old_rt == 0:
+                            new_rt = round(gap_hours, 1)
+                        else:
+                            new_rt = round(0.25 * gap_hours + 0.75 * old_rt, 1)
+                        sender_user.stats.response_time = new_rt
+                        await sender_user.save()
+            except Exception:
+                pass  # Never let tracking break message delivery
 
         # Create in-app notifications for all other participants
         try:

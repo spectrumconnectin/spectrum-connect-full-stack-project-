@@ -509,7 +509,13 @@ export default function CollaboratorProfilePage() {
               {[
                 { label: 'Completed', value: completedProjects > 0 ? String(completedProjects) : '0', icon: 'fa-circle-check', color: 'text-emerald-600' },
                 { label: 'Satisfaction', value: stats?.client_satisfaction ? `${stats.client_satisfaction.toFixed(0)}%` : (creator.rating ? `${(creator.rating * 20).toFixed(0)}%` : '—'), icon: 'fa-star', color: 'text-amber-500' },
-                { label: 'Response time', value: stats?.response_time && stats.response_time > 0 ? `~${stats.response_time}h` : '—', icon: 'fa-clock', color: 'text-cobalt' },
+                { label: 'Response time', value: (() => {
+                    const rt = stats?.response_time;
+                    if (!rt || rt === 0) return '—';
+                    if (rt < 1) return '< 1h';
+                    if (rt < 24) return `~${Math.round(rt)}h`;
+                    return `~${Math.round(rt / 24)}d`;
+                  })(), icon: 'fa-clock', color: 'text-cobalt' },
                 { label: 'Active projects', value: stats?.active_projects != null ? String(stats.active_projects) : '0', icon: 'fa-briefcase', color: 'text-purple-600' },
               ].map(({ label, value, icon, color }) => (
                 <div key={label} className="text-center p-2.5 bg-gray-50 rounded-xl">
