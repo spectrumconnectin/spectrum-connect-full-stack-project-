@@ -229,44 +229,41 @@ class ProfileService:
 
             public_data["profile"] = profile_data
 
-        # ── Compute live stats from real data ────────────────────────────────
+        # ── Compute live stats — batch query, no N+1 ─────────────────────────
         active_projects_count = 0
         projects_completed_count = 0
         try:
             from app.models.schema import Application, JobPost
-            apps = await Application.find(
-                {"crew_id": user.id, "status": "accepted"}
-            ).to_list()
-            for app in apps:
-                if not app.project_id:
-                    continue
+            # If cached stats are recent enough, use them (avoid DB round-trip on every profile view)
+            cached_active = user.stats.active_projects if user.stats else None
+            cached_completed = user.stats.completed_credits if user.stats else None
+            if cached_active is not None and cached_completed is not None:
+                active_projects_count = cached_active
+                projects_completed_count = cached_completed
+            else:
+                # Compute from DB with single batch query
+                apps = await Application.find(
+                    {"crew_id": user.id, "status": "accepted"}
+                ).to_list()
+                pids = [a.project_id for a in apps if a.project_id]
+                if pids:
+                    jobs_batch = await JobPost.find({"_id": {"$in": pids}}).to_list()
+                    for j in jobs_batch:
+                        if j.status == "completed":
+                            projects_completed_count += 1
+                        elif j.status in ("in_progress", "delivered", "approved", "pending_funding"):
+                            active_projects_count += 1
+                # Persist so next profile load uses the cache
                 try:
-                    job = await JobPost.get(app.project_id)
-                    if not job:
-                        continue
-                    if job.status == "completed":
-                        projects_completed_count += 1
-                    elif job.status in ("in_progress", "delivered", "approved", "pending_funding"):
-                        active_projects_count += 1
+                    from app.models.schema import UserStats
+                    if not user.stats:
+                        user.stats = UserStats()
+                    user.stats.active_projects = active_projects_count
+                    user.stats.completed_credits = projects_completed_count
+                    user.stats.projects_completed = projects_completed_count
+                    await user.save()
                 except Exception:
                     pass
-        except Exception:
-            pass
-
-        # Use pre-computed values if live calc returns 0 (e.g. rare edge cases)
-        if projects_completed_count == 0 and user.stats:
-            projects_completed_count = user.stats.completed_credits or user.stats.projects_completed or 0
-
-        # Persist back so other surfaces see fresh data
-        try:
-            if not user.stats:
-                from app.models.schema import UserStats
-                user.stats = UserStats()
-            user.stats.active_projects = active_projects_count
-            user.stats.completed_credits = projects_completed_count
-            user.stats.projects_completed = projects_completed_count
-            user.stats.client_satisfaction = round((getattr(user, "rating", 0) or 0) * 20, 1)
-            await user.save()
         except Exception:
             pass
 

@@ -96,7 +96,8 @@ function MyWorkInner() {
     setAppError(null);
     Promise.all([
       proposals.getMe(),
-      escrow.list({ limit: 50 }).catch(() => ({ escrows: [] })),
+      // Only fetch escrow for hired (accepted) applications — not for submitted/shortlisted
+      escrow.list({ role: 'creator', limit: 20 }).catch(() => ({ escrows: [] })),
     ])
       .then(([apps, esc]) => {
         if (cancelled) return;

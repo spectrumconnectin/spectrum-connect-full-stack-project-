@@ -100,24 +100,22 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
     total_earnings = 0.0
 
     try:
-        # All accepted applications for this creator
+        # Fetch all accepted applications in one query
         all_apps = await Application.find(
             {"crew_id": current_user.id, "status": "accepted"}
         ).to_list()
 
-        for app in all_apps:
-            if not app.project_id:
-                continue
-            try:
-                job = await JobPost.get(app.project_id)
-                if not job:
-                    continue
-                if job.status == "completed":
+        project_ids = [app.project_id for app in all_apps if app.project_id]
+        if project_ids:
+            # Single batch query instead of N individual gets
+            all_jobs = await JobPost.find({"_id": {"$in": project_ids}}).to_list()
+            job_status_map = {str(j.id): j.status for j in all_jobs}
+            for pid in project_ids:
+                status = job_status_map.get(str(pid), "")
+                if status == "completed":
                     projects_completed_count += 1
-                elif job.status in ("in_progress", "delivered", "approved", "pending_funding"):
+                elif status in ("in_progress", "delivered", "approved", "pending_funding"):
                     active_projects_count += 1
-            except Exception:
-                pass
     except Exception:
         pass
 
@@ -194,7 +192,7 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
     except Exception:
         opportunities = []
 
-    # Active teams (accepted/shortlisted applications)
+    # Active teams — batch job lookup (no N+1)
     active_teams: List[ActiveTeam] = []
     try:
         apps = await Application.find(
@@ -203,52 +201,66 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
                 "status": {"$in": ["accepted", "in_progress", "shortlisted", "interviewing"]},
             }
         ).to_list(5)
-        for app in apps:
-            job = await JobPost.get(app.project_id) if app.project_id else None
-            deadline = job.deadline if job else None
-            remaining_days = None
-            if deadline:
-                remaining_days = max(0, (deadline - datetime.utcnow()).days)
-            active_teams.append(
-                ActiveTeam(
+        if apps:
+            team_job_ids = [app.project_id for app in apps if app.project_id]
+            team_jobs = await JobPost.find({"_id": {"$in": team_job_ids}}).to_list()
+            team_job_map = {str(j.id): j for j in team_jobs}
+            for app in apps:
+                job = team_job_map.get(str(app.project_id))
+                deadline = job.deadline if job else None
+                remaining_days = max(0, (deadline - datetime.utcnow()).days) if deadline else None
+                active_teams.append(ActiveTeam(
                     project_id=str(app.project_id),
                     title=job.title if job else "Project",
                     role=app.role,
                     status=app.status,
                     time_remaining_days=remaining_days,
                     avatar_urls=[],
-                )
-            )
+                ))
     except Exception:
         active_teams = []
 
-    # Recent messages (conversation last_message)
+    # Recent messages — batch user lookup (no N+1)
     messages: List[MessagePreview] = []
     try:
-        # New Conversation model has participants as list of user_id strings
-        conversations = await Conversation.find({"participants": str(current_user.id)}).sort("-last_message_at").limit(5).to_list()
+        conversations = await Conversation.find(
+            {"participants": str(current_user.id)}
+        ).sort("-last_message_at").limit(5).to_list()
+
+        # Collect all other-participant IDs, then fetch in one batch
+        other_ids = []
         for conv in conversations:
             if not conv.last_message:
                 continue
-            # Find other participant (participants is now a list of user_id strings)
-            other_participant_id = next(
-                (p for p in conv.participants if str(p) != str(current_user.id)), None
-            )
-            other_user: Optional[User] = None
-            if other_participant_id:
-                try:
-                    other_user = await User.get(other_participant_id)
-                except Exception:
-                    other_user = None
-            messages.append(
-                MessagePreview(
-                    id=str(conv.id),
-                    name=other_user.profile.display_name if other_user and other_user.profile else (conv.job_title or "Conversation"),
-                    text=conv.last_message,
-                    timestamp=conv.last_message_at,
-                    avatar=other_user.profile.profile_picture if other_user and other_user.profile else None,
-                )
-            )
+            oid = next((p for p in conv.participants if str(p) != str(current_user.id)), None)
+            if oid:
+                other_ids.append(oid)
+
+        if other_ids:
+            from beanie import PydanticObjectId as _OID
+            try:
+                other_users_list = await User.find(
+                    {"_id": {"$in": [_OID(x) for x in other_ids]}}
+                ).to_list()
+                user_map = {str(u.id): u for u in other_users_list}
+            except Exception:
+                user_map = {}
+        else:
+            user_map = {}
+
+        for conv in conversations:
+            if not conv.last_message:
+                continue
+            oid = next((p for p in conv.participants if str(p) != str(current_user.id)), None)
+            other_user = user_map.get(str(oid)) if oid else None
+            messages.append(MessagePreview(
+                id=str(conv.id),
+                name=other_user.profile.display_name if other_user and other_user.profile
+                     else (conv.job_title or "Conversation"),
+                text=conv.last_message,
+                timestamp=conv.last_message_at,
+                avatar=other_user.profile.profile_picture if other_user and other_user.profile else None,
+            ))
     except Exception:
         messages = []
 

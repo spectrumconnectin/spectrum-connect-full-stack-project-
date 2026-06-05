@@ -62,7 +62,6 @@ export default function ClientProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState('');
 
-  useEffect(() => { auth.me().then(u => setMyUserId(u.id)).catch(() => {}); }, []);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
@@ -82,31 +81,29 @@ export default function ClientProjectDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    jobs.getById(id)
-      .then(data => {
-        setJob(data);
-        // Fetch hired creator + escrow status in parallel
-        if (data.status !== 'draft') {
-          Promise.allSettled([
-            proposals.getForJob(data.id),
-            escrow.list({ role: 'client', limit: 50 }),
-          ]).then(([propResult, escResult]) => {
-            if (propResult.status === 'fulfilled') {
-              const res = propResult.value;
-              const accepted = (Array.isArray(res) ? res : []).find((p: JobProposalItem) => p.status === 'accepted');
-              if (accepted) setHiredCreator(accepted);
-            }
-            if (escResult.status === 'fulfilled') {
-              const linked = escResult.value.escrows.find(
-                (e: EscrowListItem) => e.job_post_id === data.id
-              );
-              if (linked) setProjectEscrow(linked);
-            }
-          });
-        }
-      })
-      .catch(e => setError((e as Error).message))
-      .finally(() => setLoading(false));
+    // Fire all 4 requests simultaneously — no waterfall
+    Promise.allSettled([
+      jobs.getById(id),
+      proposals.getForJob(id),
+      escrow.list({ role: 'client', limit: 50 }),
+      auth.me(),
+    ]).then(([jobRes, propRes, escRes, meRes]) => {
+      if (jobRes.status === 'fulfilled') {
+        setJob(jobRes.value);
+      } else {
+        setError('Project not found.');
+      }
+      if (propRes.status === 'fulfilled') {
+        const accepted = (Array.isArray(propRes.value) ? propRes.value : [])
+          .find((p: JobProposalItem) => p.status === 'accepted');
+        if (accepted) setHiredCreator(accepted);
+      }
+      if (escRes.status === 'fulfilled') {
+        const linked = escRes.value.escrows.find((e: EscrowListItem) => e.job_post_id === id);
+        if (linked) setProjectEscrow(linked);
+      }
+      if (meRes.status === 'fulfilled') setMyUserId(meRes.value.id);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   const handleStatusChange = async (newStatus: string) => {

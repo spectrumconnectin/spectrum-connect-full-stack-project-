@@ -157,6 +157,7 @@ async def get_proposal_detail(
     """Fetch a single proposal/application with full job + escrow context.
     Used by the creator workspace page.
     """
+    import asyncio
     from beanie import PydanticObjectId
     from app.models.escrow import Escrow as EscrowDoc
 
@@ -167,29 +168,29 @@ async def get_proposal_detail(
     if not app:
         raise HTTPException(status_code=404, detail="Proposal not found")
 
-    # Only the creator or the client can view
+    # Auth check — must be creator or client of this job
     if str(app.crew_id) != str(current_user.id):
         job_check = await JobPost.get(app.project_id)
         if not job_check or str(job_check.client_id) != str(current_user.id):
             raise HTTPException(status_code=403, detail="Not authorised")
 
-    job = await JobPost.get(app.project_id)
+    # Fetch job + escrow in parallel (not sequential)
+    async def _get_escrow():
+        try:
+            escs = await EscrowDoc.find(EscrowDoc.job_post_id == app.project_id).to_list()
+            for e in escs:
+                if str(e.creator_id) == str(app.crew_id):
+                    return e
+            return escs[0] if escs else None
+        except Exception:
+            return None
 
-    # Get escrow for this job (if any)
-    escrow = None
-    try:
-        escs = await EscrowDoc.find(EscrowDoc.job_post_id == app.project_id).to_list()
-        # prefer the one belonging to this creator
-        for e in escs:
-            if str(e.creator_id) == str(app.crew_id):
-                escrow = e
-                break
-        if escrow is None and escs:
-            escrow = escs[0]
-    except Exception:
-        pass
+    job, escrow = await asyncio.gather(
+        JobPost.get(app.project_id),
+        _get_escrow(),
+    )
 
-    # Client info
+    # Client info — now that we have job, fetch client
     client_info = None
     if job:
         try:
