@@ -12,7 +12,12 @@ class TalentService:
         skill: Optional[str] = None,
         limit: int = 30,
     ) -> List[User]:
-        query = {"account_type": "crew"}
+        # Base filter: active creator accounts only — exclude soft-deleted and suspended users
+        query: dict = {
+            "account_type": "crew",
+            "is_active": {"$ne": False},      # exclude suspended accounts
+            "deleted_at": {"$exists": False},  # exclude soft-deleted accounts
+        }
         if q:
             query["$or"] = [
                 {"profile.display_name": {"$regex": q, "$options": "i"}},

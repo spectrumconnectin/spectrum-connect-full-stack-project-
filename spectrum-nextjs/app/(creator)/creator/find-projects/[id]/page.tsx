@@ -8,7 +8,7 @@ import { jobs, proposals, JobPostItem } from '@/lib/api';
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, sfx = '') => {
     if (!min && !max) return 'Negotiable';
-    if (min && max) return `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
+    if (min && max) return min === max ? `$${min.toLocaleString()}${sfx}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
     if (min) return `From $${min.toLocaleString()}${sfx}`;
     return `Up to $${max?.toLocaleString()}${sfx}`;
   };

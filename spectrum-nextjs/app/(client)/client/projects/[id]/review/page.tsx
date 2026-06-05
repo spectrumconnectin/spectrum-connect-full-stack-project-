@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, proposals, messaging, JobPostItem, JobProposalItem } from '@/lib/api';
+import { jobs, proposals, messaging, JobPostItem, JobProposalItem, ProposalItem } from '@/lib/api';
 
 const categories = [
   { key: 'quality',       label: 'Quality of Work',     icon: 'fa-star',          desc: 'How good was the final deliverable?' },
@@ -29,6 +29,8 @@ export default function ReviewPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [privateNote, setPrivateNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+  const [existingReview, setExistingReview] = useState<{ overall: number; review: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [showFutureWork, setShowFutureWork] = useState(false);
@@ -48,6 +50,18 @@ export default function ReviewPage() {
         const list = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
         const accepted = list.find((p: { status: string }) => p.status === 'accepted') ?? list[0] ?? null;
         setCreator(accepted);
+        // Check if client already submitted a review for this proposal
+        if (accepted) {
+          proposals.getReviews(accepted.id).then(reviewData => {
+            if (reviewData?.client_rating) {
+              setAlreadyReviewed(true);
+              setExistingReview({
+                overall: reviewData.client_rating.overall ?? 0,
+                review: reviewData.client_rating.review ?? '',
+              });
+            }
+          }).catch(() => { /* non-blocking */ });
+        }
       }
     }).finally(() => setLoadingData(false));
   }, [id]);
@@ -83,6 +97,38 @@ export default function ReviewPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Show "already reviewed" state if review was previously submitted
+  if (alreadyReviewed && !submitted) {
+    return (
+      <div className="max-w-lg mx-auto py-16 text-center">
+        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <i className="fa-solid fa-circle-check text-emerald-600 text-3xl"></i>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Already Submitted</h1>
+        <p className="text-gray-500 mb-6">
+          You have already left a review for {creator?.creator_name ?? 'this creator'} on this project.
+        </p>
+        {existingReview && (
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              {[1, 2, 3, 4, 5].map(s => (
+                <i key={s} className={`fa-star text-lg ${existingReview.overall >= s ? 'fa-solid text-amber-400' : 'fa-regular text-gray-300'}`}></i>
+              ))}
+              <span className="text-sm font-bold text-gray-700 ml-1">{existingReview.overall.toFixed(1)}</span>
+            </div>
+            {existingReview.review && (
+              <p className="text-sm text-gray-600 leading-relaxed italic">&ldquo;{existingReview.review}&rdquo;</p>
+            )}
+          </div>
+        )}
+        <Link href={`/client/projects/${id}`}
+          className="px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition">
+          Back to Project
+        </Link>
       </div>
     );
   }

@@ -38,7 +38,7 @@ function jobStatusLabel(status: string): string {
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, sfx = '') => {
     if (!min && !max) return 'TBD';
-    if (min && max) return `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
+    if (min && max) return min === max ? `$${min.toLocaleString()}${sfx}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
     if (min) return `$${min.toLocaleString()}+${sfx}`;
     return `Up to $${max?.toLocaleString()}${sfx}`;
   };

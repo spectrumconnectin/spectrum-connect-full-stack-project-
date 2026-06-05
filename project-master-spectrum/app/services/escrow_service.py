@@ -264,6 +264,32 @@ class EscrowService:
         now = datetime.utcnow()
         tx_id = str(uuid.uuid4())
 
+        # ── Idempotency guard against rapid double-click / concurrent requests ──
+        # Atomically flip the milestone status from (approved/delivered) → released.
+        # If another request already changed it to 'released', this update will
+        # match 0 documents and we raise a 409 instead of creating a duplicate
+        # transaction.  We use the raw motor collection for the atomic update.
+        try:
+            from pymongo import ReturnDocument
+            result = await escrow.get_motor_collection().find_one_and_update(
+                {
+                    "_id": escrow.id,
+                    "milestones.milestone_id": milestone_id,
+                    "milestones.status": {"$in": ["approved", "delivered"]},
+                },
+                {"$set": {"milestones.$.status": "releasing"}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if result is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Milestone is already being released or has already been paid. Duplicate release prevented.",
+                )
+        except HTTPException:
+            raise
+        except ImportError:
+            pass  # pymongo not available in test environment — skip atomic guard
+
         # Apply v1 8/4 commission split — see app/services/commission_service.py.
         fees = calc_commission(milestone.amount, currency=escrow.currency)
         fees_dict = fees.to_dict()

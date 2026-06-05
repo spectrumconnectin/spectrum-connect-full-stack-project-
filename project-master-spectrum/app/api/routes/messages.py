@@ -430,7 +430,20 @@ async def search_messages(
     )
 
 
-# ==================== File Upload (Placeholder) ====================
+# ==================== File Upload ====================
+
+# Supported attachment types for in-chat file sharing
+_ALLOWED_ATTACHMENT_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+    "application/zip",
+}
+_MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 20 MB per attachment
 
 @router.post("/attachments/upload", response_model=AttachmentResponse)
 async def upload_attachment(
@@ -438,18 +451,66 @@ async def upload_attachment(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Upload a file attachment
+    Upload a file attachment for use in a project conversation.
+    Files are stored on S3 and the permanent URL is returned.
 
-    TODO: Implement actual file storage (S3, local, etc.)
-    For now, returns a placeholder
+    Supported types: images, PDF, Word/Excel, plain text, zip.
+    Max size: 20 MB per file.
     """
-    # Placeholder implementation
-    # In production, upload to S3 or local storage
+    import os as _os
+    import uuid as _uuid
+    import boto3 as _boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required.")
+
+    content = await file.read()
+    file_size = len(content)
+
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if file_size > _MAX_ATTACHMENT_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds the 20 MB limit.")
+
+    declared_type = file.content_type or "application/octet-stream"
+    if declared_type not in _ALLOWED_ATTACHMENT_TYPES:
+        # Allow images regardless of exact sub-type for convenience
+        if not declared_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{declared_type}'. Allowed: images, PDF, Word, Excel, text, zip.",
+            )
+
+    # Sanitize filename and derive extension
+    safe_name = _os.path.basename(file.filename).replace("..", "").replace("/", "_").replace("\\", "_")
+    ext = _os.path.splitext(safe_name)[1].lower() or ".bin"
+
+    # Upload to S3
+    S3_BUCKET = _os.getenv("S3_MEDIA_BUCKET", "spectrum-connect-media-217989999840")
+    S3_REGION = _os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
+    S3_BASE_URL = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com"
+    key = f"attachments/{str(current_user.id)}/{_uuid.uuid4().hex}{ext}"
+
+    try:
+        s3 = _boto3.client("s3", region_name=S3_REGION)
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=key,
+            Body=content,
+            ContentType=declared_type,
+            # Force download for non-image files (security: prevent inline JS execution)
+            ContentDisposition=f'attachment; filename="{safe_name}"' if not declared_type.startswith("image/") else "inline",
+        )
+        file_url = f"{S3_BASE_URL}/{key}"
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(status_code=500, detail=f"File upload failed: {exc}")
+
     attachment = MessageAttachment(
-        filename=file.filename,
-        file_size=0,  # Get from file
-        file_type=file.content_type,
-        file_url=f"/uploads/{file.filename}",  # Placeholder
+        filename=safe_name,
+        file_size=file_size,
+        file_type=declared_type,
+        file_url=file_url,
         uploaded_by=str(current_user.id)
     )
     await attachment.insert()

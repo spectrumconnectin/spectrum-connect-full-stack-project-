@@ -18,7 +18,7 @@ const BUDGET_RANGES = ['Any Budget', 'Under $1,000', '$1,000 – $3,000', '$3,00
 
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, suffix = '') => {
-    if (min && max) return `$${min.toLocaleString()} – $${max.toLocaleString()}${suffix}`;
+    if (min && max) return min === max ? `$${min.toLocaleString()}${suffix}` : `$${min.toLocaleString()} – $${max.toLocaleString()}${suffix}`;
     if (min) return `From $${min.toLocaleString()}${suffix}`;
     return `Rate TBD`;
   };

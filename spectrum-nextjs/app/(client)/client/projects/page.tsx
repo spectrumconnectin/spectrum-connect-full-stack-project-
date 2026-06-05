@@ -39,7 +39,7 @@ const STATUS_STYLES: Record<string, string> = {
 function formatBudget(p: JobPostItem): string {
   const fmt = (min?: number, max?: number, suffix = '') => {
     if (!min && !max) return 'TBD';
-    if (min && max) return `$${min.toLocaleString()}–$${max.toLocaleString()}${suffix}`;
+    if (min && max) return min === max ? `$${min.toLocaleString()}${suffix}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${suffix}`;
     if (min) return `$${min.toLocaleString()}+${suffix}`;
     return `$${max?.toLocaleString()}${suffix}`;
   };
