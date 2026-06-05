@@ -59,17 +59,19 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
     """Return headline metrics for the admin dashboard."""
     from app.models.etf_points import EtfPoints
 
-    total_users = await User.count()
-    # account_type values: "crew" | "producer" | "both"
-    creators = await User.find({"account_type": {"$in": ["crew", "both"]}}).count()
-    clients  = await User.find({"account_type": {"$in": ["producer", "both"]}}).count()
-    admins   = await User.find({"user_role": {"$in": ["admin", "moderator"]}}).count()
-    verified  = await User.find(User.is_verified == True).count()
-    suspended = await User.find(User.is_active == False).count()
-
-    # Users joined in the last 30 days
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    new_users_30d = await User.find(User.created_at >= thirty_days_ago).count()
+    # User counts — wrapped in try/except to shield against Beanie version differences
+    try:
+        all_users = await User.find_all().to_list()
+        total_users   = len(all_users)
+        creators      = sum(1 for u in all_users if getattr(u, "account_type", "") in ("crew", "both"))
+        clients       = sum(1 for u in all_users if getattr(u, "account_type", "") in ("producer", "both"))
+        admins        = sum(1 for u in all_users if getattr(u, "user_role", "") in ("admin", "moderator"))
+        verified      = sum(1 for u in all_users if getattr(u, "is_verified", False))
+        suspended     = sum(1 for u in all_users if not getattr(u, "is_active", True))
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        new_users_30d = sum(1 for u in all_users if u.created_at and u.created_at >= thirty_days_ago)
+    except Exception:
+        total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
     # Financial stats — pull from Transaction records (the source of truth for
     # completed payments).  Escrow model is used only for status counts.
