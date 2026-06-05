@@ -204,6 +204,13 @@ async def startup_db_client():
             ],
         )
         logger.info("Beanie initialized successfully")
+
+        # Start auto-release background scheduler (runs every 30 min)
+        import asyncio
+        from app.services.auto_release_service import _scheduler_loop
+        asyncio.create_task(_scheduler_loop())
+        logger.info("Auto-release scheduler started")
+
     except Exception as e:
         logger.exception("Error initializing Beanie")
         raise e

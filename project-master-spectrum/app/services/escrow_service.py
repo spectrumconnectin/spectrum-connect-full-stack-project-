@@ -199,16 +199,19 @@ class EscrowService:
         escrow_id: str,
         milestone_id: str,
         client_id: str,
+        is_auto_release: bool = False,
     ) -> Dict[str, Any]:
         """
         Client approves completed work and releases milestone funds to creator.
         Creates an immutable Transaction record.
+        Set is_auto_release=True to bypass the client_id ownership check
+        (used by the auto-release background job).
         """
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
             raise HTTPException(status_code=404, detail="Escrow not found.")
 
-        if str(escrow.client_id) != client_id:
+        if not is_auto_release and str(escrow.client_id) != client_id:
             raise HTTPException(status_code=403, detail="Only the client can release milestones.")
 
         if escrow.status not in {"active"}:
@@ -223,7 +226,9 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        if milestone.status not in ("funded", "approved"):
+        # Auto-release: allow 'delivered' status too (client didn't explicitly approve)
+        allowed_statuses = ("funded", "approved", "delivered") if is_auto_release else ("funded", "approved")
+        if milestone.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
                 detail=f"Milestone must be 'funded' or 'approved' before release (current: '{milestone.status}').",

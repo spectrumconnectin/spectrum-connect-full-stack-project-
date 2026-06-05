@@ -351,15 +351,35 @@ export default function ClientProjectDetailPage() {
             <i className="fa-solid fa-box-open text-white text-xl"></i>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Review &amp; Release</p>
+            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Action Required</p>
             <p className="text-indigo-700 text-sm mt-0.5 leading-relaxed">
-              The creator has submitted their work. Review the deliverables below, then release funds when you&apos;re satisfied — or request revisions from the Milestones tab.
+              The creator has submitted their work with a Google Drive link. Review it, then release payment or request revisions.
+              <span className="font-semibold"> Payment auto-releases in 48 hours if no action is taken.</span>
             </p>
-            {canReleaseFunds && (
-              <button onClick={handleOpenReleaseFunds}
-                className="inline-flex items-center gap-2 mt-3 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition">
-                <i className="fa-solid fa-coins text-xs"></i>Release Funds
-              </button>
+            {/* Find the delivered milestone and link to its review page */}
+            {projectEscrow && (
+              <div className="flex gap-3 mt-3 flex-wrap">
+                <Link
+                  href={`/client/projects/${id}/delivery/${
+                    // We don't have milestone ID here, so link to deliverables tab
+                    projectEscrow.escrow_id ? `#deliverables` : '#'
+                  }`}
+                  onClick={e => {
+                    // Navigate to the workspace and open ProjectWorkspace deliverables tab
+                    // For now, just use the release funds flow as it handles escrow detail
+                    e.preventDefault();
+                    handleOpenReleaseFunds();
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition">
+                  <i className="fa-solid fa-magnifying-glass text-xs"></i>Review Delivery
+                </Link>
+                {canReleaseFunds && (
+                  <button onClick={handleOpenReleaseFunds}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-indigo-300 text-indigo-700 text-sm font-bold rounded-xl hover:bg-indigo-50 transition">
+                    <i className="fa-solid fa-coins text-xs"></i>Release Payment
+                  </button>
+                )}
+              </div>
             )}
           </div>
           <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">

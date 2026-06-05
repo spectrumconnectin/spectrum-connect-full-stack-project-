@@ -637,10 +637,15 @@ async def deliver_milestone(
     if milestone.status not in ("funded", "revision_requested"):
         raise HTTPException(status_code=400, detail=f"Cannot deliver a milestone with status '{milestone.status}'")
 
+    now = datetime.utcnow()
     milestone.status = "delivered"
     milestone.google_drive_link = body.google_drive_link.strip()
     milestone.delivery_notes = body.delivery_notes
-    milestone.delivered_at = datetime.utcnow()
+    milestone.delivered_at = now
+    # 48-hour auto-release window starts now
+    from datetime import timedelta
+    milestone.auto_release_at = now + timedelta(hours=48)
+    milestone.auto_released = False
     await esc.save()
 
     # Check if ALL milestones are now delivered/approved/released → job status = "delivered"
@@ -656,21 +661,39 @@ async def deliver_milestone(
         except Exception:
             pass
 
-    # Notify client
+    # Notify client with 48-hour auto-release warning
     try:
         from app.services.notification_service import NotificationService
         await NotificationService.send(
             user_id=str(esc.client_id),
             type="escrow",
             category="action_required",
-            title="Delivery submitted — review required",
-            message=f"The creator has submitted work on milestone '{milestone.title}'. Please review and approve or request a revision.",
+            title="🎉 Delivery received — review within 48 hours",
+            message=(
+                f"The creator has submitted work on '{milestone.title}'. "
+                f"Review the Google Drive link and release payment or request a revision. "
+                f"If no action is taken within 48 hours, payment will be automatically released."
+            ),
             actor_id=str(current_user.id),
+        )
+        # Notify creator that delivery was received
+        await NotificationService.send(
+            user_id=str(esc.creator_id),
+            type="escrow",
+            category="info",
+            title="Delivery received by client",
+            message=f"Your delivery for '{milestone.title}' has been received. The client has 48 hours to review.",
+            actor_id=str(esc.client_id),
         )
     except Exception:
         pass
 
-    return {"success": True, "milestone_id": milestone_id, "status": "delivered"}
+    return {
+        "success": True,
+        "milestone_id": milestone_id,
+        "status": "delivered",
+        "auto_release_at": milestone.auto_release_at.isoformat() if milestone.auto_release_at else None,
+    }
 
 
 @escrow_router.post(
@@ -813,3 +836,73 @@ async def request_revision(
         pass
 
     return {"success": True, "milestone_id": milestone_id, "status": "revision_requested"}
+
+
+# ── Auto-release endpoints ────────────────────────────────────────────────────
+
+@escrow_router.post(
+    "/trigger-auto-release",
+    summary="Manually trigger auto-release check (admin/system)",
+    tags=["Admin"],
+)
+async def trigger_auto_release(admin: User = Depends(get_admin_user)):
+    """
+    Manually runs the auto-release check immediately.
+    In production this runs automatically every 30 minutes.
+    Admin only.
+    """
+    from app.services.auto_release_service import run_auto_release_check
+    result = await run_auto_release_check()
+    return {"success": True, **result}
+
+
+@escrow_router.get(
+    "/{escrow_id}/delivery-status",
+    summary="Get delivery status and auto-release countdown for a milestone",
+)
+async def get_delivery_status(
+    escrow_id: str,
+    milestone_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns delivery details and auto-release countdown for a specific milestone.
+    Used by the client delivery review page.
+    """
+    from app.models.escrow import Escrow as EscrowDoc
+    from beanie import PydanticObjectId
+    from datetime import datetime as _dt
+
+    esc = await EscrowDoc.get(PydanticObjectId(escrow_id))
+    if not esc:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    # Only client or creator can view
+    if str(esc.client_id) != str(current_user.id) and str(esc.creator_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+
+    milestone = next((m for m in esc.milestones if m.milestone_id == milestone_id), None)
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+
+    now = _dt.utcnow()
+    hours_remaining = None
+    if milestone.auto_release_at and milestone.status == "delivered":
+        diff = (milestone.auto_release_at - now).total_seconds()
+        hours_remaining = max(0, diff / 3600)
+
+    return {
+        "milestone_id": milestone.milestone_id,
+        "title": milestone.title,
+        "amount": float(milestone.amount),
+        "status": milestone.status,
+        "google_drive_link": milestone.google_drive_link,
+        "delivery_notes": milestone.delivery_notes,
+        "delivered_at": milestone.delivered_at.isoformat() if milestone.delivered_at else None,
+        "auto_release_at": milestone.auto_release_at.isoformat() if milestone.auto_release_at else None,
+        "hours_remaining": round(hours_remaining, 2) if hours_remaining is not None else None,
+        "auto_released": milestone.auto_released,
+        "escrow_id": str(esc.id),
+        "client_id": str(esc.client_id),
+        "creator_id": str(esc.creator_id),
+    }

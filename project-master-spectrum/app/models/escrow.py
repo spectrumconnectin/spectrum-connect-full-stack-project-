@@ -64,6 +64,8 @@ class EscrowMilestone(BaseModel):
     google_drive_link: Optional[str] = None   # REQUIRED when submitting delivery
     delivery_notes:    Optional[str] = None   # optional message from creator
     delivered_at:      Optional[datetime] = None
+    auto_release_at:   Optional[datetime] = None  # delivered_at + 48h
+    auto_released:     bool = False                # True if system auto-released
 
     # Optional link to a ProjectDeadline document
     deadline_id: Optional[str] = None
