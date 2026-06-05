@@ -388,9 +388,10 @@ export default function ClientProjectDetailPage() {
             <i className="fa-solid fa-box-open text-white text-xl"></i>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-indigo-900 text-lg">Delivery Received — Action Required</p>
+            <p className="font-bold text-indigo-900 text-lg">Work Delivered — Review Required</p>
             <p className="text-indigo-700 text-sm mt-0.5 leading-relaxed">
-              The creator has submitted their work with a Google Drive link. Review it, then release payment or request revisions.
+              The creator has submitted (or resubmitted) their work via Google Drive.
+              Open the link, review the deliverables, then approve the work or request further changes.
               <span className="font-semibold"> Payment auto-releases in 48 hours if no action is taken.</span>
             </p>
             {projectEscrow && (
