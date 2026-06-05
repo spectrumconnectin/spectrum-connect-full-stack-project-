@@ -10,6 +10,155 @@ const CATEGORIES = [
   'Music & Audio', 'Digital & Interactive', 'Photography', 'Branding', 'Other',
 ];
 
+// ── Project Templates ─────────────────────────────────────────────────────────
+interface Template {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  category: string;
+  title: string;
+  description: string;
+  goals: string[];
+  deliverables: string[];
+  skills: string[];
+  budgetType: string;
+  budgetMin: string;
+  budgetMax: string;
+  timeline: string;
+}
+
+const TEMPLATES: Template[] = [
+  {
+    id: 'logo',
+    name: 'Logo Design',
+    icon: 'fa-pen-nib',
+    color: 'bg-purple-100 text-purple-600',
+    category: 'Design',
+    title: 'Logo Design for [Company Name]',
+    description: 'We need a professional logo that represents our brand identity. The logo should be modern, versatile, and work across digital and print media.',
+    goals: ['Create a memorable brand identity', 'Design a timeless, scalable logo', 'Deliver files for web and print'],
+    deliverables: ['Primary logo (SVG, PNG, PDF)', 'Icon/symbol variant', 'Black & white version', 'Brand color palette', 'Usage guidelines'],
+    skills: ['Graphic Design', 'Brand Strategy', 'Illustration'],
+    budgetType: 'fixed',
+    budgetMin: '300',
+    budgetMax: '1500',
+    timeline: '1–2 weeks',
+  },
+  {
+    id: 'promo_video',
+    name: 'Promo Video',
+    icon: 'fa-film',
+    color: 'bg-red-100 text-red-600',
+    category: 'Film & Video',
+    title: 'Promotional Video for [Product/Brand]',
+    description: 'We need a high-quality promotional video to showcase our product/service. The video should be engaging, professional, and optimised for social media and our website.',
+    goals: ['Increase brand awareness', 'Drive product sales', 'Grow social media engagement'],
+    deliverables: ['60–90 second promo video', 'Social media cut (15s + 30s)', 'Raw footage files', 'Colour-graded master file'],
+    skills: ['Videography', 'Video Editing', 'Motion Graphics', 'Colour Grading'],
+    budgetType: 'fixed',
+    budgetMin: '500',
+    budgetMax: '3000',
+    timeline: '2–3 weeks',
+  },
+  {
+    id: 'social_media',
+    name: 'Social Media Pack',
+    icon: 'fa-hashtag',
+    color: 'bg-pink-100 text-pink-600',
+    category: 'Marketing & Strategy',
+    title: 'Social Media Content Pack — [Brand Name]',
+    description: 'We need a complete social media content package including graphics, captions, and a posting strategy to grow our online presence.',
+    goals: ['Grow social media following', 'Increase engagement rate', 'Build consistent brand voice'],
+    deliverables: ['10 social media graphics (Instagram, Facebook)', '10 post captions with hashtags', 'Monthly content calendar', 'Brand style guide for social'],
+    skills: ['Graphic Design', 'Social Media', 'Copywriting', 'Brand Strategy'],
+    budgetType: 'fixed',
+    budgetMin: '400',
+    budgetMax: '1200',
+    timeline: '1 week',
+  },
+  {
+    id: 'website_ui',
+    name: 'Website Design',
+    icon: 'fa-desktop',
+    color: 'bg-blue-100 text-cobalt',
+    category: 'Digital & Interactive',
+    title: 'Website UI/UX Design for [Company]',
+    description: 'We need a complete website redesign with a modern, user-friendly interface. The design should be responsive, conversion-focused, and reflect our brand identity.',
+    goals: ['Improve user experience', 'Increase conversion rate', 'Modernise brand presence online'],
+    deliverables: ['Full desktop + mobile design (Figma)', 'Homepage + 5 inner pages', 'Interactive prototype', 'Design system / component library', 'Developer handoff files'],
+    skills: ['UI/UX Design', 'Figma', 'Prototyping', 'Brand Strategy'],
+    budgetType: 'fixed',
+    budgetMin: '1500',
+    budgetMax: '5000',
+    timeline: '3–4 weeks',
+  },
+  {
+    id: 'photo_shoot',
+    name: 'Photography',
+    icon: 'fa-camera',
+    color: 'bg-amber-100 text-amber-600',
+    category: 'Photography',
+    title: 'Product/Brand Photography for [Company]',
+    description: 'Professional photography session to create high-quality images for our website, social media, and marketing materials.',
+    goals: ['Create professional brand imagery', 'Build a content library', 'Elevate product presentation'],
+    deliverables: ['30+ edited, high-resolution photos', 'Web-optimised versions', 'Raw files', 'Rights transfer agreement'],
+    skills: ['Photography', 'Photo Editing', 'Creative Direction'],
+    budgetType: 'fixed',
+    budgetMin: '300',
+    budgetMax: '1500',
+    timeline: '1 week',
+  },
+  {
+    id: 'copywriting',
+    name: 'Website Copy',
+    icon: 'fa-pen',
+    color: 'bg-green-100 text-green-600',
+    category: 'Writing & Content',
+    title: 'Website Copywriting for [Company]',
+    description: 'We need compelling, SEO-optimised copy for our website that clearly communicates our value proposition and converts visitors into customers.',
+    goals: ['Improve SEO ranking', 'Increase website conversions', 'Communicate brand value clearly'],
+    deliverables: ['Homepage copy', '5 page copy (About, Services, etc.)', 'Meta titles & descriptions', '3 blog post drafts'],
+    skills: ['Copywriting', 'SEO', 'Content Strategy'],
+    budgetType: 'fixed',
+    budgetMin: '300',
+    budgetMax: '1000',
+    timeline: '1–2 weeks',
+  },
+  {
+    id: 'music',
+    name: 'Music / Jingle',
+    icon: 'fa-music',
+    color: 'bg-indigo-100 text-indigo-600',
+    category: 'Music & Audio',
+    title: 'Original Music / Jingle for [Brand/Project]',
+    description: 'We need an original piece of music or jingle for our brand, video, or campaign. The music should be memorable, match our brand personality, and be royalty-free.',
+    goals: ['Create unique brand sound', 'Increase brand recall', 'Produce royalty-free music for campaigns'],
+    deliverables: ['Full track (WAV + MP3)', '30-second edit', '15-second cut', 'Stems/separate tracks', 'Full rights transfer'],
+    skills: ['Music Production', 'Sound Design', 'Mixing & Mastering'],
+    budgetType: 'fixed',
+    budgetMin: '200',
+    budgetMax: '1500',
+    timeline: '1–2 weeks',
+  },
+  {
+    id: 'brand_identity',
+    name: 'Brand Identity',
+    icon: 'fa-star',
+    color: 'bg-orange-100 text-orange-600',
+    category: 'Branding',
+    title: 'Complete Brand Identity for [Company]',
+    description: 'We need a comprehensive brand identity system including logo, colour palette, typography, and brand guidelines to establish a consistent visual presence across all touchpoints.',
+    goals: ['Build a cohesive brand identity', 'Create consistent brand experience', 'Differentiate from competitors'],
+    deliverables: ['Primary + secondary logo', 'Colour system + typography', 'Brand guidelines document', 'Business card + letterhead design', 'Social media templates'],
+    skills: ['Graphic Design', 'Brand Strategy', 'Creative Direction'],
+    budgetType: 'fixed',
+    budgetMin: '1000',
+    budgetMax: '5000',
+    timeline: '3–4 weeks',
+  },
+];
+
 const SKILLS_SUGGESTIONS = [
   'Video Editing', 'Videography', 'Graphic Design', 'UI/UX Design', 'Motion Graphics',
   'Animation', 'VFX', 'Copywriting', 'Scriptwriting', 'Photography',
@@ -136,6 +285,24 @@ export default function CreateProjectPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const publishRef = useRef<'open' | 'draft'>('open');
+  const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
+
+  // ── Apply a template ─────────────────────────────────────────────────────
+  const applyTemplate = (tpl: Template) => {
+    setTitle(tpl.title);
+    setDescription(tpl.description);
+    setCategory(tpl.category);
+    setGoals(tpl.goals);
+    setDeliverables(tpl.deliverables);
+    setSkills(tpl.skills);
+    setBudgetType(tpl.budgetType);
+    setBudgetMin(tpl.budgetMin);
+    setBudgetMax(tpl.budgetMax);
+    setTimeline(tpl.timeline);
+    setAppliedTemplate(tpl.id);
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // ── helpers ─────────────────────────────────────────────────────────────
   const addItem = (
@@ -263,7 +430,91 @@ export default function CreateProjectPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+      <div className="flex gap-8 items-start">
+
+      {/* ── Templates sidebar (right) ── */}
+      <div className="hidden xl:block w-72 flex-shrink-0 sticky top-6 order-2">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gradient-to-r from-cobalt to-blue-500 px-5 py-4 text-white">
+            <div className="flex items-center gap-2 mb-1">
+              <i className="fa-solid fa-bolt text-yellow-300"></i>
+              <h3 className="font-bold text-sm">Quick Templates</h3>
+            </div>
+            <p className="text-xs text-blue-100">Click any template to pre-fill the form instantly</p>
+          </div>
+          <div className="p-3 space-y-1.5 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {TEMPLATES.map(tpl => (
+              <button
+                key={tpl.id}
+                type="button"
+                onClick={() => applyTemplate(tpl)}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition group border ${
+                  appliedTemplate === tpl.id
+                    ? 'bg-cobalt border-cobalt text-white shadow-sm'
+                    : 'bg-gray-50 border-transparent hover:border-cobalt hover:bg-blue-50'
+                }`}
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  appliedTemplate === tpl.id ? 'bg-white/20' : tpl.color
+                }`}>
+                  <i className={`fa-solid ${tpl.icon} text-sm ${appliedTemplate === tpl.id ? 'text-white' : ''}`}></i>
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-sm font-semibold truncate ${appliedTemplate === tpl.id ? 'text-white' : 'text-gray-900'}`}>
+                    {tpl.name}
+                  </p>
+                  <p className={`text-xs truncate ${appliedTemplate === tpl.id ? 'text-blue-100' : 'text-gray-400'}`}>
+                    {tpl.category}
+                  </p>
+                </div>
+                {appliedTemplate === tpl.id ? (
+                  <i className="fa-solid fa-check text-white ml-auto flex-shrink-0 text-xs"></i>
+                ) : (
+                  <i className="fa-solid fa-arrow-right text-gray-300 group-hover:text-cobalt ml-auto flex-shrink-0 text-xs transition"></i>
+                )}
+              </button>
+            ))}
+          </div>
+          {appliedTemplate && (
+            <div className="px-4 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center gap-2">
+              <i className="fa-solid fa-circle-check text-emerald-600 text-sm flex-shrink-0"></i>
+              <p className="text-xs text-emerald-700 font-semibold">
+                Template applied! Customise as needed.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Mobile template strip (shown below header on small screens) ── */}
+      <div className="xl:hidden mb-6 order-first w-full">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fa-solid fa-bolt text-cobalt"></i>
+            <h3 className="font-bold text-sm text-gray-900">Quick Templates</h3>
+            <span className="text-xs text-gray-400 ml-1">— click to pre-fill the form</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {TEMPLATES.map(tpl => (
+              <button
+                key={tpl.id}
+                type="button"
+                onClick={() => applyTemplate(tpl)}
+                className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition border whitespace-nowrap ${
+                  appliedTemplate === tpl.id
+                    ? 'bg-cobalt text-white border-cobalt'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-cobalt hover:bg-blue-50'
+                }`}
+              >
+                <i className={`fa-solid ${tpl.icon}`}></i>
+                {tpl.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0 order-1">
 
         {/* ── 1. Project Information ── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
@@ -445,6 +696,8 @@ export default function CreateProjectPage() {
         </div>
 
       </form>
+
+      </div>{/* end two-column wrapper */}
     </>
   );
 }
