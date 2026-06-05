@@ -712,11 +712,11 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
                   {/* Client actions — shown when delivered or approved */}
                   {role === 'client' && (m.status === 'delivered' || m.status === 'approved') && (
                     <div className="flex flex-col gap-2 flex-shrink-0">
-                      {/* Release Payment = approve + release in one click */}
+                      {/* Release Payment — single click, auto-approves first if needed */}
                       <button
                         onClick={async () => {
                           if (acting) return;
-                          if (m.status === 'delivered') await doAction('approve', m.milestone_id);
+                          // Backend now handles delivered→approved→released in one call
                           await doAction('release', m.milestone_id);
                         }}
                         disabled={acting === m.milestone_id}

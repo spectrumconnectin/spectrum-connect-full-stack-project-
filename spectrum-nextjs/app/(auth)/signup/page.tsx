@@ -194,13 +194,20 @@ export default function SignUpPage() {
         email,
         username,
         password,
-        phone_number: phone,
+        phone_number: phone.length > 3 ? phone : undefined,
+        first_name: first.trim(),
+        last_name: last.trim(),
         account_type: accountType,
         name: `${first} ${last}`.trim(),
       });
       setStep('otp');
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : 'Registration failed');
+      const msg = e instanceof Error ? e.message : 'Registration failed';
+      // Surface specific constraint violations as field hints
+      if (msg.toLowerCase().includes('email already')) setErr('This email is already registered. Try logging in instead.');
+      else if (msg.toLowerCase().includes('username already') || msg.toLowerCase().includes('username')) setErr('That username is taken. Try a different one.');
+      else if (msg.toLowerCase().includes('phone')) setErr('Phone number already registered. Try a different number or leave it blank.');
+      else setErr(msg);
     } finally {
       setSubmitting(false);
     }

@@ -174,10 +174,12 @@ export const auth = {
     email: string;
     username: string;
     password: string;
-    phone_number: string;
+    phone_number?: string;
     phone_country_code?: string;
     account_type: string;
     name?: string;
+    first_name?: string;
+    last_name?: string;
   }): Promise<RegisterResponse> =>
     request<RegisterResponse>('/auth/register', {
       method: 'POST',

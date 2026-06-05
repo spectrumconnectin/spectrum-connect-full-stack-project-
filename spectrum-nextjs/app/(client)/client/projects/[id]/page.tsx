@@ -115,6 +115,10 @@ export default function ClientProjectDetailPage() {
     try {
       const updated = await jobs.updateStatus(id, newStatus);
       setJob(updated);
+      if (newStatus === 'completed') {
+        // Navigate to projects list so user sees the updated state
+        setTimeout(() => router.push('/client/projects'), 800);
+      }
     } catch (e) {
       alert((e as Error).message);
     } finally {
