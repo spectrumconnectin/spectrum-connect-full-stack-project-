@@ -670,7 +670,7 @@ export default function DeliveryReviewPage() {
               {!driveOpened && (
                 <p className="text-xs text-cobalt font-semibold mt-3 flex items-center gap-1.5">
                   <i className="fa-solid fa-circle-info"></i>
-                  Click "Open Drive Link" above to view the deliverables and unlock the review process.
+                  Click &ldquo;Open Drive Link&rdquo; above to view the deliverables and unlock the review process.
                 </p>
               )}
             </div>
