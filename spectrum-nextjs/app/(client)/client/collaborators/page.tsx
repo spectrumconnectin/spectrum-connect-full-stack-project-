@@ -253,12 +253,12 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
               size="xs"
             />
           )}
-          {/* Show real-time status OR fallback to profile-set availability */}
+          {/* Real-time presence status only — never show "Available" when not active */}
           {c.is_online
             ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse"></span>Online</span>
             : c.last_seen
-              ? <span className="text-xs text-gray-400">Active {relativeTime(c.last_seen)}</span>
-              : <AvailabilityDot status={c.availability_status ?? undefined} />
+              ? <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block"></span>Active {relativeTime(c.last_seen)}</span>
+              : <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block"></span>Offline</span>
           }
           {hasPortfolio && (
             <span className="flex items-center gap-1 text-xs text-purple-600 font-medium">
