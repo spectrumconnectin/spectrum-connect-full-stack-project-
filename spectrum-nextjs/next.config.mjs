@@ -24,7 +24,13 @@ const securityHeaders = [
 
 const nextConfig = {
   images: {
-    domains: [],
+    domains: [
+      'storage.googleapis.com',        // Google Cloud Storage avatars/covers
+      'spectrum-connect-media-217989999840.s3.ap-south-1.amazonaws.com', // S3 uploads
+      'ui-avatars.com',                // Fallback initials avatars
+      'uxpilot-auth.appspot.com',      // Demo/placeholder avatars
+      'lh3.googleusercontent.com',     // Google OAuth profile pictures
+    ],
   },
   // Don't broadcast the framework version in the X-Powered-By header.
   poweredByHeader: false,

@@ -360,8 +360,6 @@ export const profile = {
     const data = typeof nameOrData === 'string' ? { name: nameOrData, level } : nameOrData;
     return request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) });
   },
-  _addSkill_orig: (data: { name: string; level?: string; years_of_experience?: number }) =>
-    request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) }),
 
   deleteSkill: (index: number) =>
     request(`/profiles/me/skills/${index}`, { method: 'DELETE' }),
@@ -1515,10 +1513,10 @@ export const messaging = {
     request<MessageListResponse>(`/messages/conversations/${conversationId}/messages${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
   uploadAttachment: async (file: File): Promise<{ id: string; filename: string; file_url: string; file_size: number; file_type: string }> => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') || localStorage.getItem('access_token') : null;
+    const token = tokenStore.get();
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/messages/attachments/upload`, {
+    const res = await fetch(`${BASE_URL}/messages/attachments/upload`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,

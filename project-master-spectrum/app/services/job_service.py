@@ -383,5 +383,5 @@ class JobService:
             if job:
                 job.view_count += 1
                 await job.save()
-        except:
+        except Exception:
             pass  # Silently fail for view counting

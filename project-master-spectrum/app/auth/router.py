@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import Dict
 import logging
 import secrets
-import random
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -415,100 +414,6 @@ async def google_callback(code: str, state: str | None = None):
         logger.exception("Google OAuth callback failed")
         # Redirect with a generic error indicator; avoid leaking details.
         return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error")
-
-# ============================================================================
-# FACEBOOK OAUTH - COMMENTED OUT (Not used by frontend)
-# ============================================================================
-# @router.get("/facebook_login")
-# async def facebook_login():
-#     authorize_request_url = await facebook_oauth_client.get_authorization_url(
-#         redirect_uri=facebook_oauth_client.redirect_uri
-#     )
-#     return RedirectResponse(authorize_request_url)
-
-# @router.get("/facebook_callback")
-# async def facebook_callback(code: str, state: str | None = None):
-#     """
-#     Handles the Facebook OAuth2 callback.
-#
-#     Security notes:
-#     - Uses a per-user random password for OAuth-created accounts instead
-#       of a static shared password.
-#     - For dev compatibility with the existing frontend, this endpoint
-#       returns the JWT as a `?token=` query parameter to the frontend.
-#     """
-#     try:
-#         import httpx
-#
-#         token_response = await facebook_oauth_client.get_access_token(
-#             code, facebook_oauth_client.redirect_uri
-#         )
-#         access_token_value = token_response["access_token"]
-#         
-#         async with httpx.AsyncClient() as client:
-#             response = await client.get(
-#                 "https://graph.facebook.com/me?fields=id,email",
-#                 headers={"Authorization": f"Bearer {access_token_value}"},
-#             )
-#             user_data = response.json()
-#             email = user_data.get("email")
-#             user_id = user_data["id"]
-#             
-#             if not email:
-#                 # Some Facebook apps don't return email; treat as error but don't leak details.
-#                 logger.warning("Facebook OAuth callback without email for user_id=%s", user_id)
-#                 return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error")
-#
-#         user = await User.find_one(User.email == email)
-#         if user:
-#             if not user.oauth or not user.oauth.facebook:
-#                 from app.models.schema import OAuth, FacebookOAuth
-#
-#                 if not user.oauth:
-#                     user.oauth = OAuth()
-#                 user.oauth.facebook = FacebookOAuth(
-#                     id=user_id,
-#                     email=email,
-#                     access_token=access_token_value,
-#                     connected_at=datetime.utcnow(),
-#                 )
-#                 await user.save()
-#             jwt_token = create_access_token(data={"sub": user.username})
-#         else:
-#             username = email.split("@")[0]
-#             existing = await User.find_one(User.username == username)
-#             if existing:
-#                 username = f"{username}_{user_id[:8]}"
-#             
-#             from app.models.schema import OAuth, FacebookOAuth
-#
-#             random_password = secrets.token_urlsafe(32)
-#             hashed_password = get_password_hash(random_password)
-#
-#             new_user = User(
-#                 email=email,
-#                 username=username,
-#                 password_hash=hashed_password,
-#                 account_type="crew",
-#                 is_verified=True,
-#                 oauth=OAuth(
-#                     facebook=FacebookOAuth(
-#                         id=user_id,
-#                         email=email,
-#                         access_token=access_token_value,
-#                         connected_at=datetime.utcnow(),
-#                     )
-#                 ),
-#             )
-#             await new_user.insert()
-#             jwt_token = create_access_token(data={"sub": new_user.username})
-#         
-#         # Redirect to OAuth callback page with token
-#         return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-callback?token={jwt_token}")
-#     except Exception:
-#         logger.exception("Facebook OAuth callback failed")
-#         return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error")
-
 
 @router.get(
     "/oauth-token",

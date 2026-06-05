@@ -166,7 +166,7 @@ export default function AIAssistantPage() {
               {msg.role === 'user' && (
                 <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" alt="" className="w-full h-full object-cover" />
+                  <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" alt="Your avatar" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>

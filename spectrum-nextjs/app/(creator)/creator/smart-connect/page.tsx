@@ -245,7 +245,7 @@ export default function CreatorSmartConnectPage() {
                       {/* Avatar / icon */}
                       <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {h.match_avatar
-                          ? <img src={h.match_avatar} alt="" className="w-full h-full object-cover" />
+                          ? <img src={h.match_avatar} alt={h.match_title ?? 'Creator avatar'} className="w-full h-full object-cover" />
                           : <i className="fa-solid fa-briefcase text-cobalt text-lg"></i>}
                       </div>
                       {/* Info */}

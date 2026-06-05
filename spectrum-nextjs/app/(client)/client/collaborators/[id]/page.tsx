@@ -179,7 +179,7 @@ export default function CollaboratorProfilePage() {
         {pr?.cover_image && (
           <div className="absolute inset-0 opacity-20 rounded-3xl overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={pr.cover_image} alt="" className="w-full h-full object-cover" />
+            <img src={pr.cover_image} alt="Profile cover" className="w-full h-full object-cover" />
           </div>
         )}
 

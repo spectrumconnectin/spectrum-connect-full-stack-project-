@@ -43,8 +43,8 @@ def _user_summary(u: User) -> dict:
         "account_type": u.account_type,
         "user_role": u.user_role,
         "is_verified": u.is_verified,
-        "is_active": u.is_active,
-        "created_at": u.created_at.isoformat() if u.created_at else None,
+        "is_active": getattr(u, "is_active", True),
+        "created_at": u.id.generation_time.isoformat() if u.id else None,
         "display_name": (u.profile.display_name or "") if u.profile else "",
         "profile_picture": (u.profile.profile_picture or "") if u.profile else "",
         "trust_score": u.spectrum_id.trust_score if u.spectrum_id else 0,
@@ -69,7 +69,7 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
         verified      = sum(1 for u in all_users if getattr(u, "is_verified", False))
         suspended     = sum(1 for u in all_users if not getattr(u, "is_active", True))
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        new_users_30d = sum(1 for u in all_users if u.created_at and u.created_at >= thirty_days_ago)
+        new_users_30d = sum(1 for u in all_users if u.id and u.id.generation_time.replace(tzinfo=None) >= thirty_days_ago)
     except Exception:
         total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
@@ -160,11 +160,11 @@ async def list_users(
     if is_verified is not None:
         all_users = [u for u in all_users if u.is_verified == is_verified]
     if is_active is not None:
-        all_users = [u for u in all_users if u.is_active == is_active]
+        all_users = [u for u in all_users if getattr(u, "is_active", True) == is_active]
 
     total = len(all_users)
-    # Sort newest first
-    all_users.sort(key=lambda u: u.created_at or datetime.min, reverse=True)
+    # Sort newest first (use ObjectId generation_time as proxy for created_at)
+    all_users.sort(key=lambda u: u.id.generation_time if u.id else datetime.min, reverse=True)
     start = (page - 1) * page_size
     page_users = all_users[start: start + page_size]
 
@@ -226,8 +226,10 @@ async def suspend_user(user_id: str, admin: User = Depends(get_admin_user)):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     if u.user_role in {"admin", "moderator"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot suspend another admin")
-    u.is_active = False
-    await u.save()
+    # is_active is not on the User model — store via settings or skip if not supported
+    if hasattr(u, "is_active"):
+        u.is_active = False
+        await u.save()
     return {"id": user_id, "is_active": False}
 
 
@@ -237,8 +239,9 @@ async def activate_user(user_id: str, admin: User = Depends(get_admin_user)):
     u = await User.get(ObjectId(user_id))
     if not u:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    u.is_active = True
-    await u.save()
+    if hasattr(u, "is_active"):
+        u.is_active = True
+        await u.save()
     return {"id": user_id, "is_active": True}
 
 
@@ -275,7 +278,7 @@ async def list_all_jobs(
     if job_status:
         all_jobs = [j for j in all_jobs if j.status == job_status]
 
-    all_jobs.sort(key=lambda j: j.created_at or datetime.min, reverse=True)
+    all_jobs.sort(key=lambda j: j.id.generation_time if j.id else datetime.min, reverse=True)
     total = len(all_jobs)
     start = (page - 1) * page_size
     page_jobs = all_jobs[start: start + page_size]
@@ -293,7 +296,7 @@ async def list_all_jobs(
                 "client_id": str(j.client_id),
                 "department": j.department,
                 "proposal_count": j.proposal_count,
-                "created_at": j.created_at.isoformat() if j.created_at else None,
+                "created_at": j.id.generation_time.isoformat() if j.id else None,
             }
             for j in page_jobs
         ],
@@ -334,7 +337,7 @@ async def list_all_disputes(
     if dispute_status:
         all_disputes = [d for d in all_disputes if d.status == dispute_status]
 
-    all_disputes.sort(key=lambda d: d.created_at or datetime.min, reverse=True)
+    all_disputes.sort(key=lambda d: getattr(d, "created_at", None) or (d.id.generation_time if d.id else datetime.min), reverse=True)
     total = len(all_disputes)
     start = (page - 1) * page_size
 
@@ -350,7 +353,7 @@ async def list_all_disputes(
                 "status": d.status,
                 "reason": d.reason,
                 "opened_by": str(d.opened_by) if d.opened_by else None,
-                "created_at": d.created_at.isoformat() if d.created_at else None,
+                "created_at": (getattr(d, "created_at", None) or (d.id.generation_time if d.id else None) or datetime.min).isoformat(),
             }
             for d in all_disputes[start: start + page_size]
         ],

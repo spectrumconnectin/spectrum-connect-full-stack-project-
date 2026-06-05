@@ -9,6 +9,7 @@ Endpoints for messaging system:
 - User presence
 """
 
+import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -47,27 +48,28 @@ async def _conversation_to_response(
     current_user_id: str
 ) -> ConversationResponse:
     """Convert Conversation model to response schema"""
-    # Get participant details
-    participants = []
-    for participant_id in conversation.participants:
-        try:
-            user = await User.get(PydanticObjectId(participant_id))
-        except Exception:
-            user = None
-        if user:
-            # Get presence
-            presence = await MessageService.get_user_presence(participant_id)
-            is_online = presence.is_online if presence else False
-            last_seen = presence.last_seen if presence else None
+    # Batch-load all participants and their presence in parallel — avoids N+1.
+    participant_ids = conversation.participants or []
 
-            participants.append(ConversationParticipant(
-                user_id=str(user.id),
-                username=user.username,
-                display_name=user.profile.display_name if user.profile else None,
-                avatar_url=user.profile.avatar if user.profile else None,
-                is_online=is_online,
-                last_seen=last_seen
-            ))
+    async def _fetch_participant(pid: str):
+        try:
+            user = await User.get(PydanticObjectId(pid))
+        except Exception:
+            return None
+        if not user:
+            return None
+        presence = await MessageService.get_user_presence(pid)
+        return ConversationParticipant(
+            user_id=str(user.id),
+            username=user.username,
+            display_name=user.profile.display_name if user.profile else None,
+            avatar_url=user.profile.avatar if user.profile else None,
+            is_online=presence.is_online if presence else False,
+            last_seen=presence.last_seen if presence else None,
+        )
+
+    results = await asyncio.gather(*[_fetch_participant(pid) for pid in participant_ids])
+    participants = [p for p in results if p is not None]
 
     # Get unread count for current user
     unread_count = conversation.unread_counts.get(current_user_id, 0)
@@ -177,15 +179,12 @@ async def list_conversations(
         include_archived=include_archived
     )
 
-    # Convert to response format
-    active_projects_responses = [
-        await _conversation_to_response(c, str(current_user.id))
-        for c in active_projects
-    ]
-    recent_responses = [
-        await _conversation_to_response(c, str(current_user.id))
-        for c in recent
-    ]
+    # Convert to response format — parallel to avoid N+1
+    uid = str(current_user.id)
+    active_projects_responses, recent_responses = await asyncio.gather(
+        asyncio.gather(*[_conversation_to_response(c, uid) for c in active_projects]),
+        asyncio.gather(*[_conversation_to_response(c, uid) for c in recent]),
+    )
 
     return ConversationListResponse(
         conversations=active_projects_responses + recent_responses,
@@ -221,10 +220,12 @@ async def get_conversation(
         limit=20
     )
 
-    recent_messages = [await _message_to_response(m) for m in messages]
+    recent_messages, base_response = await asyncio.gather(
+        asyncio.gather(*[_message_to_response(m) for m in messages]),
+        _conversation_to_response(conversation, str(current_user.id)),
+    )
 
-    # Get base response
-    base_response = await _conversation_to_response(conversation, str(current_user.id))
+    # base_response is a single object; recent_messages is a tuple from gather
 
     # Build detailed response
     return ConversationDetailResponse(
@@ -301,7 +302,7 @@ async def get_conversation_messages(
         before_message_id=before_message_id
     )
 
-    message_responses = [await _message_to_response(m) for m in messages]
+    message_responses = list(await asyncio.gather(*[_message_to_response(m) for m in messages]))
 
     return MessageListResponse(
         messages=message_responses,
@@ -418,7 +419,7 @@ async def search_messages(
         limit=data.limit
     )
 
-    message_responses = [await _message_to_response(m) for m in messages]
+    message_responses = list(await asyncio.gather(*[_message_to_response(m) for m in messages]))
 
     return MessageSearchResponse(
         results=message_responses,

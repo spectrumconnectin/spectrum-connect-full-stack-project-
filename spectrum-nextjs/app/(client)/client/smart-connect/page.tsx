@@ -266,7 +266,7 @@ function SmartConnectInner() {
                   <div key={h.id} className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center gap-4 hover:border-gray-300 transition">
                     <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {h.match_avatar
-                        ? <img src={h.match_avatar} alt="" className="w-full h-full object-cover rounded-xl" />
+                        ? <img src={h.match_avatar} alt={h.match_title ?? 'Creator avatar'} className="w-full h-full object-cover rounded-xl" />
                         : <span className="text-cobalt font-bold text-lg">{(h.match_title || '?')[0].toUpperCase()}</span>}
                     </div>
                     <div className="flex-1 min-w-0">
