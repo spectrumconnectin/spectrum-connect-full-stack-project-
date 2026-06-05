@@ -123,20 +123,17 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
 
     try:
         from app.models.schema import Transaction as TxModel
+        # Transaction uses to_user_id for the recipient (creator)
         txns = await TxModel.find({
-            "creator_id": current_user.id,
+            "to_user_id": current_user.id,
             "status": "completed",
         }).to_list()
-        # net_amount = amount minus creator's 8% fee; fall back to amount if not set
-        total_earnings = round(sum(
-            float(getattr(t, 'net_amount', None) or (float(t.amount or 0) * 0.92))
-            for t in txns
-        ), 2)
+        total_earnings = round(sum(float(t.net_amount or 0) for t in txns), 2)
     except Exception:
         total_earnings = 0.0
 
-    # client_satisfaction comes from User.rating (updated on every review)
-    satisfaction = getattr(current_user, "rating", None) or 0.0
+    # client_satisfaction from User.profile.rating (where reviews write it)
+    satisfaction = (current_user.profile.rating if current_user.profile else None) or 0.0
     # Convert 0–5 star rating to a 0–100% value for the UI
     satisfaction_pct = round(satisfaction * 20, 1) if satisfaction else 0.0
 

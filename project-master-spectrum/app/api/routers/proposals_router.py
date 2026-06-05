@@ -450,14 +450,17 @@ async def rate_proposal(
                 "reviewed_at": datetime.utcnow().isoformat(),
             }
         }})
-        # Update client's aggregate rating
+        # Update client's aggregate rating on User.profile
         client = await User.get(job.client_id)
         if client:
-            old_count  = getattr(client, "review_count", None) or 0
-            old_rating = getattr(client, "rating", None) or 0.0
+            old_count  = (client.profile.review_count if client.profile else None) or 0
+            old_rating = (client.profile.rating       if client.profile else None) or 0.0
             new_count  = old_count + 1
             new_rating = round((old_rating * old_count + overall) / new_count, 2)
-            await client.update({"$set": {"rating": new_rating, "review_count": new_count}})
+            await client.update({"$set": {
+                "profile.rating": new_rating,
+                "profile.review_count": new_count,
+            }})
         try:
             from app.services.notification_service import NotificationService
             await NotificationService.send(
@@ -491,17 +494,19 @@ async def rate_proposal(
         }}
     )
 
-    # Update creator's aggregate rating on both User and CrewProfile so all
-    # surfaces (public profile, talent search, Smart Connect) show the latest.
+    # Update creator's aggregate rating on User.profile + CrewProfile
     creator = await User.get(app.crew_id)
     if creator:
-        old_count = getattr(creator, "review_count", None) or 0
-        old_rating = getattr(creator, "rating", None) or 0.0
-        new_count = old_count + 1
+        old_count  = (creator.profile.review_count if creator.profile else None) or 0
+        old_rating = (creator.profile.rating       if creator.profile else None) or 0.0
+        new_count  = old_count + 1
         new_rating = round((old_rating * old_count + overall) / new_count, 2)
-        # Write to User document
-        await creator.update({"$set": {"rating": new_rating, "review_count": new_count}})
-        # Also sync to CrewProfile.rating so Smart Connect ranking is accurate
+        # Write to user.profile.rating (where the field is defined)
+        await creator.update({"$set": {
+            "profile.rating": new_rating,
+            "profile.review_count": new_count,
+        }})
+        # Sync to CrewProfile.rating so Smart Connect ranking is accurate
         try:
             from app.models.schema import CrewProfile as _CP
             cp = await _CP.find_one(_CP.user_id == creator.id)

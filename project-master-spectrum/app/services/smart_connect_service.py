@@ -174,11 +174,11 @@ class SmartConnectService:
 
                 # 5. Rating bonus (max 5 pts)
                 # Primary: CrewProfile.rating (synced by proposals_router on submission).
-                # Fallback: User.rating (direct field, always up-to-date).
+                # Fallback: User.profile.rating (where review writes it).
                 rating_score = 0
                 _rating_val = (
                     (crew_profile.rating.overall if crew_profile.rating else None)
-                    or getattr(user, "rating", None)
+                    or (user.profile.rating if user.profile else None)
                     or 0.0
                 )
                 if _rating_val:

@@ -185,9 +185,9 @@ class ProfileService:
             "availability_status": (
                 user.settings.availability_status if user.settings else "available"
             ),
-            # Rating aggregate from review submissions
-            "rating": user.rating if hasattr(user, "rating") else None,
-            "review_count": user.review_count if hasattr(user, "review_count") else None,
+            # Rating aggregate from review submissions — stored on user.profile
+            "rating": (user.profile.rating if user.profile else None),
+            "review_count": (user.profile.review_count if user.profile else None),
             # Completed projects count (from stats)
             "completed_projects": (
                 (user.stats.completed_credits if user.stats else None)
