@@ -83,9 +83,17 @@ export default function EarningsPage() {
 
   return (
     <>
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Earnings</h1>
-        <p className="text-lg text-gray-600">Your income, payouts, and pending balances at a glance.</p>
+      <div className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Earnings</h1>
+          <p className="text-lg text-gray-600">Your income, payouts, and pending balances at a glance.</p>
+        </div>
+        <button
+          onClick={() => earnings.downloadCreatorCSV()}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-50 transition shadow-sm">
+          <i className="fa-solid fa-download text-cobalt"></i>
+          Download Earnings Report (CSV)
+        </button>
       </div>
 
       {loading ? (

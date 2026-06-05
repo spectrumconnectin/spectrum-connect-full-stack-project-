@@ -227,13 +227,22 @@ class NotificationService:
     async def dispute_opened(*, other_user_id: str, opener_id: str, reason: str, escrow_id: str) -> None:
         """Notify the other party that a dispute was opened against them."""
         opener_name, opener_avatar = await _get_user_name(opener_id)
+        # Route to the correct dispute page based on the notified user's account type
+        try:
+            from app.models.schema import User as _User
+            from beanie import PydanticObjectId as _OID
+            notified = await _User.get(_OID(other_user_id))
+            account_type = getattr(notified, "account_type", "client") if notified else "client"
+            dispute_url = "/creator/disputes" if account_type == "creator" else "/client/disputes"
+        except Exception:
+            dispute_url = "/client/disputes"
         await send(
             user_id=other_user_id,
             type="system",
             category="alert",
             title="A dispute has been opened",
             message=f"{opener_name} opened a dispute: '{reason[:100]}'. Our team will review within 48 hours.",
-            action_url=f"/client/disputes",
+            action_url=dispute_url,
             action_text="View dispute",
             actor_id=opener_id,
             actor_name=opener_name,

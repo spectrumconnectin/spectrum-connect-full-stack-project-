@@ -368,6 +368,35 @@ async def update_proposal_status(
                     detail="This project already has an accepted proposal. Withdraw or reject it first.",
                 )
 
+    # Guard: cannot reject a creator who already has a funded escrow — client must
+    # refund the escrow first (to protect creator from sudden de-hire mid-work).
+    if data.status == "rejected" and app.status == "accepted":
+        try:
+            from app.models.escrow import Escrow as _Esc
+            from beanie import PydanticObjectId as _OID
+            funded_esc = await _Esc.find_one({
+                "job_post_id": job.id,
+                "creator_id": app.crew_id,
+                "status": "active",
+            })
+            if funded_esc:
+                has_funded_milestone = any(
+                    m.status in ("funded", "delivered", "approved")
+                    for m in funded_esc.milestones
+                )
+                if has_funded_milestone:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Cannot reject a creator with funded escrow milestones. "
+                            "Please refund the escrow first via Payments > Refund."
+                        ),
+                    )
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # non-blocking — allow reject if escrow lookup fails
+
     app.status = data.status
     await app.save()
 

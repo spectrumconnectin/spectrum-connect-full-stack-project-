@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { escrow, jobs, EscrowDetail, EscrowMilestone, JobPostItem } from '@/lib/api';
+import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -562,6 +562,148 @@ function FundProjectModal({
   );
 }
 
+// ── Pending funding section (handles single and multi-creator crew jobs) ──────
+
+type TeamMember = {
+  application_id: string;
+  creator_id: string;
+  creator_name: string;
+  creator_username?: string;
+  creator_avatar?: string;
+  role?: string;
+  proposed_budget?: number;
+  escrow?: { escrow_id: string; status: string; funded_amount: number } | null;
+};
+
+function PendingFundingSection({
+  pendingJobs,
+  existingEscrows,
+  onFundCreator,
+}: {
+  pendingJobs: JobPostItem[];
+  existingEscrows: EscrowDetail[];
+  onFundCreator: (job: JobPostItem, creatorId: string) => void;
+}) {
+  const [teamByJob, setTeamByJob] = useState<Record<string, TeamMember[]>>({});
+  const [loadingTeam, setLoadingTeam] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    pendingJobs.forEach(async job => {
+      if (teamByJob[job.id] || loadingTeam[job.id]) return;
+      setLoadingTeam(p => ({ ...p, [job.id]: true }));
+      try {
+        const { jobs: jobsApi } = await import('@/lib/api');
+        const team = await jobsApi.getTeam(job.id);
+        setTeamByJob(p => ({ ...p, [job.id]: team }));
+      } catch {
+        // fallback: show single generic fund button
+        setTeamByJob(p => ({ ...p, [job.id]: [] }));
+      } finally {
+        setLoadingTeam(p => ({ ...p, [job.id]: false }));
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJobs]);
+
+  if (pendingJobs.length === 0) return null;
+
+  // Funded creator_ids across all existing escrows, keyed by job_post_id
+  const fundedByJob: Record<string, Set<string>> = {};
+  for (const esc of existingEscrows) {
+    const jid = (esc as EscrowDetail & { job_post_id?: string }).job_post_id;
+    if (!jid) continue;
+    if (!fundedByJob[jid]) fundedByJob[jid] = new Set();
+    if (esc.creator) fundedByJob[jid].add(esc.creator.user_id);
+  }
+
+  return (
+    <section className="mb-8">
+      <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+        <i className="fa-solid fa-hourglass-half text-orange-500"></i>
+        Projects Awaiting Funding
+      </h2>
+      <div className="space-y-3">
+        {pendingJobs.map(job => {
+          const team = teamByJob[job.id] ?? [];
+          const funded = fundedByJob[job.id] ?? new Set();
+          // Filter: only show creators who don't have a funded escrow yet
+          const unfunded = team.filter(m => !funded.has(m.creator_id));
+          const isLoading = loadingTeam[job.id];
+
+          return (
+            <div key={job.id} className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+              <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+                <div>
+                  <p className="font-bold text-gray-900">{job.title}</p>
+                  <p className="text-sm text-orange-700 mt-0.5">
+                    {team.length > 1
+                      ? `${unfunded.length} of ${team.length} creators still need funding`
+                      : 'Creator hired — fund escrow to begin work'}
+                  </p>
+                  {(job.budget?.min || job.budget?.max) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Budget: ${job.budget.min?.toLocaleString()}
+                      {job.budget.max ? `–$${job.budget.max.toLocaleString()}` : '+'}
+                    </p>
+                  )}
+                </div>
+                {isLoading && (
+                  <div className="flex items-center gap-2 text-orange-500 text-sm">
+                    <i className="fa-solid fa-spinner animate-spin text-xs"></i>
+                    <span>Loading team…</span>
+                  </div>
+                )}
+              </div>
+
+              {/* One Fund button per unfunded creator (crew support) */}
+              {!isLoading && unfunded.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {unfunded.map(member => (
+                    <button
+                      key={member.creator_id}
+                      onClick={() => onFundCreator(job, member.creator_id)}
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-xl font-semibold text-sm hover:bg-orange-700 transition">
+                      <i className="fa-solid fa-lock text-xs"></i>
+                      Fund {member.creator_name.split(' ')[0]}
+                      {member.proposed_budget ? ` ($${member.proposed_budget.toLocaleString()})` : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Fallback if team endpoint returned empty (legacy / non-crew job) */}
+              {!isLoading && unfunded.length === 0 && team.length === 0 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { proposals: proposalsApi } = await import('@/lib/api');
+                      const appData = await proposalsApi.getForJob(job.id);
+                      const applicants = appData?.proposals ?? (Array.isArray(appData) ? appData : []);
+                      const hired = applicants.find((a: { status: string; creator_id?: string }) => a.status === 'accepted');
+                      if (hired?.creator_id) onFundCreator(job, hired.creator_id);
+                    } catch { /* ignore */ }
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition">
+                  <i className="fa-solid fa-lock"></i>
+                  Fund Escrow
+                </button>
+              )}
+
+              {/* All funded — job still showing because status hasn't updated yet */}
+              {!isLoading && unfunded.length === 0 && team.length > 0 && (
+                <div className="flex items-center gap-2 text-emerald-700 text-sm font-semibold">
+                  <i className="fa-solid fa-circle-check text-emerald-500"></i>
+                  All {team.length} creators funded
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function PaymentsPage() {
   const [details, setDetails] = useState<EscrowDetail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -588,16 +730,11 @@ export default function PaymentsPage() {
         setDetails(allDetails);
       }
       if (jobsRes.status === 'fulfilled') {
-        // Jobs awaiting funding (hired but no escrow yet)
-        const escrowJobIds = new Set(
-          listRes.status === 'fulfilled'
-            ? listRes.value.escrows.map(e => e.job_post_id).filter(Boolean)
-            : []
-        );
+        // Show ALL pending_funding jobs — the PendingFundingSection component will
+        // call /jobs/{id}/team to find which specific creators still need funding,
+        // handling crew projects where some creators are funded and others are not.
         setPendingJobs(
-          jobsRes.value.filter(
-            (j: JobPostItem) => j.status === 'pending_funding' && !escrowJobIds.has(j.id)
-          )
+          jobsRes.value.filter((j: JobPostItem) => j.status === 'pending_funding')
         );
       }
     } catch (e) {
@@ -677,50 +814,11 @@ export default function PaymentsPage() {
 
       {/* Projects awaiting funding */}
       {pendingJobs.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <i className="fa-solid fa-hourglass-half text-orange-500"></i>
-            Projects Awaiting Funding
-          </h2>
-          <div className="space-y-3">
-            {pendingJobs.map(job => (
-              <div key={job.id} className="bg-orange-50 border border-orange-200 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="font-bold text-gray-900">{job.title}</p>
-                  <p className="text-sm text-orange-700 mt-0.5">
-                    Creator hired — fund escrow to begin work
-                  </p>
-                  {(job.budget?.min || job.budget?.max) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Budget: ${job.budget.min?.toLocaleString()}
-                      {job.budget.max ? `–$${job.budget.max.toLocaleString()}` : '+'}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={async () => {
-                    // Get the hired creator from the applicants
-                    try {
-                      const { proposals: proposalsApi } = await import('@/lib/api');
-                      const appData = await proposalsApi.getForJob(job.id);
-                      const applicants = appData?.proposals ?? (Array.isArray(appData) ? appData : []);
-                      const hired = applicants.find((a: {status: string; creator_id?: string}) =>
-                        a.status === 'accepted'
-                      );
-                      const creatorId = hired?.creator_id;
-                      if (creatorId) {
-                        setFundingJob({ job, creatorId });
-                      }
-                    } catch { /* show modal with empty creatorId */ }
-                  }}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm hover:bg-orange-700 transition flex-shrink-0">
-                  <i className="fa-solid fa-lock"></i>
-                  Fund Escrow
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
+        <PendingFundingSection
+          pendingJobs={pendingJobs}
+          existingEscrows={details}
+          onFundCreator={(job, creatorId) => setFundingJob({ job, creatorId })}
+        />
       )}
 
       {loading ? (
@@ -797,7 +895,16 @@ export default function PaymentsPage() {
           {/* Transactions table */}
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-wrap gap-4">
-              <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>
+                <button
+                  onClick={() => earningsApi.downloadClientCSV()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition border border-gray-200"
+                  title="Download CSV payment report">
+                  <i className="fa-solid fa-download text-xs"></i>
+                  Download CSV
+                </button>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {TABS.map(t => (
                   <button key={t} onClick={() => setTab(t)}

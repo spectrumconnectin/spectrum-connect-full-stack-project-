@@ -359,6 +359,14 @@ export default function CreateProjectPage() {
       return undefined;
     })();
 
+    // Determine crew_size: if on-site work and location is set, or budget > $1,500, it's
+    // likely a multi-creator project. Otherwise keep 'individual' as the default.
+    const budgetNum2 = parseFloat(budget);
+    const derivedCrewSize = (
+      (workType === 'onsite' && location.trim()) ||
+      (!isNaN(budgetNum2) && budgetNum2 >= 1500)
+    ) ? 'small_crew' : 'individual';
+
     const payload: JobCreatePayload & { goals?: string[]; deliverables?: string[]; deadline?: string } = {
       title:       title.trim(),
       description: description.trim(),
@@ -367,7 +375,7 @@ export default function CreateProjectPage() {
       deadline:    timelineDeadline,
       skills:      skills.length ? skills : [],
       tags:        [],
-      crew_size:   'individual',
+      crew_size:   derivedCrewSize,
       complexity:  'intermediate',
       budget_type: 'fixed',
       experience_level: 'intermediate',

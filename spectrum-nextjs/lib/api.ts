@@ -610,6 +610,29 @@ export const jobs = {
 
   delete: (id: string): Promise<void> =>
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
+
+  /** Returns all hired (accepted) creators for a job, each with their escrow summary. */
+  getTeam: (id: string): Promise<{
+    application_id: string;
+    creator_id: string;
+    creator_name: string;
+    creator_username?: string;
+    creator_avatar?: string;
+    creator_title?: string;
+    role?: string;
+    proposed_budget?: number;
+    escrow?: {
+      escrow_id: string;
+      status: string;
+      total_amount: number;
+      funded_amount: number;
+      released_amount: number;
+      milestone_count: number;
+      funded_milestones: number;
+      released_milestones: number;
+    } | null;
+  }[]> =>
+    request(`/jobs/${id}/team`),
 };
 
 // ── Service Listings ──────────────────────────────────────────────────────────
@@ -915,6 +938,50 @@ export const earnings = {
 
   getStats: (): Promise<EarningsStats> =>
     request<EarningsStats>('/earnings/stats'),
+
+  /** Download a CSV earnings report (creator). Triggers file download. */
+  downloadCreatorCSV: (): void => {
+    const token = tokenStore.get();
+    const url = `${BASE_URL}/earnings/invoice/csv`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', 'spectrum_earnings.csv');
+    // For auth'd download, open in new tab (the endpoint returns a binary response)
+    if (token) {
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.blob())
+        .then(b => {
+          const burl = URL.createObjectURL(b);
+          a.href = burl;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(burl);
+        })
+        .catch(() => { /* ignore */ });
+    }
+  },
+
+  /** Download a CSV payment report (client). Triggers file download. */
+  downloadClientCSV: (): void => {
+    const token = tokenStore.get();
+    const url = `${BASE_URL}/earnings/invoice/client-csv`;
+    if (token) {
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.blob())
+        .then(b => {
+          const burl = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = burl;
+          a.setAttribute('download', 'spectrum_payments.csv');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(burl);
+        })
+        .catch(() => { /* ignore */ });
+    }
+  },
 };
 
 // ── Proposals ─────────────────────────────────────────────────────────────────

@@ -241,19 +241,34 @@ async def release_milestone(
                 amount=m_amount,
             )
 
-            # Update job to 'completed' + stamp completed_at once all milestones released
+            # Update job to 'completed' + stamp completed_at once ALL escrows for the
+            # same job_post_id are completed/refunded (handles multi-creator crew projects).
             if esc.status == "completed" and esc.job_post_id:
                 from datetime import datetime as _dt
-                # Stamp completed_at on escrow
+                from app.models.escrow import Escrow as _EscrowModel
+                # Stamp completed_at on this escrow
                 esc.completed_at = _dt.utcnow()
                 await esc.save()
 
+                # For crew projects there may be multiple escrows for the same job.
+                # Only mark the job complete when ALL of them are in a terminal state.
+                sibling_escrows = await _EscrowModel.find(
+                    _EscrowModel.job_post_id == esc.job_post_id
+                ).to_list()
+                all_terminal = all(
+                    e.status in ("completed", "refunded", "cancelled")
+                    for e in sibling_escrows
+                )
+
                 job = await JobPost.get(esc.job_post_id)
-                if job:
+                if job and all_terminal:
                     job.status = "completed"
                     if hasattr(job, "closed_at"):
                         job.closed_at = _dt.utcnow()
                     await job.save()
+                elif job and job.status not in ("completed", "cancelled"):
+                    # At least one other escrow still active — keep job in progress
+                    pass
 
                 # Update creator stats: increment projects_completed + total_earnings
                 try:
@@ -764,15 +779,26 @@ async def approve_milestone(
     milestone.status = "approved"
     await esc.save()
 
-    # Set job status to "approved" when ALL milestones are approved/released
+    # Set job status to "approved" only when ALL escrows for the same job are done.
+    # Crew projects have one escrow per creator — don't prematurely approve the job.
     try:
         from app.models.schema import JobPost
+        from app.models.escrow import Escrow as _EscrowModel
         if esc.job_post_id:
             job = await JobPost.get(esc.job_post_id)
-            all_done = all(m.status in ("approved", "released", "refunded") for m in esc.milestones)
-            if job and all_done:
-                job.status = "approved"
-                await job.save()
+            this_esc_done = all(m.status in ("approved", "released", "refunded") for m in esc.milestones)
+            if job and this_esc_done:
+                siblings = await _EscrowModel.find(
+                    _EscrowModel.job_post_id == esc.job_post_id
+                ).to_list()
+                all_escs_done = all(
+                    e.status in ("completed", "refunded", "cancelled") or
+                    all(m.status in ("approved", "released", "refunded") for m in e.milestones)
+                    for e in siblings
+                )
+                if all_escs_done:
+                    job.status = "approved"
+                    await job.save()
     except Exception:
         pass
 

@@ -305,6 +305,41 @@ class JobService:
             setattr(job, key, value)
 
         await job.save()
+
+        # If location or event_date changed, notify all hired creators so they can
+        # reconfirm availability for the new venue / date.
+        location_changed = ("location" in update_dict or "event_date" in update_dict)
+        if location_changed:
+            try:
+                from app.models.schema import Application
+                from app.services.notification_service import NotificationService
+                hired_apps = await Application.find(
+                    Application.project_id == job.id,
+                    Application.status == "accepted",
+                ).to_list()
+                new_location = getattr(job, "location", None)
+                new_event_date = getattr(job, "event_date", None)
+                date_str = new_event_date.strftime("%B %d, %Y") if new_event_date else None
+                for app in hired_apps:
+                    detail_parts = []
+                    if "location" in update_dict and new_location:
+                        detail_parts.append(f"New venue: {new_location}")
+                    if "event_date" in update_dict and date_str:
+                        detail_parts.append(f"New date: {date_str}")
+                    detail = " · ".join(detail_parts) if detail_parts else "Project details have been updated."
+                    await NotificationService.send(
+                        user_id=str(app.crew_id),
+                        type="system",
+                        category="warning",
+                        title=f"⚠️ Project update: '{job.title}'",
+                        message=f"The client updated the project details. {detail} Please confirm your availability.",
+                        action_url="/creator/projects",
+                        action_text="View project",
+                        actor_id=str(user.id),
+                    )
+            except Exception:
+                pass
+
         return job
 
     @staticmethod

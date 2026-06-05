@@ -9,8 +9,10 @@ Uses the Transaction model (schema.py).
 """
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 from typing import Optional
 from bson import ObjectId
+from datetime import datetime
 
 from app.models.schema import User, Transaction
 from app.auth.auth import get_current_user
@@ -110,3 +112,79 @@ async def get_earnings_stats(
         "monthly_breakdown": [{"month": m, "amount": round(v, 2)} for m, v in monthly.items()],
         "transaction_count": len(all_txns),
     }
+
+
+@router.get("/invoice/csv", summary="Download earnings report as CSV")
+async def download_earnings_csv(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a CSV earnings report for the authenticated creator.
+    Includes all completed transactions with amounts and fee breakdowns.
+    Returns a text/csv response for direct browser download.
+    """
+    uid = current_user.id
+    txns = (
+        await Transaction.find({"to_user_id": uid, "status": "completed"})
+        .sort(-Transaction.initiated_at)
+        .to_list()
+    )
+
+    rows = [
+        "Date,Transaction ID,Project,Milestone,Gross Amount,Platform Fee (8%),Net Payout,Currency"
+    ]
+    for t in txns:
+        date_str = t.completed_at.strftime("%Y-%m-%d") if t.completed_at else (t.initiated_at.strftime("%Y-%m-%d") if t.initiated_at else "")
+        project = (t.metadata.project_title if t.metadata and t.metadata.project_title else "").replace(",", " ")
+        milestone = (t.metadata.milestone_title if t.metadata and t.metadata.milestone_title else "").replace(",", " ")
+        creator_fee = getattr(t, "creator_fee", 0.0) or 0.0
+        rows.append(
+            f'{date_str},{t.transaction_id},{project},{milestone},'
+            f'{t.amount:.2f},{creator_fee:.2f},{t.net_amount:.2f},{t.currency}'
+        )
+
+    now_str = datetime.utcnow().strftime("%Y%m%d")
+    filename = f"spectrum_earnings_{now_str}.csv"
+    return PlainTextResponse(
+        content="\n".join(rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/invoice/client-csv", summary="Download client payment report as CSV")
+async def download_client_payments_csv(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a CSV payment report for the authenticated client.
+    Includes all payments made, with fee breakdowns.
+    """
+    uid = current_user.id
+    txns = (
+        await Transaction.find({"from_user_id": uid, "status": "completed"})
+        .sort(-Transaction.initiated_at)
+        .to_list()
+    )
+
+    rows = [
+        "Date,Transaction ID,Project,Milestone,Project Amount,Platform Fee (4%),Total Charged,Currency"
+    ]
+    for t in txns:
+        date_str = t.completed_at.strftime("%Y-%m-%d") if t.completed_at else (t.initiated_at.strftime("%Y-%m-%d") if t.initiated_at else "")
+        project = (t.metadata.project_title if t.metadata and t.metadata.project_title else "").replace(",", " ")
+        milestone = (t.metadata.milestone_title if t.metadata and t.metadata.milestone_title else "").replace(",", " ")
+        client_fee = getattr(t, "client_fee", 0.0) or 0.0
+        client_total = round(t.amount + client_fee, 2)
+        rows.append(
+            f'{date_str},{t.transaction_id},{project},{milestone},'
+            f'{t.amount:.2f},{client_fee:.2f},{client_total:.2f},{t.currency}'
+        )
+
+    now_str = datetime.utcnow().strftime("%Y%m%d")
+    filename = f"spectrum_payments_{now_str}.csv"
+    return PlainTextResponse(
+        content="\n".join(rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
