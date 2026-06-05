@@ -141,6 +141,8 @@ export interface MeResponse {
     certifications?: object[];
     hourly_rate_min?: number;
     hourly_rate_max?: number;
+    rating?: number;
+    review_count?: number;
   };
   settings?: {
     email_notifications?: boolean;
@@ -151,8 +153,16 @@ export interface MeResponse {
     show_location?: boolean;
     show_earnings?: boolean;
     two_factor_auth?: boolean;
+    availability_status?: string;
   };
-  stats?: object;
+  stats?: {
+    projects_completed?: number;
+    completed_credits?: number;
+    active_projects?: number;
+    total_earnings?: number;
+    response_time?: number;
+    client_satisfaction?: number;
+  };
 }
 
 // ── Authentication ───────────────────────────────────────────────────────────
@@ -346,7 +356,11 @@ export const profile = {
     return request<{ url: string }>('/upload/cover', { method: 'POST', body: form });
   },
 
-  addSkill: (data: { name: string; level?: string; years_of_experience?: number }) =>
+  addSkill: (nameOrData: string | { name: string; level?: string; years_of_experience?: number }, level?: string) => {
+    const data = typeof nameOrData === 'string' ? { name: nameOrData, level } : nameOrData;
+    return request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) });
+  },
+  _addSkill_orig: (data: { name: string; level?: string; years_of_experience?: number }) =>
     request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) }),
 
   deleteSkill: (index: number) =>

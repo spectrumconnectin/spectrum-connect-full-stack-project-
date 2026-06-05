@@ -465,84 +465,296 @@ export default function ProfilePage() {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
 
-      {/* ── Left: profile card ── */}
-      <div className="lg:col-span-1 space-y-6">
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="relative h-32" style={{
-            background: coverUrl ? `url(${coverUrl}) center/cover` : 'linear-gradient(135deg,#195ad7,#8b5cf6)',
+      {/* ── Left: advanced profile card ── */}
+      <div className="lg:col-span-1 space-y-5">
+
+        {/* ── Hero card ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          {/* Cover */}
+          <div className="relative h-36 group" style={{
+            background: coverUrl ? `url(${coverUrl}) center/cover` : 'linear-gradient(135deg,#195ad7 0%,#7c3aed 100%)',
           }}>
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition" />
             <button onClick={() => coverRef.current?.click()} disabled={coverUploading}
-              className="absolute bottom-2 right-2 bg-black/40 text-white text-xs px-2 py-1 rounded-lg hover:bg-black/60">
-              {coverUploading ? '…' : 'Edit cover'}
+              className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-black/50 hover:bg-black/70 text-white text-xs font-semibold px-3 py-1.5 rounded-xl backdrop-blur-sm transition">
+              <i className="fa-solid fa-camera text-[10px]"></i>
+              {coverUploading ? 'Uploading…' : 'Edit cover'}
             </button>
             <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+
+            {/* Online badge */}
+            <div className={`absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-sm ${
+              user?.is_online ? 'bg-emerald-500/90 text-white' : 'bg-black/40 text-gray-200'
+            }`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${user?.is_online ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></span>
+              {user?.is_online ? 'Online' : 'Offline'}
+            </div>
           </div>
 
-          <div className="px-6 pb-6 -mt-12">
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatar} className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg object-cover" alt={nameDisplay} />
-              <button onClick={() => avatarRef.current?.click()} disabled={avatarUploading}
-                className="absolute bottom-1 right-1 bg-cobalt text-white text-xs px-2 py-0.5 rounded-md">
-                {avatarUploading ? '…' : 'Edit'}
-              </button>
-              <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+          <div className="px-5 pb-5">
+            {/* Avatar row */}
+            <div className="flex items-end justify-between -mt-10 mb-4">
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatar} className="w-20 h-20 rounded-2xl border-4 border-white shadow-xl object-cover" alt={nameDisplay} />
+                <button onClick={() => avatarRef.current?.click()} disabled={avatarUploading}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-cobalt hover:bg-blue-700 text-white text-xs rounded-lg shadow-md flex items-center justify-center transition">
+                  {avatarUploading ? <i className="fa-solid fa-spinner animate-spin text-[10px]"></i> : <i className="fa-solid fa-pen text-[10px]"></i>}
+                </button>
+                <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+              </div>
+
+              {/* Verified + ETF badge */}
+              <div className="flex items-center gap-2 mb-1">
+                {user?.is_verified && (
+                  <span className="flex items-center gap-1 bg-blue-50 text-cobalt text-xs font-bold px-2.5 py-1 rounded-full border border-blue-200">
+                    <i className="fa-solid fa-circle-check text-[10px]"></i> Verified
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="mt-4">
-              <h2 className="text-xl font-bold text-gray-900">{nameDisplay}</h2>
-              <p className="text-sm text-gray-500">{tagline || user?.account_type}</p>
-              <p className="text-xs text-gray-400 mt-1">@{user?.username}</p>
+            {/* Name + tagline */}
+            <h2 className="text-xl font-bold text-gray-900 leading-tight">{nameDisplay}</h2>
+            {tagline ? (
+              <p className="text-sm text-cobalt font-medium mt-0.5">{tagline}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic mt-0.5">Add a tagline to your profile</p>
+            )}
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <i className="fa-solid fa-at text-[10px]"></i>{user?.username}
+            </p>
+
+            {/* Location + rate */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {(city || country) && (
+                <span className="flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
+                  <i className="fa-solid fa-location-dot text-gray-400 text-[10px]"></i>
+                  {[city, country].filter(Boolean).join(', ')}
+                </span>
+              )}
+              {(hourlyMin || hourlyMax) && (
+                <span className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold">
+                  <i className="fa-solid fa-dollar-sign text-[10px]"></i>
+                  {hourlyMin}{hourlyMax && hourlyMax !== hourlyMin ? `–${hourlyMax}` : ''}/hr
+                </span>
+              )}
             </div>
 
-            {(hourlyMin || hourlyMax) && (
-              <div className="mt-3 inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                ${hourlyMin}{hourlyMax && hourlyMax !== hourlyMin ? `–$${hourlyMax}` : ''} / hr
+            {/* Stats strip */}
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
+              <div className="text-center py-2 bg-gray-50 rounded-xl">
+                <p className="text-base font-bold text-gray-900">
+                  {user?.stats?.projects_completed ?? user?.stats?.completed_credits ?? 0}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Completed</p>
+              </div>
+              <div className="text-center py-2 bg-gray-50 rounded-xl">
+                <p className="text-base font-bold text-gray-900">
+                  {user?.profile?.rating ? `${user.profile.rating.toFixed(1)}★` : '—'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Rating</p>
+              </div>
+              <div className="text-center py-2 bg-gray-50 rounded-xl">
+                <p className="text-base font-bold text-gray-900">
+                  {user?.stats?.response_time ? `${user.stats.response_time}h` : '—'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Response</p>
+              </div>
+            </div>
+
+            {/* Profile completion bar */}
+            {(() => {
+              const fields = [nameDisplay, tagline, bio, city, hourlyMin, website, skills.length > 0];
+              const done = fields.filter(Boolean).length;
+              const pct = Math.round((done / fields.length) * 100);
+              return pct < 100 ? (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-semibold text-gray-600">Profile strength</p>
+                    <p className="text-xs font-bold text-cobalt">{pct}%</p>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-cobalt'}`}
+                      style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {pct < 50 ? 'Add your tagline, bio and location to stand out' :
+                     pct < 80 ? 'Almost there — add skills and a rate' :
+                     'Great profile! Add a few more details'}
+                  </p>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Social links */}
+            {(linkedin || imdb || vimeo || website) && (
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+                {website && (
+                  <a href={website} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-cobalt bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
+                    <i className="fa-solid fa-globe text-[11px]"></i> Website
+                  </a>
+                )}
+                {linkedin && (
+                  <a href={linkedin} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-700 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition">
+                    <i className="fa-brands fa-linkedin text-[11px]"></i> LinkedIn
+                  </a>
+                )}
+                {imdb && (
+                  <a href={imdb} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 bg-gray-50 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition">
+                    <i className="fa-brands fa-imdb text-[11px]"></i> IMDb
+                  </a>
+                )}
+                {vimeo && (
+                  <a href={vimeo} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-sky-600 bg-gray-50 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition">
+                    <i className="fa-brands fa-vimeo text-[11px]"></i> Vimeo
+                  </a>
+                )}
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100">
-              <div className="text-center">
-                <p className="font-bold text-gray-900 capitalize">{user?.account_type}</p>
-                <p className="text-xs text-gray-500">Role</p>
-              </div>
-              <div className="text-center flex flex-col items-center">
-                <div className="mb-1">
-                  <OnlineStatusBadge isOnline={user?.is_online ?? false} size="md" />
-                </div>
-                <p className="text-xs text-gray-500">{user?.is_online ? 'Online' : 'Offline'}</p>
-              </div>
-              <div className="text-center">
-                <p className="font-bold text-gray-900">{user?.is_verified ? '✓ Verified' : 'Unverified'}</p>
-                <p className="text-xs text-gray-500">Verification</p>
-              </div>
-            </div>
           </div>
         </div>
 
-        {/* Skills */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h3 className="font-bold text-gray-900 mb-3">Skills</h3>
-          <div className="flex flex-wrap gap-2 mb-3">
+        {/* ── Skills card ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <i className="fa-solid fa-code text-cobalt text-sm"></i>Skills
+              <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{skills.length}</span>
+            </h3>
+          </div>
+
+          {/* Skill chips with level badge */}
+          <div className="flex flex-wrap gap-2 mb-4">
             {skills.map((s, i) => (
-              <span key={i} className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-cobalt text-xs font-semibold rounded-full">
-                {s.name}
-                <button onClick={() => removeSkill(i)} className="text-blue-300 hover:text-red-400 ml-1">&times;</button>
-              </span>
+              <div key={i} className="group flex items-center gap-1 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 px-3 py-1.5 rounded-xl">
+                <span className="text-xs font-semibold text-cobalt">{s.name}</span>
+                {s.level && (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1 ${
+                    s.level === 'expert'       ? 'bg-purple-100 text-purple-700' :
+                    s.level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
+                                                 'bg-gray-100 text-gray-500'
+                  }`}>{s.level}</span>
+                )}
+                <button onClick={() => removeSkill(i)}
+                  className="text-blue-200 hover:text-red-400 transition ml-0.5 opacity-0 group-hover:opacity-100 text-xs">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
             ))}
-            {skills.length === 0 && <p className="text-xs text-gray-400">No skills yet</p>}
+            {skills.length === 0 && (
+              <div className="w-full py-6 flex flex-col items-center gap-2 text-center">
+                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                  <i className="fa-solid fa-screwdriver-wrench text-cobalt"></i>
+                </div>
+                <p className="text-sm text-gray-500 font-medium">No skills yet</p>
+                <p className="text-xs text-gray-400">Add your skills to get matched with the right projects</p>
+              </div>
+            )}
           </div>
-          <div className="flex gap-2">
-            <input type="text" value={newSkill} onChange={e => setNewSkill(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addSkill()}
-              placeholder="Add skill…"
-              className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-cobalt" />
-            <button onClick={addSkill} disabled={addingSkill || !newSkill.trim()}
-              className="px-3 py-1.5 bg-cobalt text-white text-sm rounded-lg disabled:opacity-40">
-              {addingSkill ? '…' : '+'}
-            </button>
+
+          {/* Add skill with level selector */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+                <input type="text" value={newSkill} onChange={e => setNewSkill(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addSkill()}
+                  placeholder="Add a skill…"
+                  className="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <select
+                id="skill-level-select"
+                className="px-3 py-2.5 border border-gray-200 rounded-xl text-xs text-gray-600 focus:outline-none focus:border-cobalt bg-white">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="expert">Expert</option>
+              </select>
+              <button
+                onClick={() => {
+                  const sel = document.getElementById('skill-level-select') as HTMLSelectElement;
+                  if (newSkill.trim()) {
+                    const s = newSkill.trim();
+                    setNewSkill('');
+                    setAddingSkill(true);
+                    profileApi.addSkill(s, sel?.value || 'intermediate')
+                      .then(() => setSkills(prev => [...prev, { name: s, level: sel?.value || 'intermediate' }]))
+                      .catch(() => setSkills(prev => [...prev, { name: s, level: sel?.value || 'intermediate' }]))
+                      .finally(() => setAddingSkill(false));
+                  }
+                }}
+                disabled={addingSkill || !newSkill.trim()}
+                className="w-10 h-10 bg-cobalt hover:bg-blue-700 text-white rounded-xl disabled:opacity-40 transition flex items-center justify-center flex-shrink-0">
+                {addingSkill ? <i className="fa-solid fa-spinner animate-spin text-xs"></i> : <i className="fa-solid fa-plus text-xs"></i>}
+              </button>
+            </div>
+
+            {/* Quick-add suggestions */}
+            {skills.length < 8 && (
+              <div>
+                <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Quick add</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Video Editing','Motion Graphics','Color Grading','Cinematography','Sound Design','Scriptwriting','Photography','VFX','Animation','3D Modeling']
+                    .filter(s => !skills.some(sk => sk.name.toLowerCase() === s.toLowerCase()))
+                    .slice(0, 6)
+                    .map(s => (
+                      <button key={s} onClick={() => {
+                        setAddingSkill(true);
+                        profileApi.addSkill(s, 'intermediate')
+                          .then(() => setSkills(prev => [...prev, { name: s, level: 'intermediate' }]))
+                          .catch(() => setSkills(prev => [...prev, { name: s, level: 'intermediate' }]))
+                          .finally(() => setAddingSkill(false));
+                      }}
+                        className="text-[11px] px-2.5 py-1 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-cobalt border border-gray-200 hover:border-blue-300 rounded-lg transition">
+                        + {s}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* ── Availability card ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <i className="fa-solid fa-calendar-check text-emerald-500 text-sm"></i>Availability
+          </h3>
+          <div className="space-y-3">
+            {[
+              { val: 'available',     label: 'Available now',       desc: 'Actively looking for projects', color: 'bg-emerald-500' },
+              { val: 'busy',          label: 'Busy',                desc: 'Working on current projects',   color: 'bg-amber-400' },
+              { val: 'not_available', label: 'Not available',       desc: 'Not taking new work right now', color: 'bg-gray-400' },
+            ].map(opt => (
+              <button key={opt.val}
+                onClick={async () => {
+                  try { await profileApi.updateSettings({ availability_status: opt.val }); }
+                  catch { /* silent */ }
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition ${
+                  (user?.settings?.availability_status ?? 'available') === opt.val
+                    ? 'border-cobalt bg-blue-50'
+                    : 'border-gray-100 hover:border-gray-200'
+                }`}>
+                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.color}`}></div>
+                <div>
+                  <p className={`text-sm font-semibold ${(user?.settings?.availability_status ?? 'available') === opt.val ? 'text-cobalt' : 'text-gray-700'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-[11px] text-gray-400">{opt.desc}</p>
+                </div>
+                {(user?.settings?.availability_status ?? 'available') === opt.val && (
+                  <i className="fa-solid fa-circle-check text-cobalt text-sm ml-auto"></i>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
 
       {/* ── Right: tabs ── */}
