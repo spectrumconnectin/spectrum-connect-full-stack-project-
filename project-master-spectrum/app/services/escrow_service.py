@@ -226,13 +226,16 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        # Auto-release: allow 'delivered' status too (client didn't explicitly approve)
-        allowed_statuses = ("funded", "approved", "delivered") if is_auto_release else ("funded", "approved")
+        # Allow 'delivered' for both manual and auto-release (auto-approves internally)
+        allowed_statuses = ("funded", "approved", "delivered")
         if milestone.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
-                detail=f"Milestone must be 'funded' or 'approved' before release (current: '{milestone.status}').",
+                detail=f"Milestone must be funded or delivered before release (current: '{milestone.status}').",
             )
+        # If in 'delivered' state, auto-approve before release
+        if milestone.status == "delivered":
+            milestone.status = "approved"
 
         now = datetime.utcnow()
         tx_id = str(uuid.uuid4())
