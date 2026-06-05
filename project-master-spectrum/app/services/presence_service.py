@@ -101,7 +101,12 @@ class PresenceService:
 
     @staticmethod
     async def get_presence(user_id: str) -> dict:
-        """Get full presence info for a user"""
+        """Get full presence info for a user.
+
+        is_online is derived purely from last_activity age — this correctly
+        handles browser crashes, network drops, and sessions that expire
+        without an explicit logout (no stored flag to go stale).
+        """
         try:
             presence = await UserPresence.find_one({"user_id": str(user_id)})
 
@@ -109,25 +114,31 @@ class PresenceService:
                 return {
                     "user_id": str(user_id),
                     "is_online": False,
-                    "last_seen": None,
+                    "last_activity": None,
                 }
 
-            # Check if should be offline due to timeout
+            # Compute is_online from heartbeat age only — ignores the stored flag
+            # so browser crashes / network drops auto-expire correctly.
             time_since_activity = datetime.utcnow() - presence.last_activity
-            is_online = (
-                presence.is_online
-                and time_since_activity <= timedelta(minutes=PresenceService.OFFLINE_TIMEOUT)
-            )
+            is_online = time_since_activity <= timedelta(minutes=PresenceService.OFFLINE_TIMEOUT)
+
+            # Persist the computed state so the stored flag stays in sync.
+            if presence.is_online != is_online:
+                presence.is_online = is_online
+                if not is_online:
+                    presence.last_seen = presence.last_activity  # stamp last_seen on expiry
+                await presence.save()
 
             return {
                 "user_id": str(user_id),
                 "is_online": is_online,
-                "last_seen": presence.last_seen.isoformat() if presence.last_seen else None,
+                # last_activity is the authoritative "last seen" timestamp —
+                # it's updated on every heartbeat, so it's always accurate.
                 "last_activity": presence.last_activity.isoformat() if presence.last_activity else None,
             }
         except Exception:
             return {
                 "user_id": str(user_id),
                 "is_online": False,
-                "last_seen": None,
+                "last_activity": None,
             }

@@ -1,19 +1,32 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { talent, TalentItem } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
-function relativeTime(iso?: string | null): string {
-  if (!iso) return 'a while ago';
+/**
+ * Returns a "Last seen …" label or null when the gap is ≥ 3 days.
+ * Spec:
+ *   < 60 min   → "Last seen Xm ago"
+ *   < 24 h     → "Last seen Xh ago"
+ *   1 day      → "Last seen 1 day ago"
+ *   2 days     → "Last seen 2 days ago"
+ *   ≥ 3 days   → null  (caller shows "Offline")
+ */
+function lastSeenLabel(iso?: string | null): string | null {
+  if (!iso) return null;
   const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 2) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  const mins  = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(diffMs / 3_600_000);
+  const days  = Math.floor(diffMs / 86_400_000);
+
+  if (mins  < 1)   return 'Last seen just now';
+  if (mins  < 60)  return `Last seen ${mins}m ago`;
+  if (hours < 24)  return `Last seen ${hours}h ago`;
+  if (days  === 1) return 'Last seen 1 day ago';
+  if (days  === 2) return 'Last seen 2 days ago';
+  return null; // ≥ 3 days → show Offline
 }
 
 const ROLES = [
@@ -50,27 +63,35 @@ export default function CollaboratorsPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const fetchCreators = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError(null);
+    try {
+      const params: { q?: string; skill?: string; limit: number } = { limit: 40 };
+      if (search.trim()) params.q = search.trim();
+      if (roleFilter !== 'All Roles') params.skill = roleFilter;
+      const result = await talent.search(params);
+      setCreators(result.talent || []);
+    } catch (e) {
+      if (!silent) setError((e as Error).message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [search, roleFilter]);
+
+  // Load on mount, filter change, or manual refresh
   useEffect(() => {
     let cancelled = false;
     const delay = search ? 400 : 0;
-    const timeout = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params: { q?: string; skill?: string; limit: number } = { limit: 40 };
-        if (search.trim()) params.q = search.trim();
-        if (roleFilter !== 'All Roles') params.skill = roleFilter;
+    const t = setTimeout(() => { if (!cancelled) fetchCreators(); }, delay);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [fetchCreators, refreshKey]);
 
-        const result = await talent.search(params);
-        if (!cancelled) setCreators(result.talent || []);
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, delay);
-    return () => { cancelled = true; clearTimeout(timeout); };
-  }, [search, roleFilter, refreshKey]);
+  // Silent background refresh every 30 s — keeps online badges accurate
+  useEffect(() => {
+    const interval = setInterval(() => fetchCreators(true), 30_000);
+    return () => clearInterval(interval);
+  }, [fetchCreators]);
 
   const sorted = [...creators].sort((a, b) => {
     if (sortBy === 'Highest Rated') return (b.rating ?? 0) - (a.rating ?? 0);
@@ -253,12 +274,24 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
               size="xs"
             />
           )}
-          {/* Real-time presence status only — never show "Available" when not active */}
+          {/* Presence status — driven purely by real heartbeat data */}
           {c.is_online
-            ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse"></span>Online</span>
-            : c.last_seen
-              ? <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block"></span>Active {relativeTime(c.last_seen)}</span>
-              : <span className="flex items-center gap-1 text-xs text-gray-400"><span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block"></span>Offline</span>
+            ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
+                Online
+              </span>
+            : (() => {
+                const label = lastSeenLabel(c.last_seen);
+                return label
+                  ? <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
+                      {label}
+                    </span>
+                  : <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 inline-block" />
+                      Offline
+                    </span>;
+              })()
           }
           {hasPortfolio && (
             <span className="flex items-center gap-1 text-xs text-purple-600 font-medium">

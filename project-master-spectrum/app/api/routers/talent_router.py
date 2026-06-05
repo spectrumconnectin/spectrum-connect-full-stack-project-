@@ -82,9 +82,11 @@ async def search_talent(
         if user.settings:
             availability_status = getattr(user.settings, "availability_status", None)
 
-        # Real-time online presence from PresenceService (heartbeat-based, 2-min window)
+        # Real-time online presence from PresenceService (heartbeat-based, 2-min window).
+        # Use last_activity — updated on every heartbeat — as the authoritative
+        # "last seen" timestamp. last_seen is only stamped on explicit logout.
         is_online = isinstance(presence, dict) and presence.get("is_online", False)
-        last_seen = (presence.get("last_seen") if isinstance(presence, dict) else None)
+        last_seen = (presence.get("last_activity") if isinstance(presence, dict) else None)
 
         return {
             "id": str(user.id),

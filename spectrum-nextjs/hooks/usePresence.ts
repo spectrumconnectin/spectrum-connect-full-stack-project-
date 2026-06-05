@@ -26,12 +26,13 @@ export function usePresence() {
       // Silently fail - presence tracking is not critical
     });
 
-    // Update activity every 1 minute to keep user marked as online
+    // Heartbeat every 30 s — online window is 2 min so this gives a comfortable
+    // 4× safety margin; prevents false-offline on slow connections.
     const activityInterval = setInterval(() => {
       presence.updateActivity().catch(() => {
         // Silently fail
       });
-    }, 60 * 1000);
+    }, 30 * 1000);
 
     // Mark user as offline when leaving the page or tab is hidden
     const handleBeforeUnload = () => {
