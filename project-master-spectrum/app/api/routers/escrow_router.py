@@ -667,6 +667,18 @@ async def deliver_milestone(
         raise HTTPException(status_code=400, detail=f"Cannot deliver a milestone with status '{milestone.status}'")
 
     now = datetime.utcnow()
+
+    # Preserve previous delivery in history before overwriting (resubmission case)
+    if milestone.google_drive_link:
+        history = list(milestone.delivery_history or [])
+        history.append({
+            "version": len(history) + 1,
+            "google_drive_link": milestone.google_drive_link,
+            "delivery_notes": milestone.delivery_notes,
+            "submitted_at": milestone.delivered_at.isoformat() if milestone.delivered_at else None,
+        })
+        milestone.delivery_history = history
+
     milestone.status = "delivered"
     milestone.google_drive_link = body.google_drive_link.strip()
     milestone.delivery_notes = body.delivery_notes
@@ -933,6 +945,9 @@ async def get_delivery_status(
         "auto_release_at": milestone.auto_release_at.isoformat() if milestone.auto_release_at else None,
         "hours_remaining": round(hours_remaining, 2) if hours_remaining is not None else None,
         "auto_released": milestone.auto_released,
+        "revision_count": milestone.revision_count,
+        "revision_notes": milestone.revision_notes,
+        "delivery_history": milestone.delivery_history or [],
         "escrow_id": str(esc.id),
         "client_id": str(esc.client_id),
         "creator_id": str(esc.creator_id),

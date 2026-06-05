@@ -291,6 +291,12 @@ class JobService:
         if 'invited_crew' in update_dict and update_dict['invited_crew']:
             update_dict['invited_crew'] = [PydanticObjectId(id) for id in update_dict['invited_crew']]
 
+        # Strip immutable / ownership fields — prevents a client from transferring
+        # the job to another user or backdating creation timestamps.
+        _IMMUTABLE = {"client_id", "id", "created_at", "proposal_count"}
+        for key in _IMMUTABLE:
+            update_dict.pop(key, None)
+
         # Apply updates
         for key, value in update_dict.items():
             setattr(job, key, value)

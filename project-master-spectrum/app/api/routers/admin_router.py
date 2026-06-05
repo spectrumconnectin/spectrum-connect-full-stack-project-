@@ -230,6 +230,14 @@ async def suspend_user(user_id: str, admin: User = Depends(get_admin_user)):
     if hasattr(u, "is_active"):
         u.is_active = False
         await u.save()
+
+    # Immediately revoke presence so the banned user shows Offline everywhere
+    try:
+        from app.services.presence_service import PresenceService
+        await PresenceService.set_offline(str(u.id))
+    except Exception:
+        pass
+
     return {"id": user_id, "is_active": False}
 
 

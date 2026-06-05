@@ -11,9 +11,10 @@ Endpoints for messaging system:
 
 import asyncio
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 from beanie import PydanticObjectId
+from app.core.rate_limit import rate_limiter
 
 from app.models.schema import User
 from app.models.message import Conversation, Message, UserPresence, MessageAttachment
@@ -250,7 +251,8 @@ async def archive_conversation(
 @router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def create_message(
     data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limiter("send_message", limit=60, window_seconds=60)),
 ):
     """
     Send a message in a conversation (alias for /send)
@@ -270,7 +272,8 @@ async def create_message(
 @router.post("/send", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(
     data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limiter("send_message", limit=60, window_seconds=60)),
 ):
     """Send a message in a conversation"""
     message = await MessageService.send_message(

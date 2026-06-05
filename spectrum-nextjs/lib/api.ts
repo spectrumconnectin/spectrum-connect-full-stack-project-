@@ -1168,6 +1168,14 @@ export const escrow = {
     auto_release_at?: string;
     hours_remaining?: number;
     auto_released: boolean;
+    revision_count?: number;
+    revision_notes?: string;
+    delivery_history?: Array<{
+      version: number;
+      google_drive_link: string;
+      delivery_notes?: string;
+      submitted_at?: string;
+    }>;
     escrow_id: string;
     client_id: string;
     creator_id: string;

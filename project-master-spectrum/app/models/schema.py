@@ -302,8 +302,16 @@ class User(Document):
             "oauth.facebook.id",
             "oauth.linkedin.id",
             "account_type",
-            "spectrum_id.tier",   
+            "spectrum_id.tier",
             "spectrum_id.trust_score",
+            # Search / filter indexes — critical for talent search at scale
+            "is_verified",
+            "last_active",
+            "deleted_at",             # fast filter for soft-deleted users
+            "profile.skills.name",    # skill search (regex on this field)
+            "profile.location.city",  # location filter
+            "profile.rating",         # sort by rating
+            [("account_type", 1), ("is_verified", 1), ("last_active", -1)],  # compound: crew + verified + active
         ]
 
 # ============================================================================

@@ -33,6 +33,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def _is_account_active(user: User) -> bool:
+    """Return False if the account is soft-deleted or suspended."""
+    if user.deleted_at is not None:
+        return False
+    if not getattr(user, "is_active", True):  # is_active defaults True (field may not exist yet)
+        return False
+    return True
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -40,7 +49,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Hardcode HS256 — never accept "none" or RS algorithms even if config changes.
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -50,26 +60,30 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     user = await User.find_one(User.username == token_data.username)
     if user is None:
         raise credentials_exception
+    # Reject tokens for suspended or soft-deleted accounts immediately.
+    if not _is_account_active(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended or deleted.",
+        )
     return user
 
 
 async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme_optional)):
-
-
-
-    
     """
     Same as get_current_user but returns None instead of raising when token is missing/invalid.
-    Useful for optional auth flows (e.g., contact form).
+    Useful for optional auth flows (e.g., public profile views).
     """
     if not token:
         return None
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         username: str = payload.get("sub")
         if username is None:
             return None
         user = await User.find_one(User.username == username)
+        if user is None or not _is_account_active(user):
+            return None
         return user
     except JWTError:
         return None

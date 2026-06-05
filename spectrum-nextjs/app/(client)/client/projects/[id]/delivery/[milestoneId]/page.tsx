@@ -378,6 +378,31 @@ export default function DeliveryReviewPage() {
               <p className="text-sm text-gray-700 leading-relaxed">&ldquo;{delivery.delivery_notes}&rdquo;</p>
             </div>
           )}
+
+          {/* Delivery version history */}
+          {delivery.delivery_history && delivery.delivery_history.length > 0 && (
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">
+                <i className="fa-solid fa-clock-rotate-left mr-1"></i>Previous Versions
+              </p>
+              <div className="space-y-2">
+                {delivery.delivery_history.map((v: { version: number; google_drive_link: string; delivery_notes?: string; submitted_at?: string }, i: number) => (
+                  <div key={i} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
+                    <span className="text-xs text-gray-500 font-medium">Version {v.version}</span>
+                    <div className="flex items-center gap-3">
+                      {v.submitted_at && (
+                        <span className="text-xs text-gray-400">{new Date(v.submitted_at).toLocaleDateString()}</span>
+                      )}
+                      <a href={v.google_drive_link} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-cobalt font-semibold hover:underline flex items-center gap-1">
+                        <i className="fa-brands fa-google-drive text-[10px]"></i>View
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Payment info */}

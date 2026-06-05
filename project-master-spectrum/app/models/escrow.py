@@ -71,6 +71,17 @@ class EscrowMilestone(BaseModel):
     revision_count:    int = 0                     # number of revisions requested
     revision_notes:    Optional[str] = None        # latest revision feedback from client
 
+    # Full delivery history — every version the creator has submitted.
+    # Entries are appended (never removed) so the complete audit trail is preserved.
+    delivery_history: List[dict] = Field(default_factory=list)
+    # Each entry shape:
+    # {
+    #   "version": int,          # 1-based submission number
+    #   "google_drive_link": str,
+    #   "delivery_notes": str | None,
+    #   "submitted_at": ISO str,
+    # }
+
     # Optional link to a ProjectDeadline document
     deadline_id: Optional[str] = None
 
