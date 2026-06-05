@@ -92,6 +92,8 @@ export default function ProfilePage() {
   const [coverUrl, setCoverUrl] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
+
+  const [availabilityStatus, setAvailabilityStatus] = useState<string>('available');
   const avatarRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
 
@@ -186,6 +188,7 @@ export default function ProfilePage() {
           show_location: s.show_location ?? true,
           show_earnings: s.show_earnings ?? false,
         });
+        setAvailabilityStatus(s.availability_status ?? 'available');
       }
     }).catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
@@ -729,29 +732,35 @@ export default function ProfilePage() {
               { val: 'available',     label: 'Available now',       desc: 'Actively looking for projects', color: 'bg-emerald-500' },
               { val: 'busy',          label: 'Busy',                desc: 'Working on current projects',   color: 'bg-amber-400' },
               { val: 'not_available', label: 'Not available',       desc: 'Not taking new work right now', color: 'bg-gray-400' },
-            ].map(opt => (
-              <button key={opt.val}
-                onClick={async () => {
-                  try { await profileApi.updateSettings({ availability_status: opt.val }); }
-                  catch { /* silent */ }
-                }}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition ${
-                  (user?.settings?.availability_status ?? 'available') === opt.val
-                    ? 'border-cobalt bg-blue-50'
-                    : 'border-gray-100 hover:border-gray-200'
-                }`}>
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.color}`}></div>
-                <div>
-                  <p className={`text-sm font-semibold ${(user?.settings?.availability_status ?? 'available') === opt.val ? 'text-cobalt' : 'text-gray-700'}`}>
-                    {opt.label}
-                  </p>
-                  <p className="text-[11px] text-gray-400">{opt.desc}</p>
-                </div>
-                {(user?.settings?.availability_status ?? 'available') === opt.val && (
-                  <i className="fa-solid fa-circle-check text-cobalt text-sm ml-auto"></i>
-                )}
-              </button>
-            ))}
+            ].map(opt => {
+              const isSelected = availabilityStatus === opt.val;
+              return (
+                <button key={opt.val}
+                  onClick={async () => {
+                    const prev = availabilityStatus;
+                    setAvailabilityStatus(opt.val); // optimistic update — UI responds instantly
+                    try {
+                      await profileApi.updateSettings({ availability_status: opt.val });
+                    } catch {
+                      setAvailabilityStatus(prev); // revert on failure
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition ${
+                    isSelected ? 'border-cobalt bg-blue-50' : 'border-gray-100 hover:border-gray-200 bg-white'
+                  }`}>
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${opt.color}`}></div>
+                  <div>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-cobalt' : 'text-gray-700'}`}>
+                      {opt.label}
+                    </p>
+                    <p className="text-[11px] text-gray-400">{opt.desc}</p>
+                  </div>
+                  {isSelected && (
+                    <i className="fa-solid fa-circle-check text-cobalt text-sm ml-auto"></i>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
