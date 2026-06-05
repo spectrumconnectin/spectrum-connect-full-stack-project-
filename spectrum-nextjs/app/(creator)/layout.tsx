@@ -286,6 +286,10 @@ function CreatorFooter() {
 }
 
 export default function CreatorLayout({ children }: { children: React.ReactNode }) {
+  // Activate real-time presence tracking: marks user Online, sends heartbeats,
+  // marks Offline on tab-hide / unload.
+  usePresence();
+
   return (
     <div className="bg-off-white min-h-screen" style={{ fontFamily: "'Inter',sans-serif" }}>
       <CreatorHeader />

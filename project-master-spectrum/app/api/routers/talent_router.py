@@ -2,6 +2,7 @@ from fastapi import APIRouter, Query
 from typing import Optional, List
 
 from app.services.talent_service import TalentService
+from app.services.presence_service import PresenceService
 
 router = APIRouter(prefix="/talent", tags=["talent"])
 
@@ -34,14 +35,14 @@ async def search_talent(
 ):
     results = await TalentService.search(q=q, location=location, skill=skill, limit=limit)
 
-    # Fetch ETF levels for all users in parallel to avoid N+1
+    # Fetch ETF levels + real-time presence for all users in parallel (no N+1)
     import asyncio
-    etf_levels = await asyncio.gather(
-        *[_get_etf_level(u.id) for u in results],
-        return_exceptions=True
+    etf_levels, presence_data = await asyncio.gather(
+        asyncio.gather(*[_get_etf_level(u.id) for u in results], return_exceptions=True),
+        asyncio.gather(*[PresenceService.get_presence(str(u.id)) for u in results], return_exceptions=True),
     )
 
-    def serialize(user, etf_level: str):
+    def serialize(user, etf_level: str, presence: dict):
         profile = user.profile
         stats = user.stats or {}
         stats_get = stats.get if isinstance(stats, dict) else lambda k, d=None: getattr(stats, k, d)
@@ -74,10 +75,16 @@ async def search_talent(
         )
         portfolio_item_count = len(portfolio_items)
 
-        # Availability status (set during onboarding / profile settings)
+        # Availability status — what the user has manually set in their profile
+        # (available / busy / not_available). Null means they haven't set it; do NOT
+        # default to "available" because that would show everyone as green.
         availability_status = None
         if user.settings:
             availability_status = getattr(user.settings, "availability_status", None)
+
+        # Real-time online presence from PresenceService (heartbeat-based, 2-min window)
+        is_online = isinstance(presence, dict) and presence.get("is_online", False)
+        last_seen = (presence.get("last_seen") if isinstance(presence, dict) else None)
 
         return {
             "id": str(user.id),
@@ -93,9 +100,13 @@ async def search_talent(
             "review_count": getattr(user, "review_count", None) or 0,
             # Stage 4 additions
             "etf_level": etf_level if isinstance(etf_level, str) else "bronze",
-            "availability_status": availability_status or "available",
+            # Profile-set availability (busy/available/not_available) — null if not set
+            "availability_status": availability_status,
+            # Real-time heartbeat presence — only True if user sent a heartbeat recently
+            "is_online": is_online,
+            "last_seen": last_seen,
             "portfolio_has_video": portfolio_has_video,
             "portfolio_item_count": portfolio_item_count,
         }
 
-    return {"talent": [serialize(u, etf_levels[i]) for i, u in enumerate(results)]}
+    return {"talent": [serialize(u, etf_levels[i], presence_data[i]) for i, u in enumerate(results)]}

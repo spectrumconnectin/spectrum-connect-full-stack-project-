@@ -685,7 +685,12 @@ export interface TalentItem {
   rating?: number;
   review_count?: number;
   etf_level?: string;
-  availability_status?: string;
+  /** Profile-set preference: 'available' | 'busy' | 'not_available' | null */
+  availability_status?: string | null;
+  /** True only if creator sent a presence heartbeat within the last 2 minutes */
+  is_online?: boolean;
+  /** ISO timestamp of last heartbeat — shown as "Last active X ago" */
+  last_seen?: string | null;
   portfolio_has_video?: boolean;
   portfolio_item_count?: number;
 }

@@ -5,6 +5,17 @@ import { useState, useEffect } from 'react';
 import { talent, TalentItem } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
+function relativeTime(iso?: string | null): string {
+  if (!iso) return 'a while ago';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 const ROLES = [
   'All Roles',
   // Design
@@ -200,9 +211,9 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
                   {c.name[0]?.toUpperCase()}
                 </div>
               )}
-              {/* Availability dot on avatar */}
-              {c.availability_status && c.availability_status !== 'not_available' && (
-                <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${c.availability_status === 'available' ? 'bg-green-500' : 'bg-amber-400'}`} />
+              {/* Real-time presence dot — only green when genuinely online (heartbeat within 2 min) */}
+              {c.is_online && (
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white bg-green-500" title="Online now" />
               )}
             </div>
             <div className="min-w-0">
@@ -242,7 +253,13 @@ function CreatorCard({ creator: c }: { creator: TalentItem }) {
               size="xs"
             />
           )}
-          <AvailabilityDot status={c.availability_status} />
+          {/* Show real-time status OR fallback to profile-set availability */}
+          {c.is_online
+            ? <span className="flex items-center gap-1 text-xs font-semibold text-green-600"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block animate-pulse"></span>Online</span>
+            : c.last_seen
+              ? <span className="text-xs text-gray-400">Active {relativeTime(c.last_seen)}</span>
+              : <AvailabilityDot status={c.availability_status ?? undefined} />
+          }
           {hasPortfolio && (
             <span className="flex items-center gap-1 text-xs text-purple-600 font-medium">
               <i className={`fa-solid ${c.portfolio_has_video ? 'fa-film' : 'fa-image'} text-[10px]`}></i>
