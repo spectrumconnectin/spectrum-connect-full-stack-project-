@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.models.schema import User
 from app.models.message import UserPresence
-from app.auth.auth import get_current_user
+from app.auth.auth import get_current_user, get_current_user_optional
 from app.services.profile_service import ProfileService
 from app.api.schemas.profile_schemas import (
     UserProfileRead,
@@ -321,7 +321,7 @@ async def get_user_reviews(user_id: str):
 @router.get("/{user_id}", summary="Get user profile by ID")
 async def get_user_profile(
     user_id: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get a user's public profile by their ID.
@@ -342,7 +342,7 @@ async def get_user_profile(
 @router.get("/username/{username}", summary="Get user profile by username")
 async def get_user_profile_by_username(
     username: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get a user's public profile by their username."""
     user = await ProfileService.get_user_by_username(username)
