@@ -329,7 +329,13 @@ export default function CreatorWorkspacePage() {
               {(data.job_budget_min || data.job_budget_max) && (
                 <span className="flex items-center gap-1.5">
                   <i className="fa-solid fa-wallet text-cobalt text-xs"></i>
-                  ${data.job_budget_min?.toLocaleString()}{data.job_budget_max ? `–$${data.job_budget_max.toLocaleString()}` : '+'}
+                  {data.job_budget_min && data.job_budget_max
+                    ? data.job_budget_min === data.job_budget_max
+                      ? `$${data.job_budget_min.toLocaleString()}`
+                      : `$${data.job_budget_min.toLocaleString()}–$${data.job_budget_max.toLocaleString()}`
+                    : data.job_budget_min
+                      ? `$${data.job_budget_min.toLocaleString()}+`
+                      : `$${data.job_budget_max?.toLocaleString()}`}
                 </span>
               )}
               {data.job_location && (

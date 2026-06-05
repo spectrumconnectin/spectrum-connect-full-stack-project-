@@ -716,7 +716,7 @@ async def deliver_milestone(
         try:
             from app.models.schema import JobPost
             job = await JobPost.get(esc.job_post_id)
-            if job and job.status == "in_progress":
+            if job and job.status in ("in_progress", "revision_requested"):
                 job.status = "delivered"
                 await job.save()
         except Exception:
