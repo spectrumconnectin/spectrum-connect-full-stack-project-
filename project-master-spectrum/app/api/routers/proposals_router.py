@@ -242,7 +242,9 @@ async def get_proposal_detail(
         "job_status": job.status if job else "",
         "job_budget_min": (job.budget.min if job and job.budget else None),
         "job_budget_max": (job.budget.max if job and job.budget else None),
-        "job_location": None,  # JobPost has no top-level location field
+        "job_location": getattr(job, "location", None) if job else None,
+        "job_event_date": job.event_date.isoformat() if job and getattr(job, "event_date", None) else None,
+        "job_is_remote": getattr(job, "is_remote", None) if job else None,
         "job_skills": (job.skills or []) if job else [],
         "job_deadline": job.deadline.isoformat() if job and job.deadline else None,
         "client_id": str(job.client_id) if job else None,
@@ -351,17 +353,20 @@ async def update_proposal_status(
     if data.status == "accepted" and str(app.crew_id) == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot hire yourself")
 
-    # Prevent multiple accepted proposals for the same job
+    # For single-creator jobs (individual / no crew_size set), block duplicate hires.
+    # For crew-based jobs (small_crew, full_crew), multiple creators can be accepted.
     if data.status == "accepted":
-        already_accepted = await Application.find_one(
-            Application.project_id == job.id,
-            Application.status == "accepted",
-        )
-        if already_accepted and str(already_accepted.id) != proposal_id:
-            raise HTTPException(
-                status_code=409,
-                detail="This project already has an accepted proposal. Withdraw or reject it first.",
+        is_crew_job = (job.crew_size or "individual") in ("small_crew", "full_crew")
+        if not is_crew_job:
+            already_accepted = await Application.find_one(
+                Application.project_id == job.id,
+                Application.status == "accepted",
             )
+            if already_accepted and str(already_accepted.id) != proposal_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This project already has an accepted proposal. Withdraw or reject it first.",
+                )
 
     app.status = data.status
     await app.save()
@@ -631,8 +636,27 @@ async def review_client(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.status != "completed":
-        raise HTTPException(status_code=400, detail="Can only review after project is completed")
+    # Allow review once the project is in a terminal/paid state.
+    # "approved" and "completed" mean work was accepted; also allow if any
+    # milestone has been released (handles cases where job status lags behind).
+    REVIEWABLE_STATUSES = {"completed", "approved"}
+    if job.status not in REVIEWABLE_STATUSES:
+        # Check whether at least one escrow milestone has been released for this job
+        try:
+            from app.models.escrow import Escrow as _Esc
+            escs = await _Esc.find(_Esc.job_post_id == job.id).to_list()
+            has_released = any(
+                m.status in ("released",)
+                for esc in escs
+                for m in esc.milestones
+            )
+        except Exception:
+            has_released = False
+        if not has_released:
+            raise HTTPException(
+                status_code=400,
+                detail="You can only review after the project has been completed or payment has been released."
+            )
 
     if not data.ratings:
         raise HTTPException(status_code=400, detail="At least one rating is required")
@@ -751,8 +775,8 @@ async def direct_hire(
         raise HTTPException(status_code=404, detail="Project not found")
     if str(job.client_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="You do not own this project")
-    if job.status != "open":
-        raise HTTPException(status_code=400, detail="Project must be open to hire")
+    if job.status not in ("open", "in_review"):
+        raise HTTPException(status_code=400, detail="Project must be open or under review to hire directly")
     if data.creator_id == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot hire yourself")
 

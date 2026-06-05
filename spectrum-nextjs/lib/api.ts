@@ -541,7 +541,9 @@ export interface JobPostItem {
   published_at?: string;
   created_at?: string;
   workspace?: { progress: number; roles_required: number; roles_filled: number };
-  location?: string;
+  location?: string;           // physical location for in-person jobs
+  event_date?: string;         // ISO date for event-based projects
+  is_remote?: boolean;         // true = remote only, false = on-site, undefined = flexible
   goals?: string[];
   deliverables?: string[];
 }
@@ -572,6 +574,9 @@ export interface JobCreatePayload {
   experience_level?: string;
   goals?: string[];
   deliverables?: string[];
+  location?: string;
+  event_date?: string;
+  is_remote?: boolean;
   status?: string;
 }
 

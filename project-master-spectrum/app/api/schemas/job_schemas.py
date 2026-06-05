@@ -159,6 +159,11 @@ class JobPostCreate(BaseModel):
             raise ValueError('Projects must have a minimum budget of $5.')
         return v
 
+    # Location & event details (required for in-person / on-site work)
+    location: Optional[str] = Field(None, max_length=200, description="Physical location e.g. 'Colombo, Sri Lanka'")
+    event_date: Optional[datetime] = Field(None, description="Specific event date for event-based projects")
+    is_remote: Optional[bool] = Field(None, description="True = remote only, False = in-person, None = flexible")
+
     # Timeline
     duration: Optional[str] = Field(None, description="Timeline description e.g. '2 weeks', 'by end of July'")
     estimated_duration: Optional[int] = Field(None, ge=1, le=365, description="Estimated days")
@@ -255,6 +260,10 @@ class JobPostUpdate(BaseModel):
     daily_rate: Optional[RateCreate] = None
     weekly_rate: Optional[RateCreate] = None
 
+    location: Optional[str] = Field(None, max_length=200)
+    event_date: Optional[datetime] = None
+    is_remote: Optional[bool] = None
+
     duration: Optional[str] = None
     estimated_duration: Optional[int] = Field(None, ge=1, le=365)
     start_date: Optional[datetime] = None
@@ -302,6 +311,10 @@ class JobPostRead(BaseModel):
     hourly_rate: Optional[dict] = None
     daily_rate: Optional[dict] = None
     weekly_rate: Optional[dict] = None
+
+    location: Optional[str] = None
+    event_date: Optional[datetime] = None
+    is_remote: Optional[bool] = None
 
     duration: Optional[str] = None
     estimated_duration: Optional[int] = None

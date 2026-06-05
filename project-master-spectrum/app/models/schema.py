@@ -557,6 +557,9 @@ class JobPost(Document):
     daily_rate: Optional[Rate] = None
     weekly_rate: Optional[Rate] = None
 
+    location: Optional[str] = None         # physical location for in-person/on-site jobs
+    event_date: Optional[datetime] = None  # specific event date (e.g. sports meet, wedding)
+    is_remote: Optional[bool] = None       # True = remote, False = in-person, None = either
     duration: Optional[str] = None
     estimated_duration: Optional[int] = None # in days
     start_date: Optional[datetime] = None

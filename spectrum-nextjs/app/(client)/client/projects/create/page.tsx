@@ -272,6 +272,11 @@ export default function CreateProjectPage() {
   const [skills, setSkills]       = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
 
+  // ── Step 5: Location & Work Type ───────────────────────────────────────
+  const [location, setLocation]     = useState('');
+  const [eventDate, setEventDate]   = useState('');
+  const [workType, setWorkType]     = useState<'remote' | 'onsite' | 'flexible'>('flexible');
+
   // ── Submit ──────────────────────────────────────────────────────────────
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -368,6 +373,9 @@ export default function CreateProjectPage() {
       experience_level: 'intermediate',
       goals:        goals.length ? goals : undefined,
       deliverables: deliverables.length ? deliverables : undefined,
+      location:     location.trim() || undefined,
+      event_date:   eventDate || undefined,
+      is_remote:    workType === 'remote' ? true : workType === 'onsite' ? false : undefined,
       status: publishRef.current,
       ...buildRate(),
     };
@@ -661,7 +669,61 @@ export default function CreateProjectPage() {
           </div>
         </div>
 
-        {/* ── 5. Timeline & Skills ── */}
+        {/* ── 5. Location & Work Type ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          {sectionHeader('location-dot', 'bg-rose-100 text-rose-600', 'Location & Work Type', 'Is this an in-person, on-site, or remote project?')}
+          <div className="space-y-5">
+            {/* Work type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Work Type</label>
+              <div className="flex gap-2 flex-wrap">
+                {(['flexible', 'remote', 'onsite'] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setWorkType(t)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition capitalize ${
+                      workType === t
+                        ? 'border-cobalt bg-blue-50 text-cobalt'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                    }`}>
+                    {t === 'flexible' ? '🌐 Flexible' : t === 'remote' ? '💻 Remote Only' : '📍 On-Site / In-Person'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Location — shown for on-site/flexible */}
+            {workType !== 'remote' && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                  Location <span className="text-gray-400 font-normal text-xs">{workType === 'onsite' ? '(required for on-site)' : '(optional)'}</span>
+                </label>
+                <div className="relative">
+                  <i className="fa-solid fa-location-dot absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                  <input type="text" value={location} onChange={e => setLocation(e.target.value)}
+                    placeholder="e.g. Colombo, Sri Lanka"
+                    className={`${inp} pl-10`} />
+                </div>
+              </div>
+            )}
+            {/* Event date — for event-based work */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">
+                Event Date <span className="text-gray-400 font-normal text-xs">(optional — for event photography, shoots, etc.)</span>
+              </label>
+              <div className="relative">
+                <i className="fa-solid fa-calendar-day absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)}
+                  className={`${inp} pl-10`} />
+              </div>
+              {eventDate && (
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                  <i className="fa-solid fa-circle-info text-cobalt"></i>
+                  Creators will see this date when reviewing your project.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── 6. Timeline & Skills ── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
           {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
           <div className="space-y-5">

@@ -134,9 +134,28 @@ export default function JobDetailPage() {
                   <i className="fa-solid fa-gauge-high mr-1"></i>{job.complexity}
                 </span>
               )}
+              {/* Location chip — amber for on-site work so it stands out */}
               {job.location && (
-                <span className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full font-medium">
+                <span className="text-xs px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full font-medium border border-amber-200">
                   <i className="fa-solid fa-location-dot mr-1"></i>{job.location}
+                </span>
+              )}
+              {/* Event date — shown prominently for event-based jobs */}
+              {(job as JobPostItem & { event_date?: string }).event_date && (
+                <span className="text-xs px-3 py-1.5 bg-rose-50 text-rose-700 rounded-full font-semibold border border-rose-200">
+                  <i className="fa-solid fa-calendar-day mr-1"></i>
+                  Event: {new Date((job as JobPostItem & { event_date?: string }).event_date!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+              {/* Work-type chip */}
+              {(job as JobPostItem & { is_remote?: boolean }).is_remote === false && (
+                <span className="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full font-medium border border-indigo-200">
+                  <i className="fa-solid fa-person-walking-arrow-right mr-1"></i>In-Person Required
+                </span>
+              )}
+              {(job as JobPostItem & { is_remote?: boolean }).is_remote === true && (
+                <span className="text-xs px-3 py-1.5 bg-green-50 text-green-700 rounded-full font-medium border border-green-200">
+                  <i className="fa-solid fa-laptop mr-1"></i>Remote
                 </span>
               )}
             </div>
@@ -216,6 +235,9 @@ export default function JobDetailPage() {
               {[
                 { label: 'Budget',      value: budget,                   icon: 'fa-wallet' },
                 { label: 'Category',    value: job.department,           icon: 'fa-film' },
+                { label: 'Location',    value: job.location,             icon: 'fa-location-dot' },
+                { label: 'Event Date',  value: (job as JobPostItem & { event_date?: string }).event_date ? formatDate((job as JobPostItem & { event_date?: string }).event_date) : undefined, icon: 'fa-calendar-day' },
+                { label: 'Work Type',   value: (job as JobPostItem & { is_remote?: boolean }).is_remote === true ? 'Remote' : (job as JobPostItem & { is_remote?: boolean }).is_remote === false ? 'In-Person / On-Site' : undefined, icon: 'fa-laptop' },
                 { label: 'Experience',  value: job.experience_level,     icon: 'fa-star' },
                 { label: 'Crew Size',   value: job.crew_size,            icon: 'fa-users' },
                 { label: 'Complexity',  value: job.complexity,           icon: 'fa-gauge-high' },
