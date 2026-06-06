@@ -1016,6 +1016,9 @@ export interface JobProposalItem {
   status: string;
   client_viewed: boolean;
   submitted_at?: string;
+  accepted_at?: string;
+  deadline_at?: string;
+  proposed_duration?: number;
 }
 
 export interface ProposalDetail {
@@ -1034,9 +1037,12 @@ export interface ProposalDetail {
   client?: { id: string; username: string; display_name?: string; avatar?: string };
   cover_letter: string;
   proposed_budget?: number;
+  proposed_duration?: number;
   role?: string;
   status: string;
   submitted_at?: string;
+  accepted_at?: string;
+  deadline_at?: string;
   escrow?: {
     escrow_id: string;
     status: string;

@@ -5,6 +5,42 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { proposals, escrow as escrowApi, messaging, ProposalDetail, EscrowMilestone } from '@/lib/api';
 
+// ── Deadline countdown ────────────────────────────────────────────────────────
+function useDeadlineCountdown(deadlineAt?: string) {
+  const [label, setLabel] = useState('');
+  const [expired, setExpired] = useState(false);
+  const [urgency, setUrgency] = useState<'ok' | 'soon' | 'overdue'>('ok');
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const tick = () => {
+      const diff = new Date(deadlineAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setExpired(true);
+        setUrgency('overdue');
+        const over = Math.abs(diff);
+        const d = Math.floor(over / 86400000);
+        setLabel(d > 0 ? `${d}d overdue` : 'Due today — overdue');
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (diff < 86400000) setUrgency('soon');         // < 24 h
+      else if (diff < 3 * 86400000) setUrgency('soon'); // < 3 days
+      else setUrgency('ok');
+      if (d > 0) setLabel(`${d}d ${h}h left`);
+      else if (h > 0) setLabel(`${h}h ${m}m left`);
+      else setLabel(`${m}m left`);
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [deadlineAt]);
+
+  return { label, expired, urgency };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function validateGoogleDriveLink(link: string): string | null {
   if (!link.trim()) return 'A Google Drive link is required.';
@@ -254,6 +290,9 @@ export default function CreatorWorkspacePage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deadline countdown — must be declared before any early return
+  const deadlineData = useDeadlineCountdown((data as (typeof data & { deadline_at?: string }) | null)?.deadline_at);
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center py-24 gap-4">
       <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
@@ -279,6 +318,7 @@ export default function CreatorWorkspacePage() {
   const canDeliver = fundedMilestones.length > 0 || deliveredMilestones.some(m => m.status === 'revision_requested');
   const isJobCompleted = data.job_status === 'completed';
   const { label: statusBadgeLabel, style: statusBadgeStyle } = getWorkspaceBadge(data.status, data.job_status);
+  const isOverdue = deadlineData.expired && !['completed', 'delivered', 'approved'].includes(data.job_status ?? '');
 
   return (
     <>
@@ -289,6 +329,25 @@ export default function CreatorWorkspacePage() {
           <i className="fa-solid fa-arrow-left text-xs"></i>Back to My Work
         </Link>
       </div>
+
+      {/* Overdue banner — deadline passed, work not yet delivered */}
+      {isOverdue && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-clock text-white text-xl"></i>
+          </div>
+          <div>
+            <p className="font-bold text-red-900 text-lg">Deadline Passed — Deliver ASAP</p>
+            <p className="text-red-700 text-sm mt-1 leading-relaxed">
+              Your agreed delivery deadline has passed. Submit your work immediately to avoid a negative review.
+              The client may cancel the project or hire a replacement creator.
+            </p>
+          </div>
+          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 mt-0.5 whitespace-nowrap">
+            {deadlineData.label}
+          </span>
+        </div>
+      )}
 
       {/* Completion banner */}
       {isJobCompleted && (
@@ -316,6 +375,17 @@ export default function CreatorWorkspacePage() {
               </span>
               {data.job_department && (
                 <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full capitalize">{data.job_department}</span>
+              )}
+              {/* Deadline countdown badge */}
+              {(data as ProposalDetail & { deadline_at?: string }).deadline_at && !isJobCompleted && deadlineData.label && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${
+                  deadlineData.urgency === 'overdue' ? 'bg-red-100 text-red-700' :
+                  deadlineData.urgency === 'soon'    ? 'bg-amber-100 text-amber-700' :
+                                                       'bg-blue-50 text-cobalt'
+                }`}>
+                  <i className="fa-solid fa-clock text-[10px]"></i>
+                  {deadlineData.label}
+                </span>
               )}
             </div>
 

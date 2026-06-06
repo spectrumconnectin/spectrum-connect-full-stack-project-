@@ -4,6 +4,39 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem, EscrowListItem, EscrowDetail } from '@/lib/api';
+
+// ── Deadline countdown hook ───────────────────────────────────────────────────
+function useDeadlineCountdown(deadlineAt?: string) {
+  const [label, setLabel] = useState('');
+  const [expired, setExpired] = useState(false);
+  const [urgency, setUrgency] = useState<'ok' | 'soon' | 'overdue'>('ok');
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const tick = () => {
+      const diff = new Date(deadlineAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setExpired(true);
+        setUrgency('overdue');
+        const over = Math.abs(diff);
+        const d = Math.floor(over / 86400000);
+        setLabel(d > 0 ? `${d}d overdue` : 'Due today — overdue');
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      if (diff < 3 * 86400000) setUrgency('soon');
+      else setUrgency('ok');
+      if (d > 0) setLabel(`${d}d ${h}h left`);
+      else setLabel(`${h}h left`);
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [deadlineAt]);
+
+  return { label, expired, urgency };
+}
 import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -210,6 +243,9 @@ export default function ClientProjectDetailPage() {
     }
   };
 
+  // Deadline from the hired creator's proposal — must be called before any early return
+  const deadline = useDeadlineCountdown(hiredCreator?.deadline_at);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -233,6 +269,9 @@ export default function ClientProjectDetailPage() {
   }
 
   const budget = formatBudget(job);
+  const deadlineExpired = deadline.expired &&
+    !['completed', 'delivered', 'approved', 'revision_requested'].includes(job.status);
+
   const canPublish  = job.status === 'draft';
   const canStart    = (job.status === 'open' || job.status === 'closed' || job.status === 'pending_funding') && !!hiredCreator && (!!(projectEscrow && projectEscrow.funded_amount > 0) || job.status !== 'pending_funding');
   const canDelete   = job.status === 'draft';
@@ -297,6 +336,17 @@ export default function ClientProjectDetailPage() {
               }`}>
                 {jobStatusLabel(job.status)}
               </span>
+              {/* Delivery deadline countdown */}
+              {hiredCreator?.deadline_at && !['completed'].includes(job.status) && deadline.label && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${
+                  deadline.urgency === 'overdue' ? 'bg-red-100 text-red-700' :
+                  deadline.urgency === 'soon'    ? 'bg-amber-100 text-amber-700' :
+                                                   'bg-blue-50 text-cobalt'
+                }`}>
+                  <i className="fa-solid fa-clock text-[10px]"></i>
+                  Delivery: {deadline.label}
+                </span>
+              )}
             </div>
             <p className="text-gray-500 mt-1 text-sm">
               {job.department}{job.role ? ` · ${job.role}` : ''} · Posted {formatDate(job.created_at)}
@@ -316,6 +366,43 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Deadline expired — creator has not delivered yet */}
+      {deadlineExpired && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-triangle-exclamation text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-red-900 text-lg">Delivery Deadline Passed</p>
+            <p className="text-red-700 text-sm mt-0.5 leading-relaxed">
+              {hiredCreator?.creator_name?.split(' ')[0] ?? 'The creator'} agreed to deliver by this date but has not submitted yet.
+              You can message them for an update, find a replacement, or cancel the project and get a refund.
+            </p>
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {hiredCreator?.creator_id && (
+                <Link href={`/client/messaging?userId=${hiredCreator.creator_id}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                  <i className="fa-solid fa-comment text-xs"></i>Message Creator
+                </Link>
+              )}
+              <Link href={`/client/projects/${id}/applicants`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition">
+                <i className="fa-solid fa-user-plus text-xs"></i>Find New Creator
+              </Link>
+              {projectEscrow && projectEscrow.funded_amount > 0 && (
+                <Link href="/client/payments"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                  <i className="fa-solid fa-rotate-left text-xs"></i>Cancel &amp; Refund
+                </Link>
+              )}
+            </div>
+          </div>
+          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 mt-0.5 whitespace-nowrap">
+            {deadline.label}
+          </span>
+        </div>
+      )}
 
       {/* Payment completed — project finished + review CTA */}
       {job.status === 'completed' && (

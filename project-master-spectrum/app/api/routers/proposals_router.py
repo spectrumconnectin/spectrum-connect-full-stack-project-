@@ -259,9 +259,12 @@ async def get_proposal_detail(
         "client": client_info,
         "cover_letter": app.cover_letter,
         "proposed_budget": app.proposed_budget,
+        "proposed_duration": app.proposed_duration,
         "role": app.role,
         "status": app.status,
         "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
+        "accepted_at": app.accepted_at.isoformat() if getattr(app, "accepted_at", None) else None,
+        "deadline_at": app.deadline_at.isoformat() if getattr(app, "deadline_at", None) else None,
         "escrow": escrow_data,
     }
 
@@ -321,6 +324,9 @@ async def get_job_proposals(
             "status": app.status,
             "client_viewed": app.client_viewed,
             "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
+            "accepted_at": app.accepted_at.isoformat() if getattr(app, "accepted_at", None) else None,
+            "deadline_at": app.deadline_at.isoformat() if getattr(app, "deadline_at", None) else None,
+            "proposed_duration": app.proposed_duration,
         })
 
     # Mark unviewed as viewed (batch update to avoid N+1 saves)
@@ -406,6 +412,16 @@ async def update_proposal_status(
             pass  # non-blocking — allow reject if escrow lookup fails
 
     app.status = data.status
+
+    # Record acceptance timestamp and compute delivery deadline
+    if data.status == "accepted":
+        from datetime import timedelta
+        now = datetime.utcnow()
+        app.accepted_at = now
+        # proposed_duration is stored in weeks (matches DURATION_OPTIONS in the frontend)
+        if app.proposed_duration:
+            app.deadline_at = now + timedelta(weeks=app.proposed_duration)
+
     await app.save()
 
     # Update job status based on accepted / rejected decision

@@ -630,6 +630,8 @@ class Application(Document):
     client_rating: Optional[dict] = None             # Review submitted by client (client → creator)
     creator_rating_of_client: Optional[dict] = None  # Review submitted by creator (creator → client), via /rate
     creator_rating: Optional[dict] = None            # Review submitted by creator via /review-client
+    accepted_at: Optional[datetime] = None   # When client accepted this proposal
+    deadline_at: Optional[datetime] = None   # accepted_at + proposed_duration weeks
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None
