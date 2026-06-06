@@ -392,8 +392,13 @@ function FundProjectModal({
   onFunded: () => void;
   onClose: () => void;
 }) {
+  // For fixed-price jobs the amount is always the fixed price — no overriding allowed
+  const fixedPrice = job.budget_type === 'fixed' &&
+    job.budget?.min && job.budget?.max &&
+    job.budget.min === job.budget.max
+      ? job.budget.min : null;
   const [amount, setAmount] = useState(
-    job.budget?.min ? String(job.budget.min) : ''
+    fixedPrice ? String(fixedPrice) : (job.budget?.min ? String(job.budget.min) : '')
   );
   const [milestoneTitle, setMilestoneTitle] = useState('Project Payment');
   const [step, setStep] = useState<'setup' | 'processing' | 'done'>('setup');
@@ -514,16 +519,34 @@ function FundProjectModal({
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     Amount (USD) <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
-                    <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full border border-gray-300 rounded-xl pl-7 pr-4 py-2.5 text-sm focus:outline-none focus:border-cobalt" />
-                  </div>
-                  {job.budget?.min && job.budget?.max && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Project budget: ${job.budget.min.toLocaleString()}–${job.budget.max.toLocaleString()}
-                    </p>
+                  {fixedPrice ? (
+                    /* Fixed-price project — amount is locked */
+                    <div>
+                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                        <i className="fa-solid fa-tag text-emerald-600"></i>
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-emerald-900">Fixed Price</p>
+                          <p className="text-xs text-emerald-700">Set by the client at project creation — cannot be changed.</p>
+                        </div>
+                        <span className="text-xl font-bold text-emerald-700">${fixedPrice.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Negotiable / hourly / daily — editable */
+                    <div>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
+                        <input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full border border-gray-300 rounded-xl pl-7 pr-4 py-2.5 text-sm focus:outline-none focus:border-cobalt" />
+                      </div>
+                      {job.budget?.min && job.budget?.max && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Project budget: ${job.budget.min.toLocaleString()}
+                          {job.budget.min !== job.budget.max && `–$${job.budget.max.toLocaleString()}`}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

@@ -17,6 +17,7 @@ const DURATION_OPTIONS = [
 
 function budgetLabel(job: JobPostItem): string {
   if (job.budget?.min && job.budget?.max) {
+    if (job.budget.min === job.budget.max) return `$${job.budget.min.toLocaleString()} (fixed)`;
     return `$${job.budget.min.toLocaleString()} – $${job.budget.max.toLocaleString()}`;
   }
   if (job.budget?.min) return `From $${job.budget.min.toLocaleString()}`;
@@ -31,6 +32,12 @@ function budgetLabel(job: JobPostItem): string {
     return max ? `$${min}–$${max}/hr` : `From $${min}/hr`;
   }
   return 'Negotiable';
+}
+
+function isFixedPrice(job: JobPostItem): boolean {
+  return job.budget_type === 'fixed' &&
+    !!job.budget?.min && !!job.budget?.max &&
+    job.budget.min === job.budget.max;
 }
 
 export default function ProjectApplicationPage() {
@@ -58,6 +65,10 @@ export default function ProjectApplicationPage() {
     Promise.all([jobs.getById(id), profileApi.getMe()])
       .then(([jobData, me]) => {
         setJob(jobData);
+        // For fixed-price jobs, lock the proposed budget to the exact fixed price
+        if (isFixedPrice(jobData) && jobData.budget?.min) {
+          setProposedBudget(String(jobData.budget.min));
+        }
         // Block self-application: job's client_id matches the logged-in user
         if (jobData.client_id && me.id && String(jobData.client_id) === String(me.id)) {
           setIsOwnJob(true);
@@ -181,8 +192,30 @@ export default function ProjectApplicationPage() {
                 </div>
                 <h2 className="text-lg font-bold text-gray-900">Your Proposal</h2>
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
+
+              {/* Fixed-price notice — rate is not negotiable */}
+              {job && isFixedPrice(job) ? (
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3.5 mb-4">
+                    <i className="fa-solid fa-tag text-emerald-600 text-lg flex-shrink-0"></i>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">Fixed Price Project</p>
+                      <p className="text-xs text-emerald-700 mt-0.5">
+                        This project has a fixed price of{' '}
+                        <strong>${job.budget!.min!.toLocaleString()}</strong>.
+                        The rate is non-negotiable — you apply at this price or not at all.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    <span className="text-sm font-semibold text-gray-700">Your payout (after 8% fee)</span>
+                    <span className="text-lg font-bold text-emerald-600">
+                      ${(job.budget!.min! * 0.92).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-6">
                   <label className="block text-sm font-semibold text-gray-900 mb-2">Your Rate ($)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
@@ -199,19 +232,20 @@ export default function ProjectApplicationPage() {
                     <p className="text-xs text-gray-400 mt-1.5">Client budget: {budgetLabel(job)}</p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Estimated Timeline</label>
-                  <select
-                    value={proposedDuration}
-                    onChange={e => setProposedDuration(e.target.value)}
-                    className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900"
-                  >
-                    <option value="">Select timeline</option>
-                    {DURATION_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Estimated Timeline</label>
+                <select
+                  value={proposedDuration}
+                  onChange={e => setProposedDuration(e.target.value)}
+                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900"
+                >
+                  <option value="">Select timeline</option>
+                  {DURATION_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
