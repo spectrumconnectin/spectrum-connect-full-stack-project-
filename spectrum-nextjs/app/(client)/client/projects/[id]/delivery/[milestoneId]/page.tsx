@@ -348,6 +348,8 @@ export default function DeliveryReviewPage() {
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [markingOpen, setMarkingOpen] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
+  const [approveError, setApproveError] = useState('');
 
   // Modal state
   const [showRevision, setShowRevision] = useState(false);
@@ -418,10 +420,16 @@ export default function DeliveryReviewPage() {
     setConfirmingReview(true);
     try {
       const result = await escrowApi.confirmReview(escrowId, milestoneId);
-      setDelivery(prev => prev ? { ...prev, client_reviewed_at: result.client_reviewed_at } : prev);
-      setReviewConfirmed(true);
+      // Only advance if the backend actually confirmed (client_reviewed_at is set)
+      if (result.client_reviewed_at) {
+        setDelivery(prev => prev ? { ...prev, client_reviewed_at: result.client_reviewed_at } : prev);
+        setReviewConfirmed(true);
+      } else {
+        // API succeeded but returned no timestamp — refresh from server to get true state
+        await load();
+      }
     } catch (e) {
-      alert((e as Error).message);
+      setConfirmError((e as Error).message);
     } finally {
       setConfirmingReview(false);
     }
@@ -430,13 +438,33 @@ export default function DeliveryReviewPage() {
   // ── Step 3: Approve ────────────────────────────────────────────────────────
   const handleApprove = async () => {
     if (!escrowId || !milestoneId) return;
+
+    // Guard: if the DB value is missing (stale UI), refresh and send user back to step 2
+    if (!delivery?.client_reviewed_at) {
+      await load(); // refresh from server
+      setShowApprove(false);
+      setReviewConfirmed(false);
+      setApproveError('Please complete the review confirmation step before approving.');
+      return;
+    }
+
     setApprovingBusy(true);
+    setApproveError('');
     try {
       await escrowApi.approveMilestone(escrowId, milestoneId);
       setDelivery(prev => prev ? { ...prev, status: 'approved' } : prev);
       setShowApprove(false);
     } catch (e) {
-      alert((e as Error).message);
+      const msg = (e as Error).message;
+      // If backend says review not confirmed, refresh state and reset to step 2
+      if (msg.toLowerCase().includes('review') || msg.toLowerCase().includes('confirm')) {
+        await load();
+        setReviewConfirmed(false);
+        setShowApprove(false);
+        setApproveError('Your review session expired — please re-confirm that you have reviewed the work.');
+      } else {
+        setApproveError(msg);
+      }
     } finally {
       setApprovingBusy(false);
     }
@@ -529,9 +557,10 @@ export default function DeliveryReviewPage() {
   const isRevisionRequested = delivery.status === 'revision_requested';
   const creatorName = hiredCreator?.creator_name ?? 'Creator';
 
-  // Optimistic state — if user just confirmed locally but API hasn't confirmed yet
+  // Step is derived purely from DB-confirmed values — never from local state alone.
+  // reviewConfirmed is only used for loading UI feedback, never to gate the approve button.
   const driveOpened   = !!(delivery.drive_link_opened_at);
-  const reviewDone    = !!(delivery.client_reviewed_at) || reviewConfirmed;
+  const reviewDone    = !!(delivery.client_reviewed_at); // DB value only — no local fallback
   const effectiveStep: ReviewStep = isApproved ? 'release'
     : reviewDone ? 'decide'
     : driveOpened ? 'review'
@@ -755,6 +784,12 @@ export default function DeliveryReviewPage() {
               </span>
             </label>
 
+            {confirmError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i className="fa-solid fa-circle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+                <p className="text-sm text-red-700">{confirmError}</p>
+              </div>
+            )}
             <button
               onClick={handleConfirmReview}
               disabled={!reviewConfirmed || confirmingReview}
@@ -773,8 +808,14 @@ export default function DeliveryReviewPage() {
               <i className="fa-solid fa-circle-check text-teal-600 text-sm flex-shrink-0"></i>
               <p className="text-sm text-teal-800 font-semibold">Review confirmed — choose your next action</p>
             </div>
+            {approveError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2">
+                <i className="fa-solid fa-circle-exclamation text-red-500 text-sm mt-0.5 flex-shrink-0"></i>
+                <p className="text-sm text-red-700">{approveError}</p>
+              </div>
+            )}
             <button
-              onClick={() => setShowApprove(true)}
+              onClick={() => { setApproveError(''); setShowApprove(true); }}
               className="w-full py-4 bg-teal-600 text-white rounded-2xl font-bold text-base hover:bg-teal-700 transition flex items-center justify-center gap-3 shadow-lg shadow-teal-200">
               <i className="fa-solid fa-circle-check"></i>Approve Delivery
             </button>
