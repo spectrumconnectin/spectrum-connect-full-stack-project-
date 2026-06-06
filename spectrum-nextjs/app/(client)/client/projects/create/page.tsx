@@ -476,10 +476,39 @@ export default function CreateProjectPage() {
         </div>
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 items-start">
+      {/* ── Mobile template strip — OUTSIDE the two-col flex so it always stacks above the form ── */}
+      <div className="xl:hidden mb-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <i className="fa-solid fa-bolt text-cobalt"></i>
+            <h3 className="font-bold text-sm text-gray-900">Quick Templates</h3>
+            <span className="text-xs text-gray-400 ml-1">— click to pre-fill the form</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {TEMPLATES.map(tpl => (
+              <button
+                key={tpl.id}
+                type="button"
+                onClick={() => applyTemplate(tpl)}
+                className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition border whitespace-nowrap ${
+                  appliedTemplate === tpl.id
+                    ? 'bg-cobalt text-white border-cobalt'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-cobalt hover:bg-blue-50'
+                }`}
+              >
+                <i className={`fa-solid ${tpl.icon}`}></i>
+                {tpl.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {/* ── Templates sidebar (right) ── */}
-      <div className="hidden xl:block w-72 flex-shrink-0 sticky top-6 order-2">
+      {/* ── Two-column layout: form (always) + sidebar (xl only) ── */}
+      <div className="flex gap-8 items-start">
+
+      {/* ── Templates sidebar (right, xl+) ── */}
+      <div className="hidden xl:block w-72 flex-shrink-0 sticky top-6">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-gradient-to-r from-cobalt to-blue-500 px-5 py-4 text-white">
             <div className="flex items-center gap-2 mb-1">
@@ -532,35 +561,7 @@ export default function CreateProjectPage() {
         </div>
       </div>
 
-      {/* ── Mobile template strip (shown below header on small screens) ── */}
-      <div className="xl:hidden mb-6 order-first w-full">
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <i className="fa-solid fa-bolt text-cobalt"></i>
-            <h3 className="font-bold text-sm text-gray-900">Quick Templates</h3>
-            <span className="text-xs text-gray-400 ml-1">— click to pre-fill the form</span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {TEMPLATES.map(tpl => (
-              <button
-                key={tpl.id}
-                type="button"
-                onClick={() => applyTemplate(tpl)}
-                className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition border whitespace-nowrap ${
-                  appliedTemplate === tpl.id
-                    ? 'bg-cobalt text-white border-cobalt'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-cobalt hover:bg-blue-50'
-                }`}
-              >
-                <i className={`fa-solid ${tpl.icon}`}></i>
-                {tpl.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0 order-1">
+      <form onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0 w-full">
 
         {/* ── 1. Project Information ── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
