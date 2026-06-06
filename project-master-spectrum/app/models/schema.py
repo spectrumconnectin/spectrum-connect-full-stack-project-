@@ -282,6 +282,10 @@ class User(Document):
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None
     deleted_at: Optional[datetime] = None # Soft delete — use get_active_user() helper, never User.get() directly
+    # One-time password reset token hash (SHA-256 of the raw JWT).
+    # Set when a reset link is issued; cleared immediately on first successful use
+    # to prevent token replay within the 1-hour expiry window.
+    password_reset_token_hash: Optional[str] = None
 
     @classmethod
     async def get_active(cls, user_id) -> "Optional[User]":

@@ -8,7 +8,8 @@ function setCookie(token: string, rememberMe: boolean = false) {
   // 30 days if "Remember me" is checked, otherwise 7 days
   const daysToExpire = rememberMe ? 30 : 7;
   const expires = new Date(Date.now() + daysToExpire * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Lax`;
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
 }
 
 function getCookie(): string | null {

@@ -122,6 +122,12 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    # Content-Security-Policy — deny frames and restrict scripts/objects.
+    # APIs don't serve HTML so a strict policy is safe without breaking clients.
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'none'; frame-ancestors 'none'",
+    )
     if settings.is_production():
         # Tell browsers to upgrade and pin HTTPS once a TLS cert is in front of
         # the LB. Harmless on HTTP origins (browsers ignore HSTS over HTTP).

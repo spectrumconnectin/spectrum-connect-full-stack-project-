@@ -143,10 +143,15 @@ async def verify_otp(
 @router.get("/google_login")
 async def google_login():
     """
-    Redirects to Google's authorization page.
-    Constructs URL directly to avoid httpx_oauth making blocking outbound calls.
+    Redirects to Google's authorization page with a CSRF-protection state token.
+    The state is stored server-side and verified in the callback.
     """
     from urllib.parse import urlencode
+
+    # Generate a cryptographically secure state token and store it server-side.
+    state_token = secrets.token_urlsafe(32)
+    oauth_state_tokens[state_token] = True   # dict keyed by token; value is sentinel
+
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -154,6 +159,7 @@ async def google_login():
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "select_account",
+        "state": state_token,
     }
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
     return RedirectResponse(url)
@@ -324,11 +330,19 @@ async def google_callback(code: str, state: str | None = None):
     Handles the Google OAuth2 callback.
 
     Security notes:
+    - Validates the `state` parameter to prevent CSRF attacks.
     - Uses a per-user random password for OAuth-created accounts instead
       of a static shared password.
     - Sets httpOnly cookies for auth_token and user_role
     - Also includes token in URL for backward compatibility
     """
+    # Validate state to prevent CSRF
+    if not state or state not in oauth_state_tokens:
+        logger.warning("OAuth callback rejected: invalid or missing state token")
+        return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error?reason=invalid_state")
+    # Consume the state token — one-time use only.
+    oauth_state_tokens.pop(state, None)
+
     try:
         import httpx
 
@@ -395,18 +409,27 @@ async def google_callback(code: str, state: str | None = None):
             jwt_token = create_access_token(data={"sub": new_user.username})
             user = new_user
 
-        # Create redirect response with cookies
-        redirect_url = f"{settings.FRONTEND_URL}/oauth-callback?token={jwt_token}"
+        # Store the token in a short-lived exchange store keyed by an opaque
+        # code so the JWT is NEVER placed in the redirect URL (which would
+        # expose it in access logs, browser history, and Referer headers).
+        exchange_code = secrets.token_urlsafe(32)
+        oauth_state_tokens[f"exchange:{exchange_code}"] = jwt_token
+
+        # Redirect with only the opaque exchange code — no JWT in the URL.
+        redirect_url = f"{settings.FRONTEND_URL}/oauth-callback?code={exchange_code}"
         response = RedirectResponse(redirect_url, status_code=302)
 
-        # Set auth_token cookie
+        # Also set httpOnly cookies so the frontend can read role without JS.
+        is_prod = settings.ENVIRONMENT == "production"
+
+        # Set auth_token cookie (httpOnly — not readable by JS)
         response.set_cookie(
             key="auth_token",
             value=jwt_token,
             httponly=True,
-            secure=settings.ENVIRONMENT == "production",
+            secure=is_prod,
             samesite="lax",
-            max_age=604800,  # 7 days
+            max_age=3600,  # 1 hour — matches ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
         # Set user_role cookie
@@ -415,10 +438,10 @@ async def google_callback(code: str, state: str | None = None):
         response.set_cookie(
             key="user_role",
             value=user_role,
-            httponly=True,
-            secure=settings.ENVIRONMENT == "production",
+            httponly=False,    # needs to be readable by JS for routing
+            secure=is_prod,
             samesite="lax",
-            max_age=604800,
+            max_age=3600,
         )
 
         return response
@@ -430,20 +453,24 @@ async def google_callback(code: str, state: str | None = None):
 @router.get(
     "/oauth-token",
     response_model=Token,
-    summary="Exchange OAuth state for JWT (reserved for future use)",
+    summary="Exchange one-time OAuth code for a JWT",
 )
-async def get_oauth_token(state: str):
+async def get_oauth_token(code: str):
     """
-    Reserved for a future, more secure state-based OAuth flow.
+    Exchange the opaque short-lived exchange code (from the OAuth redirect)
+    for a proper JWT access token.
 
-    Currently unused by the frontend – OAuth flows redirect directly with
-    `?token=` for compatibility in dev. When you are ready to harden the
-    frontend, you can switch to exchanging state for tokens instead.
+    The code is single-use and expires from the in-memory store after retrieval.
+    This prevents the JWT from ever appearing in a redirect URL / browser history.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="State-based OAuth token exchange is not enabled in this environment.",
-    )
+    exchange_key = f"exchange:{code}"
+    jwt_token = oauth_state_tokens.pop(exchange_key, None)
+    if not jwt_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired exchange code.",
+        )
+    return {"access_token": jwt_token, "token_type": "bearer"}
 
 @router.get("/verify-email", summary="Verify email address")
 async def verify_email(token: str):
@@ -496,23 +523,22 @@ async def resend_verification(
     ```
     """
     user = await User.find_one(User.email == email)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.is_verified:
-        raise HTTPException(status_code=400, detail="Email already verified")
-    
+
+    # Always return the same success response to prevent email enumeration.
+    _generic_response = JSONResponse({"message": "If an account with that email exists and is not yet verified, a verification email has been sent."})
+
+    if not user or user.is_verified:
+        return _generic_response
+
     try:
         token = create_verification_token(user.email)
         verification_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
         html = get_verification_email_html(user.username, verification_link)
-        success = await send_email(user.email, "Verify your Spectrum Connect account", html)
-        if success:
-            return JSONResponse({"message": "Verification email sent"})
-        else:
-            raise HTTPException(status_code=500, detail="Failed to send email")
+        await send_email(user.email, "Verify your Spectrum Connect account", html)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Email error: {str(e)}")
+        logger.error("resend-verification email error for %s: %s", email, e)
+
+    return _generic_response
 
 @router.post("/reset-password", summary="Request password reset")
 async def request_password_reset(
@@ -549,8 +575,13 @@ async def request_password_reset(
 
     if user:
         try:
+            import hashlib
             # Create reset token
             reset_token = create_password_reset_token(user.email)
+            # Store a one-time hash so the token can be consumed on first use.
+            user.password_reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+            await user.save()
+
             reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
 
             # Send email
@@ -573,6 +604,7 @@ async def request_password_reset(
 @router.post("/reset-password/confirm", summary="Confirm password reset")
 async def confirm_password_reset(
     request: PasswordResetConfirm,
+    _: None = Depends(rate_limiter("password_reset_confirm_ip", limit=5, window_seconds=300)),
 ):
     """
     Reset password using reset token from email.
@@ -597,7 +629,9 @@ async def confirm_password_reset(
     - 404: User not found
     - 500: Failed to update password
     """
-    # Verify token and get email
+    import hashlib
+
+    # Verify token signature and expiry
     email = verify_password_reset_token(request.token)
     if not email:
         raise HTTPException(
@@ -610,9 +644,20 @@ async def confirm_password_reset(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Update password
+    # One-time use guard: verify the stored hash matches and hasn't been consumed yet.
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    if not user.password_reset_token_hash or not secrets.compare_digest(
+        user.password_reset_token_hash, token_hash
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="This reset link has already been used or is invalid. Please request a new one."
+        )
+
+    # Update password and immediately invalidate the token (one-time use)
     try:
         user.password_hash = get_password_hash(request.new_password)
+        user.password_reset_token_hash = None  # consume the token
         await user.save()
         logger.info(f"Password reset successful for user: {user.email}")
 

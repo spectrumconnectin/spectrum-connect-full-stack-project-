@@ -131,8 +131,22 @@ class ProfileService:
         return user
 
     @staticmethod
+    def _validate_url(url: str, field: str = "URL") -> str:
+        """Reject javascript: and data: URIs that could be used for XSS."""
+        from fastapi import HTTPException, status as _status
+        stripped = url.strip().lower()
+        if stripped.startswith("javascript:") or stripped.startswith("data:"):
+            raise HTTPException(
+                status_code=_status.HTTP_400_BAD_REQUEST,
+                detail=f"{field} must be a valid https:// URL.",
+            )
+        return url
+
+    @staticmethod
     async def update_profile_picture(user: User, picture_url: str) -> User:
         """Update user profile picture"""
+
+        ProfileService._validate_url(picture_url, "Profile picture URL")
 
         if not user.profile:
             user.profile = Profile()
@@ -144,6 +158,8 @@ class ProfileService:
     @staticmethod
     async def update_cover_image(user: User, cover_url: str) -> User:
         """Update user cover image"""
+
+        ProfileService._validate_url(cover_url, "Cover image URL")
 
         if not user.profile:
             user.profile = Profile()

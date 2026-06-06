@@ -482,6 +482,29 @@ async def upload_attachment(
                 detail=f"Unsupported file type '{declared_type}'. Allowed: images, PDF, Word, Excel, text, zip.",
             )
 
+    # Magic byte validation for images: reject files whose bytes don't match the declared type.
+    # This prevents an attacker from declaring image/jpeg but uploading an HTML/JS payload.
+    _IMAGE_MAGIC: dict[str, list[bytes]] = {
+        "image/jpeg": [b"\xff\xd8\xff"],
+        "image/png":  [b"\x89PNG\r\n\x1a\n"],
+        "image/gif":  [b"GIF87a", b"GIF89a"],
+        "image/webp": [b"RIFF"],  # bytes 8-11 must also be WEBP
+    }
+    if declared_type in _IMAGE_MAGIC:
+        magic_ok = False
+        for sig in _IMAGE_MAGIC[declared_type]:
+            if content[:len(sig)] == sig:
+                if declared_type == "image/webp":
+                    magic_ok = len(content) >= 12 and content[8:12] == b"WEBP"
+                else:
+                    magic_ok = True
+                break
+        if not magic_ok:
+            raise HTTPException(
+                status_code=400,
+                detail="File content does not match its declared image type.",
+            )
+
     # Sanitize filename and derive extension
     safe_name = _os.path.basename(file.filename).replace("..", "").replace("/", "_").replace("\\", "_")
     ext = _os.path.splitext(safe_name)[1].lower() or ".bin"
@@ -501,6 +524,8 @@ async def upload_attachment(
             ContentType=declared_type,
             # Force download for non-image files (security: prevent inline JS execution)
             ContentDisposition=f'attachment; filename="{safe_name}"' if not declared_type.startswith("image/") else "inline",
+            # Encrypt at rest — uses the bucket's default KMS/SSE key.
+            ServerSideEncryption="AES256",
         )
         file_url = f"{S3_BASE_URL}/{key}"
     except (BotoCoreError, ClientError) as exc:

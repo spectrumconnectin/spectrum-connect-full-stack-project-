@@ -119,6 +119,8 @@ def _upload_to_s3(content: bytes, folder: str, ext: str, content_type: str) -> s
         # Use attachment for non-image types to prevent inline rendering of
         # potentially dangerous content (e.g. SVG with inline JS).
         ContentDisposition="inline" if content_type.startswith("image/") else "attachment",
+        # Encrypt at rest using the bucket's default SSE-S3 key.
+        ServerSideEncryption="AES256",
     )
     return f"{S3_BASE_URL}/{key}"
 

@@ -1,7 +1,19 @@
+import re
 from typing import List, Optional
 from beanie import PydanticObjectId
 
 from app.models.schema import User
+
+
+def _safe_regex(raw: str) -> str:
+    """Escape a user-supplied string before embedding it in a MongoDB $regex.
+
+    Without escaping, a crafted pattern like '(a+)+' can cause catastrophic
+    backtracking (ReDoS) inside the MongoDB query engine.  re.escape() converts
+    every metacharacter to a literal so the query is always a plain substring search.
+    We also hard-cap the length to prevent excessively long patterns.
+    """
+    return re.escape(raw[:100])
 
 
 class TalentService:
@@ -25,15 +37,15 @@ class TalentService:
             ],
         }
         if q:
+            safe_q = _safe_regex(q)
             query["$or"] = [
-                {"profile.display_name": {"$regex": q, "$options": "i"}},
-                {"profile.headline": {"$regex": q, "$options": "i"}},
-                {"username": {"$regex": q, "$options": "i"}},
+                {"profile.display_name": {"$regex": safe_q, "$options": "i"}},
+                {"profile.headline": {"$regex": safe_q, "$options": "i"}},
+                {"username": {"$regex": safe_q, "$options": "i"}},
             ]
         if location:
-            query["profile.location.city"] = {"$regex": location, "$options": "i"}
+            query["profile.location.city"] = {"$regex": _safe_regex(location), "$options": "i"}
         if skill:
-            query["profile.skills.name"] = {"$regex": skill, "$options": "i"}
+            query["profile.skills.name"] = {"$regex": _safe_regex(skill), "$options": "i"}
 
         return await User.find(query).limit(limit).to_list()
-

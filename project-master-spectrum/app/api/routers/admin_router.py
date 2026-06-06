@@ -21,6 +21,7 @@ GET  /admin/revenue                  Platform revenue breakdown (fees by month/p
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -29,6 +30,11 @@ from pydantic import BaseModel
 
 from app.auth.auth import get_admin_user
 from app.models.schema import User
+
+
+def _safe_regex(raw: str) -> str:
+    """Escape user input before embedding in a MongoDB $regex to prevent ReDoS."""
+    return re.escape(raw[:200])
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
@@ -182,30 +188,32 @@ async def list_users(
     is_active: Optional[bool] = Query(None),
     admin: User = Depends(get_admin_user),
 ):
-    query = User.find()
-    all_users = await query.to_list()
-
-    # Apply filters in Python (simple, works across MongoDB versions)
+    # Build DB-level filter dict — push filtering to MongoDB instead of loading
+    # all users into memory (which is a DoS risk as the user base grows).
+    raw_filter: dict = {}
     if search:
-        q = search.lower()
-        all_users = [u for u in all_users if
-            q in (u.email or "").lower() or
-            q in (u.username or "").lower() or
-            q in ((u.profile.display_name or "") if u.profile else "").lower()]
+        safe_search = _safe_regex(search)
+        raw_filter["$or"] = [
+            {"email": {"$regex": safe_search, "$options": "i"}},
+            {"username": {"$regex": safe_search, "$options": "i"}},
+            {"profile.display_name": {"$regex": safe_search, "$options": "i"}},
+        ]
     if account_type:
-        all_users = [u for u in all_users if u.account_type == account_type]
+        raw_filter["account_type"] = account_type
     if user_role:
-        all_users = [u for u in all_users if u.user_role == user_role]
+        raw_filter["user_role"] = user_role
     if is_verified is not None:
-        all_users = [u for u in all_users if u.is_verified == is_verified]
+        raw_filter["is_verified"] = is_verified
     if is_active is not None:
-        all_users = [u for u in all_users if getattr(u, "is_active", True) == is_active]
+        raw_filter["is_active"] = is_active
 
-    total = len(all_users)
-    # Sort newest first (use ObjectId generation_time as proxy for created_at)
-    all_users.sort(key=lambda u: u.id.generation_time if u.id else datetime.min, reverse=True)
+    query = User.find(raw_filter)
+    total = await query.count()
+
     start = (page - 1) * page_size
-    page_users = all_users[start: start + page_size]
+    page_users = (
+        await query.sort([("_id", -1)]).skip(start).limit(page_size).to_list()
+    )
 
     return {
         "total": total,
@@ -319,9 +327,10 @@ async def list_all_jobs(
         if job_status:
             raw_filter["status"] = job_status
         if search:
+            safe_search = _safe_regex(search)
             raw_filter["$or"] = [
-                {"title": {"$regex": search, "$options": "i"}},
-                {"description": {"$regex": search, "$options": "i"}},
+                {"title": {"$regex": safe_search, "$options": "i"}},
+                {"description": {"$regex": safe_search, "$options": "i"}},
             ]
         query = JobPost.find(raw_filter)
         total = await query.count()

@@ -40,6 +40,22 @@ router = APIRouter()
 # CURRENT USER PROFILE ENDPOINTS
 # ============================================================================
 
+def _safe_user_dict(user: User) -> dict:
+    """Return a safe dict from a User document — strip ALL sensitive fields.
+
+    Never use `user.model_dump()` directly in a response: it includes
+    `password_hash`, `oauth` access/refresh tokens, and `login_history`.
+    """
+    return user.model_dump(
+        exclude={
+            "password_hash",
+            "oauth",           # contains raw access/refresh tokens from Google/FB etc.
+            "login_history",   # IP addresses — only accessible server-side
+            "deleted_at",      # internal soft-delete field
+        }
+    )
+
+
 @router.get("/me", response_model=UserProfileRead, summary="Get current user profile")
 async def get_my_profile(current_user: User = Depends(get_current_user)):
     """
@@ -48,7 +64,7 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     Returns:
         - Full user profile including settings, stats, and all personal information
     """
-    user_dict = current_user.model_dump()
+    user_dict = _safe_user_dict(current_user)
     user_dict['id'] = str(current_user.id)
 
     # Add online status
@@ -83,7 +99,7 @@ async def update_my_profile(
         - Updated user profile
     """
     updated_user = await ProfileService.update_profile(current_user, profile_data)
-    user_dict = updated_user.model_dump()
+    user_dict = _safe_user_dict(updated_user)
     user_dict['id'] = str(updated_user.id)
     return user_dict
 
@@ -141,7 +157,7 @@ async def update_account_type(
         - both: Both crew and producer
     """
     updated_user = await ProfileService.update_account_type(current_user, account_type_data)
-    user_dict = updated_user.model_dump()
+    user_dict = _safe_user_dict(updated_user)
     user_dict['id'] = str(updated_user.id)
     return user_dict
 
