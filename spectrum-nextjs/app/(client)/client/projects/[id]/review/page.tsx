@@ -20,7 +20,11 @@ const negativeTags = ['Late delivery', 'Poor communication', 'Needed many revisi
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const [job, setJob] = useState<JobPostItem | null>(null);
-  const [creator, setCreator] = useState<JobProposalItem | null>(null);
+  // All accepted creators (may be 1 for solo or 3+ for crew)
+  const [creators, setCreators] = useState<JobProposalItem[]>([]);
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+  // Track review status per creator id
+  const [reviewedMap, setReviewedMap] = useState<Record<string, { overall: number; review: string } | null>>({});
   const [loadingData, setLoadingData] = useState(true);
 
   const [ratings, setRatings] = useState<Record<string, number>>({});
@@ -29,8 +33,6 @@ export default function ReviewPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [privateNote, setPrivateNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
-  const [existingReview, setExistingReview] = useState<{ overall: number; review: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [showFutureWork, setShowFutureWork] = useState(false);
@@ -48,23 +50,42 @@ export default function ReviewPage() {
       if (jobRes.status === 'fulfilled') setJob(jobRes.value);
       if (propRes.status === 'fulfilled') {
         const list = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
-        const accepted = list.find((p: { status: string }) => p.status === 'accepted') ?? list[0] ?? null;
-        setCreator(accepted);
-        // Check if client already submitted a review for this proposal
-        if (accepted) {
-          proposals.getReviews(accepted.id).then(reviewData => {
-            if (reviewData?.client_rating) {
-              setAlreadyReviewed(true);
-              setExistingReview({
-                overall: reviewData.client_rating.overall ?? 0,
-                review: reviewData.client_rating.review ?? '',
-              });
+        const accepted = list.filter((p: { status: string }) => p.status === 'accepted');
+        if (accepted.length === 0 && list.length > 0) accepted.push(list[0]);
+        setCreators(accepted);
+        if (accepted.length > 0) setSelectedCreatorId(accepted[0].id);
+        // Check review status for all accepted creators in parallel
+        Promise.allSettled(accepted.map((a: JobProposalItem) => proposals.getReviews(a.id))).then(results => {
+          const map: Record<string, { overall: number; review: string } | null> = {};
+          results.forEach((r, i) => {
+            const cr = accepted[i];
+            if (r.status === 'fulfilled' && r.value?.client_rating) {
+              map[cr.id] = { overall: r.value.client_rating.overall ?? 0, review: r.value.client_rating.review ?? '' };
+            } else {
+              map[cr.id] = null;
             }
-          }).catch(() => { /* non-blocking */ });
-        }
+          });
+          setReviewedMap(map);
+        });
       }
     }).finally(() => setLoadingData(false));
   }, [id]);
+
+  // Convenience: currently selected creator
+  const creator = creators.find(c => c.id === selectedCreatorId) ?? creators[0] ?? null;
+  const alreadyReviewed = !!creator && !!reviewedMap[creator.id];
+  const existingReview = creator ? reviewedMap[creator.id] : null;
+
+  // Reset form when switching creators
+  useEffect(() => {
+    setRatings({});
+    setHover({});
+    setReview('');
+    setTags([]);
+    setPrivateNote('');
+    setSubmitted(false);
+    setSubmitError('');
+  }, [selectedCreatorId]);
 
   const allRated = categories.every(c => ratings[c.key] >= 1);
   const avgRating = allRated
@@ -85,6 +106,9 @@ export default function ReviewPage() {
         tags,
         private_note: privateNote.trim() || undefined,
       });
+      // Mark this creator as reviewed in the local map
+      const overall = parseFloat((Object.values(ratings).reduce((a, b) => a + b, 0) / categories.length).toFixed(1));
+      setReviewedMap(prev => ({ ...prev, [creator.id]: { overall, review: review.trim() } }));
       setSubmitted(true);
     } catch (e: unknown) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to submit review. Please try again.');
@@ -92,6 +116,9 @@ export default function ReviewPage() {
       setSubmitting(false);
     }
   };
+
+  // How many creators still need a review
+  const pendingReviews = creators.filter(c => !reviewedMap[c.id]).length;
 
   if (loadingData) {
     return (
@@ -101,46 +128,29 @@ export default function ReviewPage() {
     );
   }
 
-  // Show "already reviewed" state if review was previously submitted
-  if (alreadyReviewed && !submitted) {
-    return (
-      <div className="max-w-lg mx-auto py-16 text-center">
-        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <i className="fa-solid fa-circle-check text-emerald-600 text-3xl"></i>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Review Already Submitted</h1>
-        <p className="text-gray-500 mb-6">
-          You have already left a review for {creator?.creator_name ?? 'this creator'} on this project.
-        </p>
-        {existingReview && (
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6 text-left">
-            <div className="flex items-center gap-2 mb-3">
-              {[1, 2, 3, 4, 5].map(s => (
-                <i key={s} className={`fa-star text-lg ${existingReview.overall >= s ? 'fa-solid text-amber-400' : 'fa-regular text-gray-300'}`}></i>
-              ))}
-              <span className="text-sm font-bold text-gray-700 ml-1">{existingReview.overall.toFixed(1)}</span>
-            </div>
-            {existingReview.review && (
-              <p className="text-sm text-gray-600 leading-relaxed italic">&ldquo;{existingReview.review}&rdquo;</p>
-            )}
-          </div>
-        )}
-        <Link href={`/client/projects/${id}`}
-          className="px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition">
-          Back to Project
-        </Link>
-      </div>
-    );
-  }
-
   if (submitted) {
+    // After submitting, show options: review next creator (if crew) or go back
+    const nextUnreviewed = creators.find(c => !reviewedMap[c.id] && c.id !== creator?.id);
     return (
       <div className="max-w-lg mx-auto py-20 text-center">
         <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-200">
           <i className="fa-solid fa-check text-white text-3xl"></i>
         </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-3">Review Submitted!</h1>
-        <p className="text-gray-500 mb-2">Thanks for taking the time to leave feedback{creator ? ` for ${creator.creator_name}` : ''}.</p>
+        <p className="text-gray-500 mb-2">Thanks for your feedback{creator ? ` for ${creator.creator_name}` : ''}.</p>
+        {nextUnreviewed && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
+            <p className="text-sm font-semibold text-amber-900 mb-3">
+              <i className="fa-solid fa-users mr-2"></i>
+              {pendingReviews} more creator{pendingReviews !== 1 ? 's' : ''} still need{pendingReviews === 1 ? 's' : ''} a review
+            </p>
+            <button
+              onClick={() => { setSelectedCreatorId(nextUnreviewed.id); setSubmitted(false); }}
+              className="w-full bg-amber-600 text-white py-3 rounded-xl font-semibold hover:bg-amber-700 transition">
+              Review {nextUnreviewed.creator_name} →
+            </button>
+          </div>
+        )}
         <p className="text-gray-400 text-sm mb-8">Your review helps the Spectrum community find great collaborators.</p>
         {avgRating && (
           <div className="flex items-center justify-center gap-1 mb-8">
@@ -253,9 +263,80 @@ Looking forward to hearing from you!`);
         <Link href={`/client/projects/${id}`} className="text-sm text-gray-500 hover:text-cobalt transition flex items-center gap-1.5 mb-4">
           <i className="fa-solid fa-arrow-left text-xs"></i> Back to project
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900 mb-1">Leave a Review</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">Leave a Review</h1>
         <p className="text-gray-500">Share your experience to help the Spectrum community.</p>
       </div>
+
+      {/* ── Crew creator picker — shown when multiple creators are hired ── */}
+      {creators.length > 1 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 shadow-sm">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+            <i className="fa-solid fa-users mr-1.5"></i>Crew project — review each creator
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            {creators.map(c => {
+              const reviewed = !!reviewedMap[c.id];
+              const isSelected = c.id === selectedCreatorId;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => { setSelectedCreatorId(c.id); setSubmitted(false); }}
+                  className={`flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition text-left ${
+                    isSelected
+                      ? 'border-cobalt bg-blue-50'
+                      : reviewed
+                      ? 'border-emerald-300 bg-emerald-50'
+                      : 'border-gray-200 hover:border-cobalt hover:bg-gray-50'
+                  }`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                    reviewed ? 'bg-emerald-500 text-white' : 'bg-blue-100 text-cobalt'
+                  }`}>
+                    {reviewed
+                      ? <i className="fa-solid fa-check text-xs" />
+                      : c.creator_name[0]?.toUpperCase()
+                    }
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold truncate ${isSelected ? 'text-cobalt' : 'text-gray-900'}`}>
+                      {c.creator_name}
+                    </p>
+                    <p className={`text-xs truncate ${reviewed ? 'text-emerald-600' : 'text-gray-400'}`}>
+                      {reviewed ? 'Reviewed ✓' : c.creator_title ?? 'Creator'}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Already reviewed inline card (non-blocking — can still switch creator) */}
+      {alreadyReviewed && !submitted && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <i className="fa-solid fa-circle-check text-emerald-600 text-lg"></i>
+            <p className="font-semibold text-emerald-900">Review already submitted for {creator?.creator_name}</p>
+          </div>
+          {existingReview && (
+            <div className="flex items-center gap-2 mt-1">
+              {[1,2,3,4,5].map(s => (
+                <i key={s} className={`fa-star text-sm ${existingReview.overall >= s ? 'fa-solid text-amber-400' : 'fa-regular text-gray-300'}`} />
+              ))}
+              <span className="text-sm font-bold text-gray-700">{existingReview.overall.toFixed(1)}</span>
+            </div>
+          )}
+          {creators.length === 1 && (
+            <Link href={`/client/projects/${id}`} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-cobalt hover:underline">
+              <i className="fa-solid fa-arrow-left text-xs"></i> Back to project
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* Only show the review form when the selected creator hasn't been reviewed yet */}
+      {alreadyReviewed && !submitted ? null : (
+      <>
 
       {/* Creator / Project card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 flex items-center gap-5 shadow-sm">
@@ -399,6 +480,9 @@ Looking forward to hearing from you!`);
           {submitting ? <><i className="fa-solid fa-spinner animate-spin"></i> Submitting…</> : <><i className="fa-solid fa-paper-plane"></i> Submit Review</>}
         </button>
       </div>
+
+      </> /* end conditional review form */
+      )}
     </div>
   );
 }

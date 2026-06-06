@@ -169,9 +169,25 @@ const SKILLS_SUGGESTIONS = [
 const QUICK_BUDGETS = [5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
 const MIN_BUDGET = 5;
 
+const CURRENCIES = [
+  { code: 'USD', symbol: '$',   label: 'USD — US Dollar' },
+  { code: 'LKR', symbol: 'Rs', label: 'LKR — Sri Lankan Rupee' },
+  { code: 'EUR', symbol: '€',   label: 'EUR — Euro' },
+  { code: 'GBP', symbol: '£',   label: 'GBP — British Pound' },
+  { code: 'AUD', symbol: 'A$',  label: 'AUD — Australian Dollar' },
+  { code: 'INR', symbol: '₹',   label: 'INR — Indian Rupee' },
+  { code: 'SGD', symbol: 'S$',  label: 'SGD — Singapore Dollar' },
+  { code: 'CAD', symbol: 'C$',  label: 'CAD — Canadian Dollar' },
+  { code: 'AED', symbol: 'AED', label: 'AED — UAE Dirham' },
+];
+
+function currencySymbol(code: string): string {
+  return CURRENCIES.find(c => c.code === code)?.symbol ?? code;
+}
+
 const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400 text-sm';
 
-function FeePreview({ budget }: { budget: string }) {
+function FeePreview({ budget, currency }: { budget: string; currency: string }) {
   const amount = useMemo(() => {
     const n = parseFloat(budget);
     return !isNaN(n) && n >= MIN_BUDGET ? n : null;
@@ -186,17 +202,18 @@ function FeePreview({ budget }: { budget: string }) {
     </div>
   );
 
+  const sym = currencySymbol(currency);
   const clientFee    = parseFloat((amount * 0.04).toFixed(2));
   const creatorFee   = parseFloat((amount * 0.08).toFixed(2));
   const clientTotal  = parseFloat((amount + clientFee).toFixed(2));
   const creatorEarns = parseFloat((amount - creatorFee).toFixed(2));
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = (n: number) => `${sym}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="mt-1 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-blue-200 bg-blue-100/60">
         <i className="fa-solid fa-receipt text-cobalt text-sm"></i>
-        <span className="text-sm font-bold text-cobalt">Fee Preview — based on ${fmt(amount)}</span>
+        <span className="text-sm font-bold text-cobalt">Fee Preview — based on {fmt(amount)} {currency}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
         {/* Client side */}
@@ -207,15 +224,15 @@ function FeePreview({ budget }: { budget: string }) {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-gray-700">
               <span>Project amount</span>
-              <span className="font-semibold">${fmt(amount)}</span>
+              <span className="font-semibold">{fmt(amount)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Platform fee (4%)</span>
-              <span className="font-semibold text-amber-600">+${fmt(clientFee)}</span>
+              <span className="font-semibold text-amber-600">+{fmt(clientFee)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-gray-100">
               <span className="font-bold text-gray-900">Total charged</span>
-              <span className="font-bold text-cobalt">${fmt(clientTotal)}</span>
+              <span className="font-bold text-cobalt">{fmt(clientTotal)}</span>
             </div>
           </div>
         </div>
@@ -227,15 +244,15 @@ function FeePreview({ budget }: { budget: string }) {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-gray-700">
               <span>Project amount</span>
-              <span className="font-semibold">${fmt(amount)}</span>
+              <span className="font-semibold">{fmt(amount)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Platform fee (8%)</span>
-              <span className="font-semibold text-rose-500">−${fmt(creatorFee)}</span>
+              <span className="font-semibold text-rose-500">−{fmt(creatorFee)}</span>
             </div>
             <div className="flex justify-between pt-2 border-t border-gray-100">
               <span className="font-bold text-gray-900">Creator earns</span>
-              <span className="font-bold text-emerald-600">${fmt(creatorEarns)}</span>
+              <span className="font-bold text-emerald-600">{fmt(creatorEarns)}</span>
             </div>
           </div>
         </div>
@@ -266,6 +283,7 @@ export default function CreateProjectPage() {
 
   // ── Step 3: Budget (single fixed price, min $5) ─────────────────────────
   const [budget, setBudget] = useState('');
+  const [currency, setCurrency] = useState('USD');
 
   // ── Step 4: Timeline & Skills ──────────────────────────────────────────
   const [timeline, setTimeline]   = useState('');
@@ -319,7 +337,7 @@ export default function CreateProjectPage() {
   const buildRate = () => {
     const amount = parseFloat(budget);
     if (isNaN(amount) || amount < MIN_BUDGET) return {};
-    return { budget: { min: amount, max: amount }, budget_type: 'fixed' };
+    return { budget: { min: amount, max: amount, currency }, budget_type: 'fixed', currency };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -629,51 +647,75 @@ export default function CreateProjectPage() {
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Project Budget', 'Fixed price — what is this project worth?')}
           <div className="space-y-5">
-            {/* Quick-select chips */}
+
+            {/* Currency selector */}
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick select</label>
+              <label className="block text-sm font-semibold text-gray-900 mb-1.5">Currency</label>
               <div className="flex flex-wrap gap-2">
-                {QUICK_BUDGETS.map(b => (
-                  <button key={b} type="button" onClick={() => setBudget(String(b))}
+                {CURRENCIES.slice(0, 6).map(c => (
+                  <button key={c.code} type="button" onClick={() => setCurrency(c.code)}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
-                      budget === String(b)
+                      currency === c.code
                         ? 'border-cobalt bg-cobalt text-white'
                         : 'border-gray-200 text-gray-700 hover:border-cobalt hover:bg-blue-50'
                     }`}>
-                    ${b.toLocaleString()}
+                    {c.symbol} {c.code}
                   </button>
                 ))}
+                <select
+                  value={CURRENCIES.slice(6).some(c => c.code === currency) ? currency : ''}
+                  onChange={e => e.target.value && setCurrency(e.target.value)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold border-2 border-gray-200 text-gray-700 hover:border-cobalt transition cursor-pointer bg-gray-50">
+                  <option value="">More…</option>
+                  {CURRENCIES.slice(6).map(c => (
+                    <option key={c.code} value={c.code}>{c.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
+
+            {/* Quick-select chips (USD only) */}
+            {currency === 'USD' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick select</label>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK_BUDGETS.map(b => (
+                    <button key={b} type="button" onClick={() => setBudget(String(b))}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
+                        budget === String(b)
+                          ? 'border-cobalt bg-cobalt text-white'
+                          : 'border-gray-200 text-gray-700 hover:border-cobalt hover:bg-blue-50'
+                      }`}>
+                      ${b.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Manual input */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-1.5">
                 Project Budget <span className="text-red-500">*</span>
-                <span className="text-gray-400 font-normal ml-2 text-xs">(minimum ${MIN_BUDGET})</span>
               </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold text-sm">$</span>
+              <div className="flex gap-2">
+                <div className="flex items-center px-3 bg-gray-100 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex-shrink-0">
+                  {currencySymbol(currency)}
+                </div>
                 <input
                   type="number"
-                  min={MIN_BUDGET}
+                  min={1}
                   step="1"
                   value={budget}
                   onChange={e => setBudget(e.target.value)}
-                  placeholder="Enter amount, e.g. 250"
-                  className={`${inp} pl-8`}
+                  placeholder={`Enter amount in ${currency}`}
+                  className={`${inp} flex-1`}
                 />
               </div>
-              {budget && parseFloat(budget) < MIN_BUDGET && (
-                <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
-                  <i className="fa-solid fa-circle-exclamation"></i>
-                  Projects must have a minimum budget of ${MIN_BUDGET}.
-                </p>
-              )}
             </div>
 
             {/* Live fee preview */}
-            <FeePreview budget={budget} />
+            <FeePreview budget={budget} currency={currency} />
           </div>
         </div>
 

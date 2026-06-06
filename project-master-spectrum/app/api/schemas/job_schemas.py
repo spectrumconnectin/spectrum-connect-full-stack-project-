@@ -146,6 +146,7 @@ class JobPostCreate(BaseModel):
     hourly_rate: Optional[RateCreate] = Field(None, description="For hourly budget")
     daily_rate: Optional[RateCreate] = Field(None, description="For daily budget")
     weekly_rate: Optional[RateCreate] = Field(None, description="For weekly budget")
+    currency: Optional[str] = Field("USD", description="ISO 4217 currency code e.g. USD, LKR, EUR")
 
     @validator('budget', always=True)
     def budget_minimum(cls, v):

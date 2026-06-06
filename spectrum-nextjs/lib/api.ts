@@ -564,10 +564,11 @@ export interface JobCreatePayload {
   crew_size?: string;
   complexity?: string;
   budget_type?: string;
-  budget?: { min?: number; max?: number };
+  budget?: { min?: number; max?: number; currency?: string };
   hourly_rate?: { min?: number; max?: number };
   daily_rate?: { min?: number; max?: number };
   weekly_rate?: { min?: number; max?: number };
+  currency?: string;
   duration?: string;
   estimated_duration?: number;
   skills?: string[];

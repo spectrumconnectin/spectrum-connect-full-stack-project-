@@ -556,6 +556,7 @@ class JobPost(Document):
     hourly_rate: Optional[Rate] = None
     daily_rate: Optional[Rate] = None
     weekly_rate: Optional[Rate] = None
+    currency: str = "USD"              # ISO 4217 currency code for all rate fields
 
     location: Optional[str] = None         # physical location for in-person/on-site jobs
     event_date: Optional[datetime] = None  # specific event date (e.g. sports meet, wedding)
