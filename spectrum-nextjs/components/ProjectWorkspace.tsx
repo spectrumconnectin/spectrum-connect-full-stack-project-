@@ -86,6 +86,36 @@ function msgTime(iso: string) {
 
 // ─── Chat Tab ─────────────────────────────────────────────────────────────────
 
+// Classify a message into a system event type or null for regular chat
+function getSystemType(content: string): 'agreement' | 'payment' | 'revision' | 'delivery' | 'hired' | null {
+  if (content.startsWith('✅'))  return 'agreement';
+  if (content.startsWith('💰'))  return 'payment';
+  if (content.startsWith('🔄'))  return 'revision';
+  if (content.startsWith('📦'))  return 'delivery';
+  if (content.startsWith('🎉'))  return 'hired';
+  return null;
+}
+
+const SYSTEM_META: Record<string, { icon: string; iconBg: string; label: string; border: string; bg: string; text: string }> = {
+  agreement: { icon: 'fa-handshake',    iconBg: 'bg-emerald-500', label: 'Agreement',         border: 'border-emerald-200', bg: 'bg-emerald-50',  text: 'text-emerald-800' },
+  payment:   { icon: 'fa-coins',        iconBg: 'bg-emerald-600', label: 'Payment Released',  border: 'border-emerald-200', bg: 'bg-emerald-50',  text: 'text-emerald-800' },
+  revision:  { icon: 'fa-rotate-left',  iconBg: 'bg-orange-500',  label: 'Revision Requested',border: 'border-orange-200',  bg: 'bg-orange-50',   text: 'text-orange-800'  },
+  delivery:  { icon: 'fa-box-open',     iconBg: 'bg-indigo-600',  label: 'Delivery Submitted',border: 'border-indigo-200',  bg: 'bg-indigo-50',   text: 'text-indigo-800'  },
+  hired:     { icon: 'fa-trophy',       iconBg: 'bg-cobalt',      label: 'Project Started',   border: 'border-blue-200',    bg: 'bg-blue-50',     text: 'text-cobalt'      },
+};
+
+// Avatar circle for a message sender
+function MsgAvatar({ name, isMe }: { name?: string; isMe: boolean }) {
+  const initial = (name || (isMe ? 'Me' : '?'))[0].toUpperCase();
+  return (
+    <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+      isMe ? 'bg-cobalt text-white' : 'bg-gray-200 text-gray-600'
+    }`}>
+      {initial}
+    </div>
+  );
+}
+
 function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
   convo: ConversationItem | null;
   msgs: MessageItem[];
@@ -98,7 +128,9 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs.length]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs.length]);
 
   const handleSend = () => {
     const text = input.trim();
@@ -115,115 +147,168 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
     e.target.value = '';
   };
 
-  if (!convo) return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <i className="fa-solid fa-comment text-4xl text-gray-300 mb-4 block"></i>
-      <h3 className="font-semibold text-gray-600 mb-1">No conversation yet</h3>
-      <p className="text-sm text-gray-400">Start chatting with the other party below.</p>
-    </div>
-  );
+  const visibleMsgs = msgs.filter(m => !m.is_deleted);
 
   return (
-    <div className="flex flex-col h-[520px]">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 rounded-xl mb-3">
-        {msgs.filter(m => !m.is_deleted).map(m => {
-          const isMe = m.sender_id === myUserId;
-          const isAgreement = m.content.startsWith('✅');
-          const isPayment = m.content.startsWith('💰');
-          const isRevision = m.content.startsWith('🔄');
-          const isDelivery = m.content.startsWith('📦');
-          const isSystem   = isAgreement || isPayment || isRevision || isDelivery;
-          return (
-            <div key={m.id} className={`flex items-end gap-2 ${isMe && !isSystem ? 'flex-row-reverse' : ''}`}>
-              <div className={`${isSystem ? 'w-full' : 'max-w-[70%]'}`}>
-                {isAgreement ? (
-                  <div className={`rounded-2xl border-2 p-3 ${isMe ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <i className="fa-solid fa-handshake text-emerald-600 text-xs"></i>
-                      <span className="font-bold text-emerald-800 text-xs">Agreement</span>
-                    </div>
-                    <p className="text-xs text-gray-600 whitespace-pre-line">{m.content.split('\n').slice(2).join('\n')}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
-                  </div>
-                ) : isPayment ? (
-                  <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 w-full">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <i className="fa-solid fa-coins text-emerald-600 text-xs"></i>
-                      <span className="font-bold text-emerald-800 text-xs">Payment Released</span>
-                    </div>
-                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(1).join('\n')}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
-                  </div>
-                ) : isRevision ? (
-                  <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-3 w-full">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <i className="fa-solid fa-rotate-left text-orange-600 text-xs"></i>
-                      <span className="font-bold text-orange-800 text-xs">Revision Requested</span>
-                    </div>
-                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(2).join('\n')}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
-                  </div>
-                ) : isDelivery ? (
-                  <div className="rounded-2xl border-2 border-indigo-300 bg-indigo-50 p-3 w-full">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <i className="fa-solid fa-box-open text-indigo-600 text-xs"></i>
-                      <span className="font-bold text-indigo-800 text-xs">Delivery Submitted</span>
-                    </div>
-                    <p className="text-xs text-gray-700 whitespace-pre-line">{m.content.split('\n').slice(1).join('\n')}</p>
-                    <p className="text-[10px] text-gray-400 mt-1">{msgTime(m.sent_at)}</p>
-                  </div>
-                ) : (
-                  <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${isMe ? 'bg-cobalt text-white rounded-br-sm' : 'bg-white text-gray-800 rounded-bl-sm border border-gray-200 shadow-sm'}`}>
-                    <span className="whitespace-pre-line">{m.content}</span>
-                    {m.attachments.map(a => (
-                      <div key={a.id} className={`mt-1.5 flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg ${isMe ? 'bg-white/20' : 'bg-gray-100'}`}>
-                        <i className="fa-solid fa-paperclip"></i>
-                        <a href={a.file_url} target="_blank" rel="noreferrer" className="hover:underline truncate">{a.filename}</a>
-                      </div>
-                    ))}
-                    <p className={`text-[10px] mt-1 ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>{msgTime(m.sent_at)}</p>
-                  </div>
-                )}
-              </div>
+    <div className="flex flex-col" style={{ height: '640px' }}>
+
+      {/* ── Messages area ── */}
+      <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 bg-gray-50/60 rounded-2xl border border-gray-100 mb-3">
+
+        {/* Empty state — shown inline so the input is always visible */}
+        {!convo || visibleMsgs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+            <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mb-5 mx-auto">
+              <i className="fa-solid fa-comments text-cobalt text-3xl"></i>
             </div>
-          );
-        })}
-        <div ref={bottomRef} />
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Start the conversation</h3>
+            <p className="text-sm text-gray-500 max-w-xs leading-relaxed mb-6">
+              Use this workspace chat to coordinate, share files, and align on deliverables with the other party.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {['Hi! Ready to get started 👋', 'Can you share your portfolio?', 'Let me know if you have questions'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => { onSend(s); }}
+                  className="text-xs px-4 py-2 bg-white border border-gray-200 rounded-full text-gray-600 hover:border-cobalt hover:text-cobalt hover:bg-blue-50 transition font-medium shadow-sm"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            {visibleMsgs.map((m, idx) => {
+              const isMe = m.sender_id === myUserId;
+              const sysType = getSystemType(m.content);
+              const meta = sysType ? SYSTEM_META[sysType] : null;
+
+              // Show date separator when the day changes
+              const prevMsg = idx > 0 ? visibleMsgs[idx - 1] : null;
+              const showDateSep = !prevMsg ||
+                new Date(m.sent_at).toDateString() !== new Date(prevMsg.sent_at).toDateString();
+
+              return (
+                <div key={m.id}>
+                  {/* Date separator */}
+                  {showDateSep && (
+                    <div className="flex items-center gap-3 my-3">
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-[11px] font-semibold text-gray-400 px-2">
+                        {new Date(m.sent_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                    </div>
+                  )}
+
+                  {/* System / event message */}
+                  {meta ? (
+                    <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3.5 ${meta.border} ${meta.bg}`}>
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${meta.iconBg}`}>
+                        <i className={`fa-solid ${meta.icon} text-white text-sm`}></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${meta.text}`}>{meta.label}</p>
+                        <p className={`text-sm leading-relaxed ${meta.text} opacity-90 whitespace-pre-line`}>
+                          {m.content.split('\n').slice(1).join('\n').trim() || m.content}
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-gray-400 flex-shrink-0 mt-0.5">{msgTime(m.sent_at)}</span>
+                    </div>
+                  ) : (
+                    /* Regular chat bubble */
+                    <div className={`flex items-end gap-2.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <MsgAvatar isMe={isMe} name={isMe ? 'Me' : undefined} />
+                      <div className={`flex flex-col gap-1 max-w-[72%] ${isMe ? 'items-end' : 'items-start'}`}>
+                        <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                          isMe
+                            ? 'bg-cobalt text-white rounded-br-none'
+                            : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                        }`}>
+                          <p className="whitespace-pre-line">{m.content}</p>
+                          {m.attachments.map(a => (
+                            <a key={a.id} href={a.file_url} target="_blank" rel="noreferrer"
+                              className={`mt-2 flex items-center gap-2 text-xs rounded-lg px-2.5 py-1.5 ${
+                                isMe ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-gray-100 text-cobalt hover:bg-blue-50'
+                              } transition`}>
+                              <i className="fa-solid fa-paperclip flex-shrink-0"></i>
+                              <span className="truncate">{a.filename}</span>
+                            </a>
+                          ))}
+                        </div>
+                        <span className={`text-[11px] px-1 ${isMe ? 'text-gray-400' : 'text-gray-400'}`}>
+                          {msgTime(m.sent_at)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div ref={bottomRef} />
+          </>
+        )}
       </div>
 
-      {/* File preview */}
+      {/* ── Attached file preview ── */}
       {uploadingFile && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl mb-2 text-sm">
-          <i className="fa-solid fa-paperclip text-cobalt text-xs"></i>
-          <span className="text-cobalt font-medium flex-1 truncate">{uploadingFile.name}</span>
-          <button onClick={() => setUploadingFile(null)} className="text-gray-400 hover:text-red-500 transition">
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl mb-2">
+          <div className="w-8 h-8 bg-cobalt rounded-lg flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-paperclip text-white text-xs"></i>
+          </div>
+          <span className="text-sm text-cobalt font-medium flex-1 truncate">{uploadingFile.name}</span>
+          <span className="text-xs text-gray-400 flex-shrink-0">{(uploadingFile.size / 1024).toFixed(0)} KB</span>
+          <button onClick={() => setUploadingFile(null)}
+            className="w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition">
             <i className="fa-solid fa-xmark text-xs"></i>
           </button>
         </div>
       )}
 
-      {/* Input */}
-      <div className="flex items-end gap-2 bg-gray-50 rounded-xl border border-gray-200 p-3">
-        {/* File attach */}
+      {/* ── Input bar ── */}
+      <div className="flex items-end gap-3 bg-white rounded-2xl border border-gray-200 shadow-sm px-4 py-3">
+        {/* Attach button */}
         <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange}
           accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt" />
-        <button onClick={() => fileRef.current?.click()}
-          className="p-2 text-gray-400 hover:text-cobalt rounded-lg hover:bg-blue-50 transition flex-shrink-0"
-          title="Attach file">
-          <i className="fa-solid fa-paperclip text-sm"></i>
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-gray-400 hover:text-cobalt hover:bg-blue-50 transition"
+          title="Attach a file">
+          <i className="fa-solid fa-paperclip"></i>
         </button>
 
-        <textarea value={input} onChange={e => setInput(e.target.value)}
+        {/* Text area */}
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder="Type a message… (Enter to send)"
+          placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
           rows={1}
-          className="flex-1 bg-transparent text-sm outline-none resize-none placeholder-gray-400 leading-relaxed text-gray-900" />
-        <button onClick={handleSend} disabled={(!input.trim() && !uploadingFile) || sending}
-          className={`p-2.5 rounded-xl transition ${(input.trim() || uploadingFile) && !sending ? 'bg-cobalt text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
-          <i className="fa-solid fa-paper-plane text-sm"></i>
+          className="flex-1 bg-transparent text-sm text-gray-900 placeholder-gray-400 outline-none resize-none leading-relaxed py-1.5"
+        />
+
+        {/* Send button */}
+        <button
+          onClick={handleSend}
+          disabled={(!input.trim() && !uploadingFile) || sending}
+          className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition ${
+            (input.trim() || uploadingFile) && !sending
+              ? 'bg-cobalt text-white hover:bg-blue-700 shadow-sm'
+              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+          }`}>
+          {sending
+            ? <i className="fa-solid fa-spinner animate-spin text-sm"></i>
+            : <i className="fa-solid fa-paper-plane text-sm"></i>
+          }
         </button>
       </div>
+
+      {/* Hint */}
+      <p className="text-[11px] text-gray-400 mt-1.5 px-1">
+        <i className="fa-solid fa-lock text-[10px] mr-1"></i>
+        Messages are private between you and the other party.
+      </p>
     </div>
   );
 }
