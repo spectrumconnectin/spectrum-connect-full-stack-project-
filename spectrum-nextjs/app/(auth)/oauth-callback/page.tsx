@@ -11,7 +11,6 @@ function OAuthCallbackInner() {
   const [message, setMessage] = useState('Signing you in…');
 
   useEffect(() => {
-    const token = params.get('token');
     const error = params.get('error');
 
     if (error) {
@@ -21,43 +20,60 @@ function OAuthCallbackInner() {
       return;
     }
 
-    if (!token) {
-      setStatus('error');
-      setMessage('No token received. Redirecting to login…');
-      setTimeout(() => router.replace('/login'), 2000);
-      return;
-    }
+    // New secure exchange flow: backend redirects with ?code=<opaque>, never ?token=<jwt>
+    const exchangeCode = params.get('code');
+    // Legacy fallback: direct ?token= (for backward compat during migration)
+    const directToken = params.get('token');
 
-    // Store the JWT
-    tokenStore.set(token);
+    const resolveToken = async (): Promise<string | null> => {
+      if (directToken) return directToken;
+      if (!exchangeCode) return null;
+      // Exchange the opaque code for the actual JWT
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/backend'}/auth/oauth-token?code=${encodeURIComponent(exchangeCode)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.access_token ?? null;
+      } catch {
+        return null;
+      }
+    };
 
-    // Fetch profile to determine account type → redirect to correct dashboard
-    // Backend stores: 'crew' (creator), 'producer' (client), 'both'
-    setMessage('Almost there…');
-    profileApi.getMe()
-      .then(user => {
-        const accountType = user.account_type;
-        const hasProfile = !!(user.profile?.first_name || user.profile?.display_name);
+    resolveToken().then(token => {
+      if (!token) {
+        setStatus('error');
+        setMessage('Sign-in failed. No credentials received. Redirecting to login…');
+        setTimeout(() => router.replace('/login'), 2000);
+        return;
+      }
 
-        if (accountType === 'producer' || accountType === 'both') {
-          // Client account
-          router.replace('/client/dashboard');
-        } else if (accountType === 'crew') {
-          if (hasProfile) {
-            // Returning creator
-            router.replace('/creator/dashboard');
+      // Store the JWT
+      tokenStore.set(token);
+
+      // Fetch profile to determine account type → redirect to correct dashboard
+      // Backend stores: 'crew' (creator), 'producer' (client), 'both'
+      setMessage('Almost there…');
+      profileApi.getMe()
+        .then(user => {
+          const accountType = user.account_type;
+          const hasProfile = !!(user.profile?.first_name || user.profile?.display_name);
+
+          if (accountType === 'producer' || accountType === 'both') {
+            router.replace('/client/dashboard');
+          } else if (accountType === 'crew') {
+            if (hasProfile) {
+              router.replace('/creator/dashboard');
+            } else {
+              router.replace('/onboarding/creator');
+            }
           } else {
-            // Brand new Google signup — send to onboarding
             router.replace('/onboarding/creator');
           }
-        } else {
-          // Fallback — onboarding
-          router.replace('/onboarding/creator');
-        }
-      })
-      .catch(() => {
-        router.replace('/creator/dashboard');
-      });
+        })
+        .catch(() => {
+          router.replace('/creator/dashboard');
+        });
+    });
   }, [params, router]);
 
   return (

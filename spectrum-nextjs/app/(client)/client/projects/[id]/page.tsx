@@ -98,11 +98,13 @@ export default function ClientProjectDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
+  const [allHiredCreators, setAllHiredCreators] = useState<JobProposalItem[]>([]);
   const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
   const [showFutureWorkModal, setShowFutureWorkModal] = useState(false);
   const [futureWorkMessage, setFutureWorkMessage] = useState('');
   const [sendingFutureWork, setSendingFutureWork] = useState(false);
   const [futureWorkSent, setFutureWorkSent] = useState(false);
+  const [showRehireModal, setShowRehireModal] = useState(false);
 
   // Release Funds modal state
   const [showReleaseFundsModal, setShowReleaseFundsModal] = useState(false);
@@ -128,8 +130,10 @@ export default function ClientProjectDetailPage() {
       }
       if (propRes.status === 'fulfilled') {
         const propList = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
-        const accepted = propList.find((p: JobProposalItem) => p.status === 'accepted');
+        const acceptedAll = propList.filter((p: JobProposalItem) => p.status === 'accepted');
+        const accepted = acceptedAll[0] ?? null;
         if (accepted) setHiredCreator(accepted);
+        if (acceptedAll.length > 0) setAllHiredCreators(acceptedAll);
       }
       if (escRes.status === 'fulfilled') {
         const linked = escRes.value.escrows.find((e: EscrowListItem) => e.job_post_id === id);
@@ -693,16 +697,23 @@ export default function ClientProjectDetailPage() {
                     className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
                     <i className="fa-solid fa-star"></i>Leave a Review
                   </Link>
-                  {hiredCreator && !futureWorkSent && (
+                  {/* Rehire same team (crew) or single creator */}
+                  {allHiredCreators.length > 1 ? (
+                    <button
+                      onClick={() => setShowRehireModal(true)}
+                      className="flex items-center gap-3 w-full bg-emerald-50 text-emerald-700 px-4 py-3 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm border border-emerald-200">
+                      <i className="fa-solid fa-users-gear"></i>Rehire This Team
+                    </button>
+                  ) : hiredCreator && !futureWorkSent ? (
                     <button
                       onClick={() => {
-                        setFutureWorkMessage(`Hi ${hiredCreator.creator_name},\n\nI really enjoyed working with you on "${job.title}". I\'d love to collaborate again on an upcoming project — would you be available?`);
+                        setFutureWorkMessage(`Hi ${hiredCreator.creator_name},\n\nI really enjoyed working with you on "${job.title}". I'd love to collaborate again — would you be available?`);
                         setShowFutureWorkModal(true);
                       }}
                       className="flex items-center gap-3 w-full bg-blue-50 text-cobalt px-4 py-3 rounded-xl font-semibold hover:bg-blue-100 transition text-sm border border-blue-200">
                       <i className="fa-solid fa-rotate-right"></i>Request Future Work
                     </button>
-                  )}
+                  ) : null}
                   {futureWorkSent && (
                     <div className="flex items-center gap-2 w-full bg-green-50 text-green-700 px-4 py-3 rounded-xl text-sm border border-green-200 font-semibold">
                       <i className="fa-solid fa-check"></i>Message sent!
@@ -1016,6 +1027,82 @@ export default function ClientProjectDetailPage() {
                 {sendingFutureWork
                   ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
                   : <><i className="fa-solid fa-paper-plane"></i> Send Message</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rehire Team Modal ── */}
+      {showRehireModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowRehireModal(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <i className="fa-solid fa-users-gear text-lg"></i>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Rehire This Team</h3>
+                  <p className="text-emerald-100 text-xs mt-0.5">From: {job?.title}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-5 leading-relaxed">
+                Contact your previous creators and create a new project together.
+                Your past collaboration history makes rehiring faster and more trusted.
+              </p>
+
+              {/* Creator list */}
+              <div className="space-y-3 mb-6">
+                {allHiredCreators.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-cobalt font-bold text-sm flex-shrink-0">
+                      {c.creator_avatar
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={c.creator_avatar} alt={c.creator_name} className="w-10 h-10 rounded-xl object-cover" />
+                        : c.creator_name[0]?.toUpperCase()
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{c.creator_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{c.creator_title ?? c.role ?? 'Creator'}</p>
+                    </div>
+                    <Link
+                      href={`/client/messaging?userId=${c.creator_id}`}
+                      onClick={() => setShowRehireModal(false)}
+                      className="flex-shrink-0 px-3 py-1.5 bg-cobalt text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition">
+                      Message
+                    </Link>
+                  </div>
+                ))}
+              </div>
+
+              {/* New project CTA */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+                <p className="text-xs font-semibold text-emerald-800 mb-2">
+                  <i className="fa-solid fa-lightbulb mr-1.5"></i>
+                  Ready to start a new project with this team?
+                </p>
+                <p className="text-xs text-emerald-700 mb-3">
+                  Message each creator to confirm availability, then post the new project and invite them directly.
+                </p>
+                <Link href="/client/projects/create"
+                  onClick={() => setShowRehireModal(false)}
+                  className="block text-center py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition">
+                  <i className="fa-solid fa-plus mr-1.5"></i>Post a New Project
+                </Link>
+              </div>
+
+              <button onClick={() => setShowRehireModal(false)}
+                className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                Close
               </button>
             </div>
           </div>
