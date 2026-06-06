@@ -547,6 +547,38 @@ export interface JobPostItem {
   is_remote?: boolean;         // true = remote only, false = on-site, undefined = flexible
   goals?: string[];
   deliverables?: string[];
+  currency?: string;  // ISO 4217 code stored on the job post (e.g. "USD", "LKR")
+}
+
+// ── Shared currency utilities ─────────────────────────────────────────────────
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', LKR: 'Rs ', EUR: '€', GBP: '£',
+  AUD: 'A$', INR: '₹', SGD: 'S$', CAD: 'C$', AED: 'AED ',
+};
+
+/** Returns the display symbol for a given ISO 4217 currency code. */
+export function currencySymbol(code?: string | null): string {
+  if (!code) return '$';
+  return CURRENCY_SYMBOLS[code] ?? `${code} `;
+}
+
+/** Currency-aware budget formatter — reads currency from the JobPostItem. */
+export function formatJobBudget(p: JobPostItem): string {
+  const sym = currencySymbol(p.budget?.currency ?? p.currency);
+  const fmt = (min?: number, max?: number, sfx = '') => {
+    if (!min && !max) return 'TBD';
+    if (min && max) return min === max
+      ? `${sym}${min.toLocaleString()}${sfx}`
+      : `${sym}${min.toLocaleString()}–${sym}${max.toLocaleString()}${sfx}`;
+    if (min) return `${sym}${min.toLocaleString()}+${sfx}`;
+    return `${sym}${max?.toLocaleString()}${sfx}`;
+  };
+  if (p.budget_type === 'fixed')  return fmt(p.budget?.min, p.budget?.max);
+  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
+  if (p.budget_type === 'daily')  return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
+  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
+  return 'Negotiable';
 }
 
 export interface JobSearchResponse {

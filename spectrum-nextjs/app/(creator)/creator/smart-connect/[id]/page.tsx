@@ -3,20 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, suffix = '') => {
-    if (min && max) return min === max ? `$${min.toLocaleString()}${suffix}` : `$${min.toLocaleString()} – $${max.toLocaleString()}${suffix}`;
-    if (min) return `From $${min.toLocaleString()}${suffix}`;
-    return 'Rate TBD';
-  };
-  if (p.budget_type === 'fixed') return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily') return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 export default function SmartConnectDetailPage() {
   const { id } = useParams<{ id: string }>();

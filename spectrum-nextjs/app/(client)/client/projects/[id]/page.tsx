@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, messaging, proposals, escrow, auth, JobPostItem, JobProposalItem, EscrowListItem, EscrowDetail } from '@/lib/api';
+import { jobs, messaging, proposals, escrow, auth, JobPostItem, formatJobBudget, JobProposalItem, EscrowListItem, EscrowDetail } from '@/lib/api';
 
 // ── Deadline countdown hook ───────────────────────────────────────────────────
 function useDeadlineCountdown(deadlineAt?: string) {
@@ -68,19 +68,7 @@ function jobStatusLabel(status: string): string {
   return map[status] ?? status;
 }
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, sfx = '') => {
-    if (!min && !max) return 'TBD';
-    if (min && max) return min === max ? `$${min.toLocaleString()}${sfx}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
-    if (min) return `$${min.toLocaleString()}+${sfx}`;
-    return `Up to $${max?.toLocaleString()}${sfx}`;
-  };
-  if (p.budget_type === 'fixed')      return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly')     return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily')      return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly')     return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '—';

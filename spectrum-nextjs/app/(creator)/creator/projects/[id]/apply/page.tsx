@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { jobs, proposals, profile as profileApi, JobPostItem } from '@/lib/api';
+import { jobs, proposals, profile as profileApi, JobPostItem, formatJobBudget, currencySymbol } from '@/lib/api';
 
 const DURATION_OPTIONS = [
   { label: 'Less than 1 week', value: 1 },
@@ -15,24 +15,7 @@ const DURATION_OPTIONS = [
   { label: '3–6 months', value: 20 },
 ];
 
-function budgetLabel(job: JobPostItem): string {
-  if (job.budget?.min && job.budget?.max) {
-    if (job.budget.min === job.budget.max) return `$${job.budget.min.toLocaleString()} (fixed)`;
-    return `$${job.budget.min.toLocaleString()} – $${job.budget.max.toLocaleString()}`;
-  }
-  if (job.budget?.min) return `From $${job.budget.min.toLocaleString()}`;
-  if (job.daily_rate?.min || job.daily_rate?.max) {
-    const min = job.daily_rate.min ?? 0;
-    const max = job.daily_rate.max;
-    return max ? `$${min}–$${max}/day` : `From $${min}/day`;
-  }
-  if (job.hourly_rate?.min || job.hourly_rate?.max) {
-    const min = job.hourly_rate.min ?? 0;
-    const max = job.hourly_rate.max;
-    return max ? `$${min}–$${max}/hr` : `From $${min}/hr`;
-  }
-  return 'Negotiable';
-}
+const budgetLabel = formatJobBudget;
 
 function isFixedPrice(job: JobPostItem): boolean {
   return job.budget_type === 'fixed' &&
@@ -202,7 +185,7 @@ export default function ProjectApplicationPage() {
                       <p className="text-sm font-bold text-emerald-900">Fixed Price Project</p>
                       <p className="text-xs text-emerald-700 mt-0.5">
                         This project has a fixed price of{' '}
-                        <strong>${job.budget!.min!.toLocaleString()}</strong>.
+                        <strong>{currencySymbol(job.budget?.currency)}{job.budget!.min!.toLocaleString()}</strong>.
                         The rate is non-negotiable — you apply at this price or not at all.
                       </p>
                     </div>
@@ -210,15 +193,15 @@ export default function ProjectApplicationPage() {
                   <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                     <span className="text-sm font-semibold text-gray-700">Your payout (after 8% fee)</span>
                     <span className="text-lg font-bold text-emerald-600">
-                      ${(job.budget!.min! * 0.92).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {currencySymbol(job.budget?.currency)}{(job.budget!.min! * 0.92).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
               ) : (
                 <div className="mb-6">
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Your Rate ($)</label>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Your Rate ({currencySymbol(job?.budget?.currency).trim()})</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">{currencySymbol(job?.budget?.currency)}</span>
                     <input
                       type="number"
                       min="1"

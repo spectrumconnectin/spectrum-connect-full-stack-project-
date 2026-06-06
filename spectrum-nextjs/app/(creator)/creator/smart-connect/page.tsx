@@ -2,17 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { smartConnect, CreatorSmartMatch, MatchHistoryItem } from '@/lib/api';
+import { smartConnect, CreatorSmartMatch, MatchHistoryItem, currencySymbol } from '@/lib/api';
 
-function formatBudget(type?: string, min?: number, max?: number): string | null {
+function formatBudget(type?: string, min?: number, max?: number, currency?: string): string | null {
+  const sym = currencySymbol(currency);
   if (!type) return null;
   if (type === 'fixed') {
-    if (min && max) return `$${min.toLocaleString()} – $${max.toLocaleString()}`;
-    if (min) return `$${min.toLocaleString()}+`;
+    if (min && max) return min === max ? `${sym}${min.toLocaleString()}` : `${sym}${min.toLocaleString()} – ${sym}${max.toLocaleString()}`;
+    if (min) return `${sym}${min.toLocaleString()}+`;
   }
   if (type === 'hourly') {
-    if (min && max) return `$${min}–$${max}/hr`;
-    if (min) return `$${min}/hr`;
+    if (min && max) return `${sym}${min}–${sym}${max}/hr`;
+    if (min) return `${sym}${min}/hr`;
   }
   return null;
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
 const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'approved', 'completed', 'draft'];
 
@@ -36,19 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
   closed:             'bg-blue-100 text-blue-700',
 };
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, suffix = '') => {
-    if (!min && !max) return 'TBD';
-    if (min && max) return min === max ? `$${min.toLocaleString()}${suffix}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${suffix}`;
-    if (min) return `$${min.toLocaleString()}+${suffix}`;
-    return `$${max?.toLocaleString()}${suffix}`;
-  };
-  if (p.budget_type === 'fixed') return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily') return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 function formatPosted(dateStr?: string): string {
   if (!dateStr) return '—';

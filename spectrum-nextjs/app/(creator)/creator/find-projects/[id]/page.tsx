@@ -3,21 +3,9 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { jobs, proposals, JobPostItem } from '@/lib/api';
+import { jobs, proposals, JobPostItem, formatJobBudget } from '@/lib/api';
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, sfx = '') => {
-    if (!min && !max) return 'Negotiable';
-    if (min && max) return min === max ? `$${min.toLocaleString()}${sfx}` : `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
-    if (min) return `From $${min.toLocaleString()}${sfx}`;
-    return `Up to $${max?.toLocaleString()}${sfx}`;
-  };
-  if (p.budget_type === 'fixed')  return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily')  return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 function formatDate(iso?: string) {
   if (!iso) return '—';

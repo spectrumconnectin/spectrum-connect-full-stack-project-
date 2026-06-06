@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { proposals, escrow as escrowApi, messaging, ProposalDetail, EscrowMilestone } from '@/lib/api';
+import { proposals, escrow as escrowApi, messaging, ProposalDetail, EscrowMilestone, currencySymbol } from '@/lib/api';
 
 // ── Deadline countdown ────────────────────────────────────────────────────────
 function useDeadlineCountdown(deadlineAt?: string) {
@@ -399,13 +399,15 @@ export default function CreatorWorkspacePage() {
               {(data.job_budget_min || data.job_budget_max) && (
                 <span className="flex items-center gap-1.5">
                   <i className="fa-solid fa-wallet text-cobalt text-xs"></i>
-                  {data.job_budget_min && data.job_budget_max
-                    ? data.job_budget_min === data.job_budget_max
-                      ? `$${data.job_budget_min.toLocaleString()}`
-                      : `$${data.job_budget_min.toLocaleString()}–$${data.job_budget_max.toLocaleString()}`
-                    : data.job_budget_min
-                      ? `$${data.job_budget_min.toLocaleString()}+`
-                      : `$${data.job_budget_max?.toLocaleString()}`}
+                  {(() => {
+                    const sym = currencySymbol((data as ProposalDetail & { currency?: string }).currency);
+                    if (data.job_budget_min && data.job_budget_max)
+                      return data.job_budget_min === data.job_budget_max
+                        ? `${sym}${data.job_budget_min.toLocaleString()}`
+                        : `${sym}${data.job_budget_min.toLocaleString()}–${sym}${data.job_budget_max.toLocaleString()}`;
+                    if (data.job_budget_min) return `${sym}${data.job_budget_min.toLocaleString()}+`;
+                    return `${sym}${data.job_budget_max?.toLocaleString()}`;
+                  })()}
                 </span>
               )}
               {data.job_location && (
