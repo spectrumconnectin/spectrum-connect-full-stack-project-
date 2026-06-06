@@ -172,6 +172,37 @@ class PendingSubmissionsResponse(BaseModel):
     has_more: bool
 
 
+class AdminSubmissionItem(BaseModel):
+    submission_id: str
+    challenge_id: str
+    challenge_title: str
+    skill_category: Optional[str] = None
+    difficulty: Optional[str] = None
+    user_id: str
+    username: str
+    content_type: str
+    submission_url: str
+    submission_notes: Optional[str] = None
+    attempt_number: int
+    evaluation_status: str
+    overall_score: Optional[float] = None
+    pass_threshold: Optional[float] = None
+    passed: Optional[bool] = None
+    submitted_at: datetime
+    evaluated_at: Optional[datetime] = None
+
+
+class AdminAllSubmissionsResponse(BaseModel):
+    submissions: List[AdminSubmissionItem]
+    total: int
+    pending_count: int
+    passed_count: int
+    failed_count: int
+    limit: int
+    offset: int
+    has_more: bool
+
+
 # ── Badge schemas ─────────────────────────────────────────────────────────────
 
 class BadgeListItem(BaseModel):

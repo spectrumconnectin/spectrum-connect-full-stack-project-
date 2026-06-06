@@ -36,6 +36,7 @@ from app.api.schemas.skill_challenge_schemas import (
     ChallengeDetailResponse,
     SubmissionListResponse,
     PendingSubmissionsResponse,
+    AdminAllSubmissionsResponse,
     BadgeListResponse,
     ChallengeActionResponse,
     SubmissionActionResponse,
@@ -102,6 +103,38 @@ async def get_my_badges(
         active_only=active_only,
     )
     return BadgeListResponse(**result)
+
+
+@router.get(
+    "/submissions",
+    response_model=AdminAllSubmissionsResponse,
+    summary="[Admin] All submissions — pending, passed, failed",
+)
+async def get_all_submissions(
+    status_filter: Optional[str] = Query(
+        None,
+        description="Filter by status: pending | evaluating | passed | failed. Omit for all.",
+    ),
+    skill_category: Optional[str] = Query(None),
+    limit:  int = Query(20, ge=1, le=100),
+    offset: int = Query(0,  ge=0),
+    admin: User = Depends(get_admin_user),
+):
+    """
+    Admin view of ALL submissions across every status.
+
+    Use `status_filter` to narrow by `pending`, `evaluating`, `passed`, or `failed`.
+    Omit the filter to see everything.
+
+    **Who:** Admin only
+    """
+    result = await SkillChallengeService.get_all_submissions(
+        status_filter=status_filter,
+        skill_category=skill_category,
+        limit=limit,
+        offset=offset,
+    )
+    return AdminAllSubmissionsResponse(**result)
 
 
 @router.get(

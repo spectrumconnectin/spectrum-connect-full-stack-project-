@@ -162,10 +162,10 @@ async def fund_milestone(
     # Notify creator that milestone funds are ready
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(escrow_id)
+        from app.models.escrow import Escrow
+        escrow = await Escrow.get(escrow_id)
         if escrow:
-            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
+            milestone = next((m for m in (escrow.milestones or []) if m.milestone_id == request.milestone_id), None)
             m_title = milestone.title if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
             await NotificationService.milestone_funded(
@@ -206,10 +206,10 @@ async def release_milestone(
     # Notify creator of released payment + confirm to client
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(escrow_id)
+        from app.models.escrow import Escrow
+        escrow = await Escrow.get(escrow_id)
         if escrow:
-            milestone = next((m for m in (escrow.milestones or []) if str(m.id) == request.milestone_id), None)
+            milestone = next((m for m in (escrow.milestones or []) if m.milestone_id == request.milestone_id), None)
             m_title = milestone.title if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
             await NotificationService.milestone_released(
@@ -281,8 +281,8 @@ async def create_dispute(
     # Notify the other party
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import EscrowTransaction
-        escrow = await EscrowTransaction.get(request.escrow_id)
+        from app.models.escrow import Escrow
+        escrow = await Escrow.get(request.escrow_id)
         if escrow:
             other_id = str(escrow.creator_id) if str(escrow.client_id) == str(current_user.id) else str(escrow.client_id)
             await NotificationService.dispute_opened(
@@ -455,10 +455,10 @@ async def resolve_dispute(
     # Notify both parties of the resolution
     try:
         from app.services.notification_service import NotificationService
-        from app.models.escrow import DisputeCase, EscrowTransaction
-        dispute = await DisputeCase.get(dispute_id)
+        from app.models.escrow import Dispute, Escrow
+        dispute = await Dispute.get(dispute_id)
         if dispute:
-            escrow = await EscrowTransaction.get(str(dispute.escrow_id))
+            escrow = await Escrow.get(str(dispute.escrow_id))
             outcome = request.resolution_type.replace("_", " ").title()
             if escrow:
                 for uid in [str(escrow.client_id), str(escrow.creator_id)]:

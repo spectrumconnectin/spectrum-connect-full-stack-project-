@@ -29,6 +29,8 @@ from app.models.etf_points import EtfPoints, EtfEvent
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
+from app.models.report import Report
+from app.models.audit_log import AuditLog
 from app.auth.router import router as auth_router
 from app.api.routers.job_router import router as job_router
 from app.api.routers.client_dashboard import router as client_dashboard_router
@@ -61,6 +63,7 @@ from app.api.routers.proposals_router import router as proposals_router
 from app.api.routers.earnings_router import router as earnings_router
 from app.api.routers.portfolio_router import router as portfolio_router
 from app.api.routers.admin_router import router as admin_router
+from app.api.routers.report_router import router as report_router
 
 load_dotenv()
 
@@ -163,6 +166,7 @@ app.include_router(proposals_router, tags=["Proposals"])
 app.include_router(earnings_router, tags=["Earnings"])
 app.include_router(portfolio_router, tags=["Portfolio"])
 app.include_router(admin_router, tags=["Admin Panel"])
+app.include_router(report_router, tags=["Reports"])
 
 
 @app.get("/health")
@@ -175,10 +179,15 @@ def read_root():
 
 @app.on_event("startup")
 async def startup_db_client():
-    logger.info("Connecting to MongoDB...")
-    client = AsyncIOMotorClient(MONGO_URI)
+    logger.info("Connecting to MongoDB Atlas...")
+    client = AsyncIOMotorClient(
+        MONGO_URI,
+        maxIdleTimeMS=45000,   # drop idle connections before Atlas closes them (~60s on free tier)
+        retryWrites=True,      # auto-retry writes on connection reset
+        retryReads=True,       # auto-retry reads on connection reset
+    )
     database = client.get_database(MONGODB_DB)
-    logger.info("MongoDB client initialized")
+    logger.info("MongoDB client initialized (maxIdleTimeMS=45000, retryWrites=True, retryReads=True)")
 
     try:
         await init_beanie(
@@ -197,9 +206,21 @@ async def startup_db_client():
                 ReviewQueue,
                 Escrow, Dispute, GuaranteeFund,
                 SkillChallenge, ChallengeSubmission, SkillBadge,
+                Report,
+                AuditLog,
             ],
         )
-        logger.info("Beanie initialized successfully")
+        logger.info("Beanie initialized successfully — all models registered")
     except Exception as e:
-        logger.exception("Error initializing Beanie")
+        err = str(e)
+        if "SSL handshake" in err or "ReplicaSetNoPrimary" in err or "ServerSelectionTimeout" in err:
+            logger.error(
+                "MongoDB Atlas connection failed at startup.\n"
+                "  Reason : %s\n"
+                "  Fix 1  : Add your IP to Atlas Network Access → cloud.mongodb.com\n"
+                "  Fix 2  : Check if port 27017 is blocked by your network/firewall",
+                err[:300],
+            )
+        else:
+            logger.exception("Error initializing Beanie: %s", err[:300])
         raise e

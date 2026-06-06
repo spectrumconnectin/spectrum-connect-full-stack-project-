@@ -545,21 +545,32 @@ class RoleUpdate(BaseModel):
 
 
 @router.patch("/users/{user_id}/role", summary="Change user role (no auth)")
-async def update_user_role(user_id: str, body: RoleUpdate):
+async def update_user_role(user_id: str, body: RoleUpdate, admin: User = Depends(get_admin_user)):
     if body.user_role not in {"user", "admin", "moderator"}:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid role")
     from bson import ObjectId
+    from app.services.audit_service import log_event
     u = await User.get(ObjectId(user_id))
     if not u:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    old_role = u.user_role
     u.user_role = body.user_role
     await u.save()
+    await log_event(
+        "admin.user.promoted",
+        actor=admin,
+        target_type="user",
+        target_id=user_id,
+        metadata={"old_role": old_role, "new_role": body.user_role, "target_username": u.username},
+        severity="critical",
+    )
     return {"id": user_id, "user_role": u.user_role}
 
 
 @router.patch("/users/{user_id}/suspend", summary="Suspend user account")
 async def suspend_user(user_id: str, admin: User = Depends(get_admin_user)):
     from bson import ObjectId
+    from app.services.audit_service import log_event
     u = await User.get(ObjectId(user_id))
     if not u:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
@@ -568,18 +579,35 @@ async def suspend_user(user_id: str, admin: User = Depends(get_admin_user)):
     u.is_active = False
     u.suspended_at = datetime.utcnow()
     await u.save()
+    await log_event(
+        "admin.user.suspended",
+        actor=admin,
+        target_type="user",
+        target_id=user_id,
+        metadata={"target_username": u.username, "target_email": u.email},
+        severity="critical",
+    )
     return {"id": user_id, "status": "suspended"}
 
 
 @router.patch("/users/{user_id}/activate", summary="Reactivate suspended user")
 async def activate_user(user_id: str, admin: User = Depends(get_admin_user)):
     from bson import ObjectId
+    from app.services.audit_service import log_event
     u = await User.get(ObjectId(user_id))
     if not u:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     u.is_active = True
     u.suspended_at = None
     await u.save()
+    await log_event(
+        "admin.user.activated",
+        actor=admin,
+        target_type="user",
+        target_id=user_id,
+        metadata={"target_username": u.username},
+        severity="warning",
+    )
     return {"id": user_id, "status": _compute_status(u)}
 
 
@@ -955,7 +983,7 @@ async def list_all_disputes(
     }
 
 
-# ── Transactions ───────────────────────────────────────────────────────────────
+# ── Transactions (Payments page) ───────────────────────────────────────────────
 
 @router.get("/transactions", summary="List all escrow transactions")
 async def list_all_transactions(
@@ -1001,6 +1029,232 @@ async def list_all_transactions(
     }
 
 
+@router.get("/transactions/{escrow_id}", summary="[Admin] Full escrow detail with milestones")
+async def get_transaction_detail(
+    escrow_id: str,
+    admin: User = Depends(get_admin_user),
+):
+    from app.models.escrow import Escrow
+    from beanie import PydanticObjectId
+    try:
+        escrow = await Escrow.get(PydanticObjectId(escrow_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid escrow ID.")
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found.")
+
+    client  = await User.get(escrow.client_id)
+    creator = await User.get(escrow.creator_id)
+
+    return {
+        "id":              str(escrow.id),
+        "status":          escrow.status,
+        "description":     escrow.description,
+        "currency":        escrow.currency,
+        "total_amount":    float(escrow.total_amount or 0),
+        "funded_amount":   float(escrow.funded_amount or 0),
+        "released_amount": float(escrow.released_amount or 0),
+        "refunded_amount": float(escrow.refunded_amount or 0),
+        "client": {
+            "id":       str(escrow.client_id),
+            "username": client.username if client else "unknown",
+            "email":    client.email    if client else "unknown",
+        },
+        "creator": {
+            "id":       str(escrow.creator_id),
+            "username": creator.username if creator else "unknown",
+            "email":    creator.email    if creator else "unknown",
+        },
+        "project_id":    str(escrow.project_id)  if escrow.project_id  else None,
+        "job_post_id":   str(escrow.job_post_id) if escrow.job_post_id else None,
+        "milestones": [
+            {
+                "milestone_id": m.milestone_id,
+                "title":        m.title,
+                "amount":       float(m.amount),
+                "status":       m.status,
+                "funded_at":    m.funded_at.isoformat()   if m.funded_at   else None,
+                "released_at":  m.released_at.isoformat() if m.released_at else None,
+                "refunded_at":  m.refunded_at.isoformat() if m.refunded_at else None,
+            }
+            for m in (escrow.milestones or [])
+        ],
+        "created_at":    escrow.created_at.isoformat()    if escrow.created_at    else None,
+        "completed_at":  escrow.completed_at.isoformat()  if escrow.completed_at  else None,
+    }
+
+
+@router.post("/transactions/{escrow_id}/refund", summary="[Admin] Force full refund on an escrow")
+async def admin_force_refund(
+    escrow_id: str,
+    body: dict,
+    admin: User = Depends(get_admin_user),
+):
+    from app.models.escrow import Escrow
+    from beanie import PydanticObjectId
+    reason = body.get("reason", "Admin-initiated refund.")
+    try:
+        escrow = await Escrow.get(PydanticObjectId(escrow_id))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid escrow ID.")
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found.")
+    if escrow.status in ("refunded", "completed"):
+        raise HTTPException(status_code=400, detail=f"Escrow is already {escrow.status}.")
+
+    refund_total = 0.0
+    for m in (escrow.milestones or []):
+        if m.status == "funded":
+            m.status = "refunded"
+            m.refunded_at = datetime.utcnow()
+            refund_total += float(m.amount)
+
+    escrow.refunded_amount = float(escrow.refunded_amount or 0) + refund_total
+    escrow.status = "refunded"
+    escrow.updated_at = datetime.utcnow()
+    await escrow.save()
+
+    return {
+        "success":       True,
+        "escrow_id":     str(escrow.id),
+        "refund_amount": refund_total,
+        "new_status":    "refunded",
+        "reason":        reason,
+        "message":       f"Refund of {refund_total} {escrow.currency} processed successfully.",
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 12: AUDIT LOG
+# ══════════════════════════════════════════════════════════════════════════════
+
+from fastapi.responses import StreamingResponse
+import csv
+import io
+
+
+@router.get("/audit", summary="[Admin] Paginated audit log")
+async def list_audit_log(
+    event_type: Optional[str] = Query(None, description="e.g. user.login, admin.user.suspended"),
+    severity:   Optional[str] = Query(None, description="debug | info | warning | error | critical"),
+    actor_id:   Optional[str] = Query(None, description="Filter by actor user ID"),
+    target_id:  Optional[str] = Query(None, description="Filter by target ID"),
+    since:      Optional[str] = Query(None, description="ISO datetime — return entries after this"),
+    limit:  int = Query(50, ge=1, le=100),
+    offset: int = Query(0,  ge=0),
+    admin: User = Depends(get_admin_user),
+):
+    from app.models.audit_log import AuditLog
+    from beanie import PydanticObjectId
+
+    filters = []
+    if event_type:
+        filters.append(AuditLog.event_type == event_type)
+    if severity:
+        filters.append(AuditLog.severity == severity)
+    if actor_id:
+        try:
+            filters.append(AuditLog.actor_id == PydanticObjectId(actor_id))
+        except Exception:
+            pass
+    if target_id:
+        filters.append(AuditLog.target_id == target_id)
+    if since:
+        try:
+            from datetime import datetime
+            since_dt = datetime.fromisoformat(since)
+            filters.append(AuditLog.created_at >= since_dt)
+        except Exception:
+            pass
+
+    query = AuditLog.find(*filters) if filters else AuditLog.find()
+    total = await query.count()
+    entries = (
+        await query.sort(-AuditLog.created_at).skip(offset).limit(limit).to_list()
+    )
+
+    return {
+        "total":  total,
+        "limit":  limit,
+        "offset": offset,
+        "has_more": (offset + limit) < total,
+        "logs": [
+            {
+                "id":             str(e.id),
+                "event_type":     e.event_type,
+                "severity":       e.severity,
+                "actor_id":       str(e.actor_id)    if e.actor_id    else None,
+                "actor_username": e.actor_username,
+                "actor_role":     e.actor_role,
+                "target_type":    e.target_type,
+                "target_id":      e.target_id,
+                "ip_address":     e.ip_address,
+                "request_path":   e.request_path,
+                "request_method": e.request_method,
+                "metadata":       e.metadata,
+                "created_at":     e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in entries
+        ],
+    }
+
+
+@router.get("/audit/export", summary="[Admin] Export audit log as CSV")
+async def export_audit_log(
+    event_type: Optional[str] = Query(None),
+    severity:   Optional[str] = Query(None),
+    actor_id:   Optional[str] = Query(None),
+    since:      Optional[str] = Query(None),
+    admin: User = Depends(get_admin_user),
+):
+    from app.models.audit_log import AuditLog
+    from beanie import PydanticObjectId
+
+    filters = []
+    if event_type:
+        filters.append(AuditLog.event_type == event_type)
+    if severity:
+        filters.append(AuditLog.severity == severity)
+    if actor_id:
+        try:
+            filters.append(AuditLog.actor_id == PydanticObjectId(actor_id))
+        except Exception:
+            pass
+    if since:
+        try:
+            from datetime import datetime
+            filters.append(AuditLog.created_at >= datetime.fromisoformat(since))
+        except Exception:
+            pass
+
+    query = AuditLog.find(*filters) if filters else AuditLog.find()
+    entries = await query.sort(-AuditLog.created_at).limit(5000).to_list()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id", "event_type", "severity", "actor_username", "actor_role",
+        "target_type", "target_id", "ip_address", "request_method",
+        "request_path", "metadata", "created_at",
+    ])
+    for e in entries:
+        writer.writerow([
+            str(e.id), e.event_type, e.severity,
+            e.actor_username or "", e.actor_role or "",
+            e.target_type or "", e.target_id or "",
+            e.ip_address or "", e.request_method or "",
+            e.request_path or "", str(e.metadata or ""),
+            e.created_at.isoformat() if e.created_at else "",
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
+    )
+
+
 # ── ETF Stats ──────────────────────────────────────────────────────────────────
 
 @router.get("/etf/stats", summary="ETF points platform summary")
@@ -1027,3 +1281,94 @@ async def get_etf_stats(admin: User = Depends(get_admin_user)):
         "total_redeemed_points": total_redeemed,
         "level_breakdown": levels,
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 13: REPORTS INBOX
+# ══════════════════════════════════════════════════════════════════════════════
+
+from app.services.report_service import ReportService
+from app.api.schemas.report_schemas import (
+    ReportListResponse,
+    ReportDetailResponse,
+    ResolveReportRequest,
+    DismissReportRequest,
+    ReportActionResponse,
+)
+
+
+@router.get(
+    "/reports",
+    response_model=ReportListResponse,
+    summary="[Admin] List all reports",
+)
+async def list_reports(
+    status_filter: Optional[str] = Query(
+        None,
+        description="pending | under_review | resolved | dismissed — omit for all",
+    ),
+    target_type: Optional[str] = Query(
+        None,
+        description="user | job | review | project | message",
+    ),
+    limit:  int = Query(20, ge=1, le=100),
+    offset: int = Query(0,  ge=0),
+    admin: User = Depends(get_admin_user),
+):
+    result = await ReportService.get_all_reports(
+        status_filter=status_filter,
+        target_type=target_type,
+        limit=limit,
+        offset=offset,
+    )
+    return ReportListResponse(**result)
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=ReportDetailResponse,
+    summary="[Admin] Get report detail",
+)
+async def get_report(
+    report_id: str,
+    admin: User = Depends(get_admin_user),
+):
+    result = await ReportService.get_report_by_id(report_id)
+    return ReportDetailResponse(**result)
+
+
+@router.patch(
+    "/reports/{report_id}/resolve",
+    response_model=ReportActionResponse,
+    summary="[Admin] Resolve a report",
+)
+async def resolve_report(
+    report_id: str,
+    body: ResolveReportRequest,
+    admin: User = Depends(get_admin_user),
+):
+    result = await ReportService.resolve_report(
+        report_id=report_id,
+        admin_user_id=str(admin.id),
+        action_taken=body.action_taken,
+        admin_note=body.admin_note,
+    )
+    return ReportActionResponse(**result)
+
+
+@router.patch(
+    "/reports/{report_id}/dismiss",
+    response_model=ReportActionResponse,
+    summary="[Admin] Dismiss a report",
+)
+async def dismiss_report(
+    report_id: str,
+    body: DismissReportRequest,
+    admin: User = Depends(get_admin_user),
+):
+    result = await ReportService.dismiss_report(
+        report_id=report_id,
+        admin_user_id=str(admin.id),
+        admin_note=body.admin_note,
+    )
+    return ReportActionResponse(**result)

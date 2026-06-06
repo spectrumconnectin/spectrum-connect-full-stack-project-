@@ -277,6 +277,12 @@ async def login_for_access_token(
     )
 
     if not user or not verify_password(form_data.password, user.password_hash):
+        from app.services.audit_service import log_event
+        await log_event(
+            "user.login_failed",
+            metadata={"identifier": form_data.username, "reason": "bad_credentials"},
+            severity="warning",
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or email or password",
@@ -291,6 +297,14 @@ async def login_for_access_token(
 
     user.last_login = datetime.utcnow()
     await user.save()
+
+    from app.services.audit_service import log_event
+    await log_event(
+        "user.login",
+        actor=user,
+        metadata={"method": "password", "role": user.user_role},
+        severity="info",
+    )
 
     access_token = create_access_token(data={"sub": user.username})
     return {

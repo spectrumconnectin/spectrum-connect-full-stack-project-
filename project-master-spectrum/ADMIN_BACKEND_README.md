@@ -19,8 +19,8 @@
 9. [Module: Skill Challenges](#9-module-skill-challenges)
 10. [Module: Transactions / Payments](#10-module-transactions--payments)
 11. [Module: ETF Points](#11-module-etf-points)
-12. [Module: Audit Log *(to build)*](#12-module-audit-log-to-build)
-13. [Module: Reports Inbox *(to build)*](#13-module-reports-inbox-to-build)
+12. [Module: Audit Log](#12-module-audit-log)
+13. [Module: Reports Inbox](#13-module-reports-inbox)
 14. [Module: Broadcast Notifications *(to build)*](#14-module-broadcast-notifications-to-build)
 15. [AuditLog Data Model *(to build)*](#15-auditlog-data-model-to-build)
 16. [Security Rules](#16-security-rules)
@@ -735,12 +735,86 @@ Content-Type: application/json
 
 ---
 
-### Planned Job Endpoints *(next PR)*
+---
+
+### 5.3 Get Job Detail ✅ Ready
 
 ```
-GET    /admin/jobs/{job_id}            →  full job detail
-PATCH  /admin/jobs/{job_id}/visibility →  hide/show/feature
-DELETE /admin/jobs/{job_id}            →  hard delete (admin only)
+GET /admin/jobs/{job_id}
+Authorization: Bearer <admin_token>
+```
+
+**Success `200`**
+
+```json
+{
+  "id": "507f1f77bcf86cd799439022",
+  "title": "Director of Photography needed for feature film",
+  "description": "Looking for an experienced DoP...",
+  "status": "open",
+  "visibility": "public",
+  "department": "Camera",
+  "role": "Director of Photography",
+  "tags": ["film", "documentary"],
+  "skills": ["Cinematography", "Lighting"],
+  "crew_size": "small_crew",
+  "complexity": "intermediate",
+  "experience_level": "expert",
+  "budget_type": "fixed",
+  "budget": { "min": 3000.00, "max": 8000.00, "currency": "USD" },
+  "client_id": "507f1f77bcf86cd799439011",
+  "proposal_count": 14,
+  "view_count": 230,
+  "hired_crew": [],
+  "start_date": "2026-07-01T00:00:00",
+  "deadline": "2026-09-30T00:00:00",
+  "published_at": "2026-06-01T09:00:00",
+  "closed_at": null,
+  "created_at": "2026-06-01T09:00:00"
+}
+```
+
+**Error `404`** — Job not found
+
+---
+
+### 5.4 Update Job Visibility ✅ Ready
+
+```
+PATCH /admin/jobs/{job_id}/visibility
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{ "visibility": "hidden" }
+```
+
+`visibility` options: `public` · `private` · `invited_only` · `hidden` · `featured`
+
+**Success `200`**
+
+```json
+{ "id": "507f1f77bcf86cd799439022", "visibility": "hidden" }
+```
+
+---
+
+### 5.5 Delete Job ✅ Ready
+
+```
+DELETE /admin/jobs/{job_id}
+Authorization: Bearer <admin_token>
+```
+
+> Requires **admin** role only — moderators get `403`.
+
+**Success `200`**
+
+```json
+{ "id": "507f1f77bcf86cd799439022", "deleted": true }
 ```
 
 ---
@@ -753,7 +827,7 @@ DELETE /admin/jobs/{job_id}            →  hard delete (admin only)
 
 ---
 
-### List All Projects ✅ Ready
+### 6.1 List All Projects ✅ Ready
 
 ```
 GET /admin/projects
@@ -802,7 +876,7 @@ GET /admin/projects
 
 ---
 
-### Get Project Detail ✅ Ready
+### 6.2 Get Project Detail ✅ Ready
 
 ```
 GET /admin/projects/{project_id}
@@ -859,7 +933,7 @@ GET /admin/projects/{project_id}
 
 ---
 
-### Get Project Timeline ✅ Ready
+### 6.3 Get Project Timeline ✅ Ready
 
 ```
 GET /admin/projects/{project_id}/timeline
@@ -914,14 +988,16 @@ Returns the full `ActivityLog` feed for a project — every action that happened
 
 ## 7. Module: Disputes
 
-> File: `app/api/routers/escrow_router.py` — `dispute_router`  
-> File: `app/api/routers/admin_router.py` — alternate route  
-> Prefix: `/disputes`
+> List: `app/api/routers/admin_router.py` — `GET /admin/disputes`  
+> Detail / Assign / Resolve: `app/api/routers/escrow_router.py`  
+> All endpoints require: `Authorization: Bearer <admin_token>`
 
-### 6.1 List All Disputes *(Admin)* ✅ Ready
+---
+
+### 7.1 List All Disputes ✅ Ready
 
 ```
-GET /disputes/all
+GET /admin/disputes
 Authorization: Bearer <admin_token>
 ```
 
@@ -931,7 +1007,7 @@ Authorization: Bearer <admin_token>
 |-------|------|-------------|
 | `page` | int | Default `1` |
 | `page_size` | int | Default `25`, max `100` |
-| `status` | string | `open` · `under_review` · `resolved_creator_favor` · `resolved_client_favor` |
+| `status` | string | `open` · `under_review` · `resolved_creator_favor` · `resolved_client_favor` · `escalated` |
 
 **Success `200`**
 
@@ -955,29 +1031,90 @@ Authorization: Bearer <admin_token>
 }
 ```
 
-Also available as `GET /admin/disputes` — same data.
-
 ---
 
-### 6.2 Get Dispute Detail ✅ Ready
+### 7.2 Get Dispute Detail ✅ Ready
 
 ```
 GET /disputes/{dispute_id}
-Authorization: Bearer <token>
+Authorization: Bearer <admin_token>
 ```
+
+**Success `200`**
+
+```json
+{
+  "dispute_id": "507f1f77bcf86cd799439033",
+  "escrow_id": "507f1f77bcf86cd799439044",
+  "project_id": null,
+  "milestone_id": "uuid-milestone-here",
+  "status": "under_review",
+  "reason": "Deliverables not as described",
+  "details": "Client says work was incomplete. Creator says it was delivered.",
+  "raised_by": {
+    "user_id": "507f1f77bcf86cd799439011",
+    "username": "producer.john",
+    "email": "john@studio.com"
+  },
+  "raised_against": {
+    "user_id": "507f1f77bcf86cd799439022",
+    "username": "dp.sarah",
+    "email": "sarah@crew.com"
+  },
+  "assigned_reviewer": {
+    "user_id": "507f1f77bcf86cd799439099",
+    "username": "admin"
+  },
+  "evidence": [
+    {
+      "submitted_by": "507f1f77bcf86cd799439011",
+      "evidence_type": "screenshot",
+      "url": "https://storage.example.com/evidence.png",
+      "description": "Screenshot showing incomplete deliverable",
+      "uploaded_at": "2026-05-29T10:00:00"
+    }
+  ],
+  "resolution_type": null,
+  "resolution_notes": null,
+  "resolution_amount": null,
+  "guarantee_fund_used": false,
+  "created_at": "2026-05-28T14:20:00",
+  "resolved_at": null
+}
+```
+
+**Error responses**
+
+| Code | Detail |
+|------|--------|
+| `400` | Invalid dispute ID — malformed ObjectId |
+| `403` | Access denied — not a party to this dispute |
+| `404` | Dispute not found |
 
 ---
 
-### 6.3 Admin Self-Assign Dispute ✅ Ready
+### 7.3 Self-Assign Dispute ✅ Ready
 
 ```
 PATCH /disputes/{dispute_id}/assign
 Authorization: Bearer <admin_token>
 ```
 
+No request body needed. Sets status `open` → `under_review`, stamps `picked_up_at`.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "dispute_id": "507f1f77bcf86cd799439033",
+  "message": "Dispute assigned to you."
+}
+```
+
 ---
 
-### 6.4 Resolve Dispute ✅ Ready
+### 7.4 Resolve Dispute ✅ Ready
 
 ```
 PATCH /disputes/{dispute_id}/resolve
@@ -989,9 +1126,31 @@ Content-Type: application/json
 
 ```json
 {
-  "outcome": "refund_client",
-  "resolution_note": "Deliverables did not meet the agreed specification.",
-  "release_to_creator": false
+  "resolution_type": "full_refund",
+  "resolution_notes": "Creator did not deliver agreed work.",
+  "resolution_amount": null
+}
+```
+
+**`resolution_type` options**
+
+| Value | Effect |
+|-------|--------|
+| `full_refund` | All disputed funds returned to client |
+| `release_to_creator` | All disputed funds released to creator |
+| `partial_refund` | `resolution_amount` to client, rest to creator |
+| `split` | Custom split — `resolution_amount` to client, rest to creator |
+
+> Both parties are notified via in-app notification automatically on resolution.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "dispute_id": "507f1f77bcf86cd799439033",
+  "resolution_type": "full_refund",
+  "message": "Dispute resolved. Funds redistributed."
 }
 ```
 
@@ -1000,68 +1159,229 @@ Content-Type: application/json
 ## 8. Module: Reviews Queue
 
 > File: `app/api/routers/review_router.py` — `admin_router`  
-> Prefix: `/admin/reviews`
+> Prefix: `/admin/reviews`  
+> All endpoints require: `Authorization: Bearer <admin_token>`
 
-### 7.1 List Review Queue ✅ Ready
+---
+
+### 8.1 List Review Queue ✅ Ready
 
 ```
 GET /admin/reviews/queue
-Authorization: Bearer <admin_token>
 ```
+
+**Query parameters**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `status` | string | `pending` · `approved` · `rejected` |
-| `page` | int | Default `1` |
-| `page_size` | int | Default `25`, max `100` |
+| `status_filter` | string | `pending` · `in_review` · `approved` · `rejected` · `resubmitted` · `permanently_rejected` |
+| `limit` | int | Default `20`, max `100` |
+| `offset` | int | Default `0` |
+
+> Default (no filter) shows all actionable reviews: `pending`, `in_review`, `resubmitted`. Sorted oldest-first so nothing gets forgotten.
+
+**Success `200`**
+
+```json
+{
+  "reviews": [
+    {
+      "review_id": "507f1f77bcf86cd799439011",
+      "status": "pending",
+      "creator_id": "507f1f77bcf86cd799439022",
+      "creator_username": "john.doe",
+      "creator_email": "john@example.com",
+      "creator_account_type": "crew",
+      "submitted_at": "2026-06-01T10:00:00",
+      "resubmission_count": 0,
+      "is_assigned": false,
+      "reviewer_username": null
+    }
+  ],
+  "total": 12,
+  "pending_count": 8,
+  "in_review_count": 4,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```
 
 ---
 
-### 7.2 Review Queue Stats ✅ Ready
+### 8.2 Review Queue Stats ✅ Ready
 
 ```
 GET /admin/reviews/stats
-Authorization: Bearer <admin_token>
 ```
 
-Returns: pending count, approved today, rejected today, avg review time.
+**Success `200`**
+
+```json
+{
+  "total_submissions": 320,
+  "pending": 8,
+  "in_review": 4,
+  "approved": 280,
+  "rejected": 22,
+  "resubmitted": 5,
+  "permanently_rejected": 1,
+  "approval_rate": 0.875,
+  "avg_review_time_hours": 3.4,
+  "total_this_week": 14,
+  "total_this_month": 48
+}
+```
 
 ---
 
-### 7.3 Get Review Detail ✅ Ready
+### 8.3 Get Review Detail ✅ Ready
 
 ```
 GET /admin/reviews/{review_id}
-Authorization: Bearer <admin_token>
+```
+
+**Success `200`**
+
+```json
+{
+  "review_id": "507f1f77bcf86cd799439011",
+  "status": "in_review",
+  "creator": {
+    "user_id": "507f1f77bcf86cd799439022",
+    "username": "john.doe",
+    "email": "john@example.com",
+    "account_type": "crew",
+    "bio": "10 years in film...",
+    "skills": ["Cinematography", "Lighting"],
+    "is_verified": false,
+    "spectrum_tier": "bronze"
+  },
+  "reviewer": {
+    "reviewer_id": "507f1f77bcf86cd799439033",
+    "username": "superadmin",
+    "email": "admin@spectrum.com"
+  },
+  "submitted_at": "2026-06-01T10:00:00",
+  "picked_up_at": "2026-06-01T11:00:00",
+  "submitted_portfolio_urls": ["https://vimeo.com/example"],
+  "submitted_notes": "Please review my recent work",
+  "resubmission_count": 0,
+  "scores": null
+}
 ```
 
 ---
 
-### 7.4 Self-Assign Review ✅ Ready
+### 8.4 Self-Assign Review ✅ Ready
 
 ```
 PATCH /admin/reviews/{review_id}/assign
-Authorization: Bearer <admin_token>
+```
+
+No request body needed — admin ID comes from JWT token.  
+Sets status `pending` / `resubmitted` → `in_review`.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "message": "Review assigned successfully.",
+  "review_id": "507f1f77bcf86cd799439011",
+  "new_status": "in_review"
+}
 ```
 
 ---
 
-### 7.5 Approve Review ✅ Ready
+### 8.5 Approve Review ✅ Ready
 
 ```
 PATCH /admin/reviews/{review_id}/approve
-Authorization: Bearer <admin_token>
 Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "review_notes": "Strong portfolio, excellent cinematography work.",
+  "verification_type": "standard",
+  "scores": {
+    "portfolio_score": 8,
+    "credential_score": 7,
+    "communication_score": 9
+  }
+}
+```
+
+| Field | Options | Required |
+|-------|---------|----------|
+| `verification_type` | `basic` · `standard` · `premium` · `elite` | ✅ |
+| `review_notes` | internal notes, max 2000 chars | ❌ |
+| `scores` | portfolio/credential/communication (1–10) | ❌ |
+
+**Effects:** Sets `User.is_verified = true`, stamps verification badge, sends approval email to creator.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "message": "Review approved.",
+  "review_id": "507f1f77bcf86cd799439011",
+  "new_status": "approved"
+}
 ```
 
 ---
 
-### 7.6 Reject Review ✅ Ready
+### 8.6 Reject Review ✅ Ready
 
 ```
 PATCH /admin/reviews/{review_id}/reject
-Authorization: Bearer <admin_token>
 Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "rejection_reasons": [
+    {
+      "code": "portfolio_insufficient",
+      "description": "Portfolio does not demonstrate required skill level"
+    }
+  ],
+  "rejection_feedback": "Please add at least 3 professional projects showing cinematography work.",
+  "review_notes": "Creator has potential but needs more experience.",
+  "scores": {
+    "portfolio_score": 4,
+    "credential_score": 5,
+    "communication_score": 7
+  }
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `rejection_reasons` | ✅ | At least 1 reason required |
+| `rejection_feedback` | ✅ | Sent to creator via email, min 10 chars |
+| `review_notes` | ❌ | Internal only, not shown to creator |
+| `scores` | ❌ | 1–10 per category |
+
+**Effects:** Sends rejection email with feedback. If creator has used all resubmissions (3), status becomes `permanently_rejected`.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "message": "Review rejected.",
+  "review_id": "507f1f77bcf86cd799439011",
+  "new_status": "rejected"
+}
 ```
 
 ---
@@ -1069,58 +1389,308 @@ Content-Type: application/json
 ## 9. Module: Skill Challenges
 
 > File: `app/api/routers/skill_challenge_router.py`  
-> Prefix: `/skill-challenges`
-
-### 8.1 List Pending Submissions ✅ Ready
-
-```
-GET /skill-challenges/submissions/pending
-Authorization: Bearer <admin_token>
-```
+> Prefix: `/skill-challenges`  
+> All admin endpoints require: `Authorization: Bearer <admin_token>`
 
 ---
 
-### 8.2 Evaluate Submission ✅ Ready
+### 9.1 All Submissions (Pending + Passed + Failed) ✅ Ready
 
 ```
-PATCH /skill-challenges/submissions/{submission_id}/evaluate
-Authorization: Bearer <admin_token>
-Content-Type: application/json
+GET /skill-challenges/submissions
 ```
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `status_filter` | string | `pending` · `evaluating` · `passed` · `failed` — omit for all |
+| `skill_category` | string | Filter by category |
+| `limit` | int | Default `20`, max `100` |
+| `offset` | int | Default `0` |
+
+**Success `200`**
 
 ```json
 {
-  "passed": true,
-  "score": 88,
-  "feedback": "Strong composition, minor issues with focus pulling."
+  "submissions": [
+    {
+      "submission_id": "507f1f77bcf86cd799439011",
+      "challenge_title": "Camera Operation — Intermediate",
+      "username": "john.doe",
+      "skill_category": "Camera",
+      "difficulty": "intermediate",
+      "content_type": "link",
+      "submission_url": "https://vimeo.com/example",
+      "attempt_number": 1,
+      "evaluation_status": "passed",
+      "overall_score": 8.2,
+      "pass_threshold": 7.0,
+      "passed": true,
+      "submitted_at": "2026-05-06T10:00:00",
+      "evaluated_at": "2026-05-07T14:30:00"
+    }
+  ],
+  "total": 3,
+  "pending_count": 1,
+  "passed_count": 1,
+  "failed_count": 1,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
 }
 ```
 
 ---
 
-### 8.3 Create Challenge ✅ Ready
+### 9.2 List Pending Submissions ✅ Ready
+
+```
+GET /skill-challenges/submissions/pending
+```
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `skill_category` | string | Filter by category: `Camera` · `Sound` · `Editing` · `VFX` · `Lighting` · etc. |
+| `limit` | int | Default `20`, max `100` |
+| `offset` | int | Default `0` |
+
+> Returns all submissions with status `pending` or `evaluating`, sorted oldest-first.
+
+**Success `200`**
+
+```json
+{
+  "submissions": [
+    {
+      "submission_id": "507f1f77bcf86cd799439011",
+      "challenge_id": "507f1f77bcf86cd799439022",
+      "challenge_title": "Advanced Camera Operator Test",
+      "skill_category": "Camera",
+      "difficulty": "advanced",
+      "user_id": "507f1f77bcf86cd799439033",
+      "username": "john.doe",
+      "content_type": "file_url",
+      "submission_url": "https://storage.example.com/submission.mp4",
+      "submission_notes": "My submission for the advanced camera test",
+      "attempt_number": 1,
+      "submitted_at": "2026-06-01T10:00:00"
+    }
+  ],
+  "total": 5,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
+}
+```
+
+---
+
+### 9.2 Evaluate Submission ✅ Ready
+
+```
+PATCH /skill-challenges/submissions/{submission_id}/evaluate
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "criterion_scores": [
+    {
+      "criterion_name": "Technical Accuracy",
+      "score": 8.5,
+      "feedback": "Excellent focus control and exposure handling"
+    },
+    {
+      "criterion_name": "Creativity",
+      "score": 7.0,
+      "feedback": "Good composition but could push boundaries more"
+    },
+    {
+      "criterion_name": "Presentation",
+      "score": 9.0,
+      "feedback": "Clean, well-edited submission"
+    }
+  ],
+  "evaluator_notes": "Strong work overall, ready for advanced-level badge"
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `criterion_scores` | ✅ | One entry per criterion defined in the challenge |
+| `criterion_name` | ✅ | Must match names from the challenge's `evaluation_criteria` |
+| `score` | ✅ | 0 to `max_score` for that criterion |
+| `feedback` | ❌ | Per-criterion feedback shown to creator |
+| `evaluator_notes` | ❌ | Internal admin notes, not shown to creator |
+
+> Weighted overall score is calculated automatically. If `overall_score >= pass_threshold`, creator passes and receives a badge.
+
+**Side effects on pass:**
+- `SkillBadge` created / upgraded
+- `User.spectrum_id.trust_score` +5
+- `User.spectrum_id.verification_checks_passed` += `"skill_verified"`
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "submission_id": "507f1f77bcf86cd799439011",
+  "evaluation_status": "passed",
+  "overall_score": 8.2,
+  "pass_threshold": 7.0,
+  "passed": true,
+  "badge_awarded": true,
+  "badge_info": {
+    "badge_id": "507f1f77bcf86cd799439099",
+    "skill_name": "Camera",
+    "badge_level": "advanced"
+  },
+  "message": "Submission passed. Badge awarded."
+}
+```
+
+---
+
+### 9.3 Create Challenge ✅ Ready
 
 ```
 POST /skill-challenges/
-Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "title": "Advanced Camera Operator Test",
+  "description": "Demonstrate your cinematography skills at an advanced level.",
+  "skill_category": "Camera",
+  "difficulty": "advanced",
+  "challenge_type": "task",
+  "instructions": "Record a 2-minute short film demonstrating...",
+  "evaluation_criteria": [
+    {
+      "criterion_name": "Technical Accuracy",
+      "weight": 0.4,
+      "max_score": 10,
+      "description": "Focus, exposure, and stabilization"
+    },
+    {
+      "criterion_name": "Creativity",
+      "weight": 0.3,
+      "max_score": 10,
+      "description": "Composition and storytelling"
+    },
+    {
+      "criterion_name": "Presentation",
+      "weight": 0.3,
+      "max_score": 10,
+      "description": "Editing and overall polish"
+    }
+  ],
+  "pass_threshold": 7.0,
+  "badge_level": "advanced",
+  "time_limit_minutes": 4320
+}
+```
+
+| Field | Options | Required |
+|-------|---------|----------|
+| `skill_category` | `Camera` · `Sound` · `Editing` · `VFX` · `Lighting` · `Directing` · `Producing` · `Writing` · `Design` · `Music` | ✅ |
+| `difficulty` | `beginner` · `intermediate` · `advanced` · `expert` | ✅ |
+| `challenge_type` | `task` · `quiz` · `project` | ✅ |
+| `evaluation_criteria` | weights must sum to exactly `1.0` | ✅ |
+| `pass_threshold` | 1.0 – 10.0, default `7.0` | ❌ |
+| `badge_level` | `verified` · `advanced` · `expert` · `master` | ❌ |
+| `time_limit_minutes` | 5 – 10080 (7 days) | ❌ |
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "message": "Challenge created successfully.",
+  "challenge_id": "507f1f77bcf86cd799439022"
+}
 ```
 
 ---
 
-### 8.4 Update Challenge ✅ Ready
+### 9.4 Update Challenge ✅ Ready
 
 ```
 PATCH /skill-challenges/{challenge_id}
-Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+Only provided fields are updated. All fields are optional.
+
+**Request body**
+
+```json
+{
+  "title": "Updated Camera Test Title",
+  "description": "Updated description",
+  "instructions": "Updated instructions...",
+  "pass_threshold": 8.0,
+  "badge_level": "expert",
+  "time_limit_minutes": 2880,
+  "is_active": false
+}
+```
+
+> Set `is_active: false` to deactivate a challenge without deleting it. Deactivated challenges no longer appear in the creator-facing browse list.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "message": "Challenge updated successfully.",
+  "challenge_id": "507f1f77bcf86cd799439022"
+}
 ```
 
 ---
 
-### 8.5 Revoke Badge ✅ Ready
+### 9.5 Revoke Badge ✅ Ready
 
 ```
 PATCH /skill-challenges/badges/{badge_id}/revoke
-Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "reason": "Badge obtained through plagiarized submission. Account under review."
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `reason` | ✅ | Min 5 chars, stored on badge record |
+
+**Side effects:**
+- `Badge.is_active = false`
+- Removed from `User.spectrum_id.badges`
+- `User.spectrum_id.trust_score` -5
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "badge_id": "507f1f77bcf86cd799439099",
+  "message": "Badge revoked successfully."
+}
 ```
 
 ---
@@ -1129,7 +1699,7 @@ Authorization: Bearer <admin_token>
 
 > File: `app/api/routers/admin_router.py`
 
-### 9.1 List All Escrow Transactions ✅ Ready
+### 10.1 List All Escrow Transactions ✅ Ready
 
 ```
 GET /admin/transactions
@@ -1159,9 +1729,11 @@ Authorization: Bearer <admin_token>
       "total_amount": 2500.00,
       "funded_amount": 2500.00,
       "released_amount": 2500.00,
+      "refunded_amount": 0.00,
       "currency": "USD",
       "client_id": "507f1f77bcf86cd799439011",
       "creator_id": "507f1f77bcf86cd799439066",
+      "project_id": "507f1f77bcf86cd799439077",
       "created_at": "2026-05-20T11:00:00"
     }
   ]
@@ -1170,12 +1742,91 @@ Authorization: Bearer <admin_token>
 
 ---
 
-### Planned Payment Endpoints *(next PR)*
+### 10.2 Get Escrow Detail ✅ Ready
 
 ```
-GET  /admin/payments/{id}      →  full escrow detail with milestones
-POST /admin/payments/{id}/refund →  body: { reason }
-GET  /admin/escrows            →  all escrow balances summary
+GET /admin/transactions/{escrow_id}
+Authorization: Bearer <admin_token>
+```
+
+**Success `200`**
+
+```json
+{
+  "id": "507f1f77bcf86cd799439055",
+  "status": "active",
+  "description": "Feature film production milestones",
+  "currency": "USD",
+  "total_amount": 5000.00,
+  "funded_amount": 2000.00,
+  "released_amount": 0.00,
+  "refunded_amount": 0.00,
+  "client": {
+    "id": "507f1f77bcf86cd799439011",
+    "username": "producer.john",
+    "email": "john@studio.com"
+  },
+  "creator": {
+    "id": "507f1f77bcf86cd799439066",
+    "username": "dp.sarah",
+    "email": "sarah@crew.com"
+  },
+  "milestones": [
+    {
+      "milestone_id": "uuid-here",
+      "title": "Pre-production",
+      "amount": 2000.00,
+      "status": "funded",
+      "funded_at": "2026-06-01T10:00:00",
+      "released_at": null,
+      "refunded_at": null
+    },
+    {
+      "milestone_id": "uuid-here-2",
+      "title": "Principal Photography",
+      "amount": 3000.00,
+      "status": "pending",
+      "funded_at": null,
+      "released_at": null,
+      "refunded_at": null
+    }
+  ],
+  "created_at": "2026-05-20T11:00:00",
+  "completed_at": null
+}
+```
+
+---
+
+### 10.3 Admin Force Refund ✅ Ready
+
+```
+POST /admin/transactions/{escrow_id}/refund
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "reason": "Client requested cancellation. Work not started."
+}
+```
+
+> Refunds all `funded` milestones back to the client. Sets escrow status → `refunded`.
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "escrow_id": "507f1f77bcf86cd799439055",
+  "refund_amount": 2000.00,
+  "new_status": "refunded",
+  "reason": "Client requested cancellation. Work not started.",
+  "message": "Refund of 2000.0 USD processed successfully."
+}
 ```
 
 ---
@@ -1184,7 +1835,7 @@ GET  /admin/escrows            →  all escrow balances summary
 
 > File: `app/api/routers/admin_router.py`
 
-### 10.1 ETF Platform Summary ✅ Ready
+### 11.1 ETF Platform Summary ✅ Ready
 
 ```
 GET /admin/etf/stats
@@ -1209,16 +1860,170 @@ Authorization: Bearer <admin_token>
 
 ---
 
-## 12. Module: Audit Log *(to build — PR 1)*
+## 12. Module: Audit Log
 
-> New file: `app/services/audit_service.py`  
-> New section in: `app/api/routers/admin_router.py`  
-> New model: `AuditLog` in `app/models/schema.py`
+> Model: `app/models/audit_log.py` — `AuditLog`  
+> Service: `app/services/audit_service.py` — `log_event()`  
+> Endpoints: `app/api/routers/admin_router.py` — prefix `/admin/audit`  
+> All endpoints require: `Authorization: Bearer <admin_token>`
 
-### 11.1 List Audit Events
+---
+
+### 12.1 List Audit Events ✅ Ready
 
 ```
 GET /admin/audit
+```
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `event_type` | string | e.g. `user.login` · `admin.user.suspended` |
+| `severity` | string | `debug` · `info` · `warning` · `error` · `critical` |
+| `actor_id` | string | Filter by who performed the action |
+| `target_id` | string | Filter by affected resource ID |
+| `since` | string | ISO datetime — entries after this timestamp (for live-tail polling) |
+| `limit` | int | Default `50`, max `100` |
+| `offset` | int | Default `0` |
+
+**Success `200`**
+
+```json
+{
+  "total": 48210,
+  "limit": 50,
+  "offset": 0,
+  "has_more": true,
+  "logs": [
+    {
+      "id": "507f1f77bcf86cd799439077",
+      "event_type": "admin.user.suspended",
+      "severity": "critical",
+      "actor_id": "507f1f77bcf86cd799439099",
+      "actor_username": "superadmin",
+      "actor_role": "admin",
+      "target_type": "user",
+      "target_id": "507f1f77bcf86cd799439011",
+      "ip_address": "192.168.1.1",
+      "request_method": "PATCH",
+      "request_path": "/admin/users/507f1f77bcf86cd799439011/suspend",
+      "metadata": {
+        "target_username": "john.doe",
+        "target_email": "john@example.com"
+      },
+      "created_at": "2026-06-07T08:45:00"
+    }
+  ]
+}
+```
+
+---
+
+### 12.2 Export Audit Log (CSV) ✅ Ready
+
+```
+GET /admin/audit/export
+```
+
+Accepts the same query params as 12.1. Returns `Content-Type: text/csv`, max 5000 rows.
+
+**CSV columns:** `id, event_type, severity, actor_username, actor_role, target_type, target_id, ip_address, request_method, request_path, metadata, created_at`
+
+---
+
+### 12.3 Auto-logged Events (wired in)
+
+These events are written automatically — no manual call needed:
+
+| Event | Severity | Trigger |
+|-------|----------|---------|
+| `user.login` | info | Successful login |
+| `user.login_failed` | warning | Bad password or username |
+| `admin.user.suspended` | critical | Admin suspends a user |
+| `admin.user.activated` | warning | Admin reactivates a user |
+| `admin.user.promoted` | critical | Admin changes user role |
+
+### 12.4 Full Event Type Reference
+
+| Event | Severity | Notes |
+|-------|----------|-------|
+| `user.signup` | info | New account created |
+| `user.login` | info | Successful login ✅ wired |
+| `user.login_failed` | warning | Bad credentials ✅ wired |
+| `user.email_verified` | info | Email confirmed |
+| `user.password_reset_requested` | info | |
+| `user.password_reset_completed` | warning | |
+| `job.created` | info | |
+| `job.applied` | info | |
+| `project.created` | info | |
+| `project.milestone_completed` | info | |
+| `payment.escrow_funded` | info | |
+| `payment.released` | info | |
+| `payment.refunded` | warning | |
+| `dispute.opened` | warning | |
+| `dispute.resolved` | info | |
+| `admin.user.suspended` | critical | ✅ wired |
+| `admin.user.activated` | warning | ✅ wired |
+| `admin.user.promoted` | critical | ✅ wired |
+| `admin.payment.refunded` | critical | |
+| `admin.content.removed` | warning | |
+| `system.error` | error | |
+| `system.rate_limit_hit` | warning | |
+
+---
+
+## 13. Module: Reports Inbox
+
+> Admin endpoints: `app/api/routers/admin_router.py` — prefix `/admin/reports`  
+> User endpoint: `app/api/routers/report_router.py` — prefix `/reports`  
+> Service: `app/services/report_service.py`  
+> Model: `app/models/report.py`
+
+---
+
+### 13.0 Submit a Report (User-facing) ✅ Ready
+
+```
+POST /reports
+Authorization: Bearer <user_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "target_type": "user",
+  "target_id": "507f1f77bcf86cd799439099",
+  "reason": "harassment",
+  "details": "This user has been sending threatening messages."
+}
+```
+
+| Field | Options | Required |
+|-------|---------|----------|
+| `target_type` | `user` · `job` · `review` · `project` · `message` | ✅ |
+| `target_id` | ID of the item being reported | ✅ |
+| `reason` | `harassment` · `spam` · `fake_profile` · `inappropriate_content` · `scam` · `copyright` · `other` | ✅ |
+| `details` | Optional longer description, max 2000 chars | ❌ |
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "report_id": "507f1f77bcf86cd799439088",
+  "message": "Report submitted. Our team will review it within 2-3 business days."
+}
+```
+
+---
+
+### 13.1 List All Reports ✅ Ready
+
+```
+GET /admin/reports
 Authorization: Bearer <admin_token>
 ```
 
@@ -1226,122 +2031,71 @@ Authorization: Bearer <admin_token>
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `page` | int | Default `1` |
-| `page_size` | int | Default `50`, max `100` |
-| `event_type` | string | e.g. `user.login`, `admin.user.suspended` |
-| `actor_id` | string | Filter by who did it |
-| `target_id` | string | Filter by affected resource |
-| `severity` | string | `debug` · `info` · `warning` · `error` · `critical` |
-| `since` | datetime | ISO 8601 — for live-tail polling |
-| `until` | datetime | ISO 8601 |
+| `status_filter` | string | `pending` · `under_review` · `resolved` · `dismissed` — omit for all |
+| `target_type` | string | `user` · `job` · `review` · `project` · `message` |
+| `limit` | int | Default `20`, max `100` |
+| `offset` | int | Default `0` |
 
 **Success `200`**
 
 ```json
 {
-  "total": 48210,
-  "page": 1,
-  "page_size": 50,
-  "has_more": true,
-  "events": [
-    {
-      "id": "507f1f77bcf86cd799439077",
-      "event_type": "admin.user.suspended",
-      "severity": "critical",
-      "actor_username": "superadmin",
-      "actor_role": "admin",
-      "target_type": "user",
-      "target_id": "507f1f77bcf86cd799439011",
-      "ip_address": "192.168.1.1",
-      "request_path": "/admin/users/507f.../suspend",
-      "request_method": "PATCH",
-      "metadata": { "reason": "Repeated ToS violations" },
-      "created_at": "2026-06-03T08:45:00"
-    }
-  ]
-}
-```
-
-### 11.2 Export Audit Log (CSV)
-
-```
-GET /admin/audit/export
-Authorization: Bearer <admin_token>
-```
-
-Accepts same query params. Returns `Content-Type: text/csv`.
-
----
-
-### Event Type Reference
-
-| Event | Severity |
-|-------|----------|
-| `user.signup` | info |
-| `user.login` | info |
-| `user.login_failed` | warning |
-| `user.email_verified` | info |
-| `user.password_reset_requested` | info |
-| `user.password_reset_completed` | warning |
-| `job.created` | info |
-| `job.applied` | info |
-| `project.created` | info |
-| `project.milestone_completed` | info |
-| `payment.escrow_funded` | info |
-| `payment.released` | info |
-| `payment.refunded` | warning |
-| `dispute.opened` | warning |
-| `dispute.resolved` | info |
-| `admin.user.suspended` | critical |
-| `admin.user.promoted` | critical |
-| `admin.user.viewed` | info |
-| `admin.payment.refunded` | critical |
-| `admin.content.removed` | warning |
-| `system.error` | error |
-| `system.rate_limit_hit` | warning |
-
----
-
-## 13. Module: Reports Inbox *(to build)*
-
-> New section in: `app/api/routers/admin_router.py`
-
-### 12.1 List Reports
-
-```
-GET /admin/reports
-Authorization: Bearer <admin_token>
-```
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `page` | int | Default `1` |
-| `page_size` | int | Default `25`, max `100` |
-| `status` | string | `pending` · `resolved` · `dismissed` |
-
-**Success `200`**
-
-```json
-{
-  "total": 3,
-  "page": 1,
-  "page_size": 25,
-  "has_more": false,
   "reports": [
     {
-      "id": "507f1f77bcf86cd799439088",
-      "reported_by": "507f1f77bcf86cd799439011",
+      "report_id": "507f1f77bcf86cd799439088",
+      "reported_by_id": "507f1f77bcf86cd799439011",
+      "reported_by_username": "john.doe",
       "target_type": "user",
       "target_id": "507f1f77bcf86cd799439099",
-      "reason": "Harassment in messages",
+      "reason": "harassment",
       "status": "pending",
       "created_at": "2026-06-02T16:10:00"
     }
-  ]
+  ],
+  "total": 4,
+  "pending_count": 2,
+  "under_review_count": 1,
+  "resolved_count": 1,
+  "dismissed_count": 0,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false
 }
 ```
 
-### 12.2 Resolve Report
+---
+
+### 13.2 Get Report Detail ✅ Ready
+
+```
+GET /admin/reports/{report_id}
+Authorization: Bearer <admin_token>
+```
+
+**Success `200`**
+
+```json
+{
+  "report_id": "507f1f77bcf86cd799439088",
+  "reported_by_id": "507f1f77bcf86cd799439011",
+  "reported_by_username": "john.doe",
+  "reported_by_email": "john@example.com",
+  "target_type": "user",
+  "target_id": "507f1f77bcf86cd799439099",
+  "reason": "harassment",
+  "details": "This user has been sending threatening messages.",
+  "status": "pending",
+  "assigned_to": null,
+  "action_taken": null,
+  "admin_note": null,
+  "resolved_at": null,
+  "created_at": "2026-06-02T16:10:00"
+}
+```
+
+---
+
+### 13.3 Resolve Report ✅ Ready
 
 ```
 PATCH /admin/reports/{report_id}/resolve
@@ -1349,17 +2103,58 @@ Authorization: Bearer <admin_token>
 Content-Type: application/json
 ```
 
+**Request body**
+
 ```json
 {
-  "action_taken": "user_suspended",
-  "note": "Confirmed harassment. User suspended for 30 days."
+  "action_taken": "suspend",
+  "admin_note": "Confirmed harassment. User suspended."
+}
+```
+
+| Field | Options | Required |
+|-------|---------|----------|
+| `action_taken` | `warn` · `suspend` · `remove_content` · `ban` · `no_action` | ✅ |
+| `admin_note` | Internal note, max 1000 chars | ❌ |
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "report_id": "507f1f77bcf86cd799439088",
+  "new_status": "resolved",
+  "message": "Report resolved."
+}
+```
+
+---
+
+### 13.4 Dismiss Report ✅ Ready
+
+```
+PATCH /admin/reports/{report_id}/dismiss
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "admin_note": "No policy violation found. Report dismissed."
 }
 ```
 
 **Success `200`**
 
 ```json
-{ "id": "507f1f77bcf86cd799439088", "status": "resolved" }
+{
+  "success": true,
+  "report_id": "507f1f77bcf86cd799439088",
+  "new_status": "dismissed",
+  "message": "Report dismissed."
+}
 ```
 
 ---
