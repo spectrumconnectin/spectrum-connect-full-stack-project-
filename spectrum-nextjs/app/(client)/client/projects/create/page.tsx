@@ -458,7 +458,7 @@ export default function CreateProjectPage() {
         </div>
       </div>
 
-      <div className="flex gap-8 items-start">
+      <div className="flex flex-col xl:flex-row gap-6 xl:gap-8 items-start">
 
       {/* ── Templates sidebar (right) ── */}
       <div className="hidden xl:block w-72 flex-shrink-0 sticky top-6 order-2">
