@@ -1451,6 +1451,30 @@ body { overflow-x: hidden; }
   }
 }
 
+/* ── Trust & Fairness two-column section ──────────────────────────────────── */
+@media (max-width: 767px) {
+  .trust-grid {
+    grid-template-columns: 1fr !important;
+    gap: 36px !important;
+  }
+  /* On mobile show the score card first, then the text */
+  .trust-grid > *:first-child {
+    order: 1;
+  }
+  .trust-grid > *:last-child {
+    order: 2;
+  }
+  /* Reduce trust score card padding */
+  .trust-grid > *:first-child {
+    padding: 24px !important;
+  }
+  /* Tighten the section padding */
+  section:has(.trust-grid) {
+    padding-top: 56px !important;
+    padding-bottom: 56px !important;
+  }
+}
+
 /* ── Auth pages — Mobile ──────────────────────────────────────────────────── */
 
 /* Hide the brand panel on mobile, show full-width form */

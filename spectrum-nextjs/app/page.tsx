@@ -292,7 +292,7 @@ export default function HomePage() {
 
       {/* ═══ TRUST & FAIRNESS ═══ */}
       <section style={{ padding: '90px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
+        <div className="trust-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
           <div className="mk-reveal-x" style={{ background: 'linear-gradient(135deg, #f8faff, #eff6ff)', border: '1px solid #bfdbfe', borderRadius: 24, padding: 36 }}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust Score</div>
