@@ -545,7 +545,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Stats strip */}
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100">
               <div className="text-center py-2 bg-gray-50 rounded-xl">
                 <p className="text-base font-bold text-gray-900">
                   {user?.stats?.projects_completed ?? user?.stats?.completed_credits ?? 0}
@@ -558,13 +558,54 @@ export default function ProfilePage() {
                 </p>
                 <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Rating</p>
               </div>
-              <div className="text-center py-2 bg-gray-50 rounded-xl">
-                <p className="text-base font-bold text-gray-900">
-                  {user?.stats?.response_time ? `${user.stats.response_time}h` : '—'}
-                </p>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">Response</p>
-              </div>
             </div>
+
+            {/* Response Time card */}
+            {(() => {
+              const rt = user?.stats?.response_time;
+              if (!rt || rt === 0) return (
+                <div className="mt-2 flex items-center gap-3 p-3 bg-sky-50 border border-sky-100 rounded-xl">
+                  <div className="w-9 h-9 bg-sky-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i className="fa-regular fa-clock text-sky-500 text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-700">Response Time</p>
+                    <p className="text-[11px] text-gray-400">Send messages to track</p>
+                  </div>
+                </div>
+              );
+              const timeStr = rt < 1    ? 'under 1 hour'
+                            : rt < 24   ? `~${Math.round(rt)} hour${Math.round(rt) !== 1 ? 's' : ''}`
+                            : `~${Math.round(rt / 24)} day${Math.round(rt / 24) !== 1 ? 's' : ''}`;
+              const isFast   = rt <= 2;
+              const isNormal = rt > 2 && rt < 12;
+              const isSlow   = rt >= 12 && rt < 24;
+              const badge    = isFast ? 'Fast' : isNormal ? 'Responsive' : isSlow ? 'Normal' : 'Moderate';
+              const badgeCls = isFast   ? 'bg-emerald-100 text-emerald-700'
+                             : isNormal ? 'bg-blue-100 text-blue-700'
+                             : isSlow   ? 'bg-amber-100 text-amber-700'
+                             : 'bg-gray-100 text-gray-600';
+              const bgCls    = isFast   ? 'bg-emerald-50 border-emerald-100'
+                             : isNormal ? 'bg-blue-50 border-blue-100'
+                             : isSlow   ? 'bg-amber-50 border-amber-100'
+                             : 'bg-gray-50 border-gray-100';
+              const iconCls  = isFast   ? 'bg-emerald-100 text-emerald-600'
+                             : isNormal ? 'bg-blue-100 text-cobalt'
+                             : isSlow   ? 'bg-amber-100 text-amber-600'
+                             : 'bg-gray-100 text-gray-500';
+              return (
+                <div className={`mt-2 flex items-center gap-3 p-3 ${bgCls} rounded-xl border`}>
+                  <div className={`w-9 h-9 ${iconCls} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <i className="fa-solid fa-clock text-sm" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-gray-500">Response Time</p>
+                    <p className="text-sm font-semibold text-gray-900">Avg. reply in {timeStr}</p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeCls} flex-shrink-0`}>{badge}</span>
+                </div>
+              );
+            })()}
 
             {/* Profile completion bar */}
             {(() => {

@@ -509,13 +509,6 @@ export default function CollaboratorProfilePage() {
               {[
                 { label: 'Completed', value: completedProjects > 0 ? String(completedProjects) : '0', icon: 'fa-circle-check', color: 'text-emerald-600' },
                 { label: 'Satisfaction', value: stats?.client_satisfaction ? `${stats.client_satisfaction.toFixed(0)}%` : (creator.rating ? `${(creator.rating * 20).toFixed(0)}%` : '—'), icon: 'fa-star', color: 'text-amber-500' },
-                { label: 'Response time', value: (() => {
-                    const rt = stats?.response_time;
-                    if (!rt || rt === 0) return '—';
-                    if (rt < 1) return '< 1h';
-                    if (rt < 24) return `~${Math.round(rt)}h`;
-                    return `~${Math.round(rt / 24)}d`;
-                  })(), icon: 'fa-clock', color: 'text-cobalt' },
                 { label: 'Active projects', value: stats?.active_projects != null ? String(stats.active_projects) : '0', icon: 'fa-briefcase', color: 'text-purple-600' },
               ].map(({ label, value, icon, color }) => (
                 <div key={label} className="text-center p-2.5 bg-gray-50 rounded-xl">
@@ -525,6 +518,56 @@ export default function CollaboratorProfilePage() {
                 </div>
               ))}
             </div>
+
+            {/* Response Time — prominent card */}
+            {(() => {
+              const rt = stats?.response_time;
+              if (!rt || rt === 0) return (
+                <div className="mt-3 flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i className="fa-regular fa-clock text-gray-400 text-sm" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-700">Response Time</p>
+                    <p className="text-[11px] text-gray-400">No message data yet</p>
+                  </div>
+                </div>
+              );
+              const isVeryFast = rt < 1;
+              const isFast    = rt >= 1 && rt <= 2;
+              const isNormal  = rt > 2  && rt < 12;
+              const isSlow    = rt >= 12 && rt < 24;
+              const timeStr   = isVeryFast ? 'under 1 hour'
+                              : isFast     ? `~${Math.round(rt)} hour${rt > 1 ? 's' : ''}`
+                              : isSlow     ? `~${Math.round(rt)} hours`
+                              : rt < 24    ? `~${Math.round(rt)} hours`
+                              : `~${Math.round(rt / 24)} day${rt / 24 >= 2 ? 's' : ''}`;
+              const badge     = isVeryFast || isFast ? 'Fast Responder' : isNormal ? 'Responsive' : isSlow ? 'Normal' : 'Moderate';
+              const badgeCls  = isVeryFast || isFast ? 'bg-emerald-100 text-emerald-700'
+                              : isNormal             ? 'bg-blue-100 text-blue-700'
+                              : isSlow               ? 'bg-amber-100 text-amber-700'
+                              : 'bg-gray-100 text-gray-600';
+              const bgCls     = isVeryFast || isFast ? 'bg-emerald-50 border-emerald-100'
+                              : isNormal             ? 'bg-blue-50 border-blue-100'
+                              : isSlow               ? 'bg-amber-50 border-amber-100'
+                              : 'bg-gray-50 border-gray-100';
+              const iconCls   = isVeryFast || isFast ? 'bg-emerald-100 text-emerald-600'
+                              : isNormal             ? 'bg-blue-100 text-cobalt'
+                              : isSlow               ? 'bg-amber-100 text-amber-600'
+                              : 'bg-gray-100 text-gray-500';
+              return (
+                <div className={`mt-3 flex items-center gap-3 p-3 ${bgCls} rounded-xl border`}>
+                  <div className={`w-9 h-9 ${iconCls} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                    <i className="fa-solid fa-clock text-sm" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-gray-500">Response Time</p>
+                    <p className="text-sm font-semibold text-gray-900">Typically replies within {timeStr}</p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeCls} flex-shrink-0`}>{badge}</span>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Previous Work — Platform track record */}
