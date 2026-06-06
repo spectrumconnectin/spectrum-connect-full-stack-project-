@@ -101,21 +101,6 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mk-reveal" style={{ marginTop: 16, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Free to join · No credit card required</p>
-            {/* Trust stats strip */}
-            <div className="mk-reveal" style={{ display: 'flex', gap: 28, marginTop: 30, paddingTop: 26, borderTop: '1px solid rgba(255,255,255,0.15)', flexWrap: 'wrap' }}>
-              {[
-                { v: '15K+', l: 'Verified Creators' },
-                { v: '4.9', l: 'Avg. Rating', star: true },
-                { v: '98%', l: 'On-Time Delivery' },
-              ].map(s => (
-                <div key={s.l}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                    {s.v}{s.star && <span style={{ color: '#fbbf24', display: 'inline-flex' }}><Icon.Star size={16} /></span>}
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.7)', marginTop: 5 }}>{s.l}</div>
-                </div>
-              ))}
-            </div>
           </div>
           {/* Floating profile cards + notifications */}
           <div className="mk-reveal-r hero-stage" style={{ position: 'relative', minHeight: 460 }}>
