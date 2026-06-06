@@ -13,10 +13,16 @@ class TalentService:
         limit: int = 30,
     ) -> List[User]:
         # Base filter: active creator accounts only — exclude soft-deleted and suspended users
+        # Beanie stores Optional fields as null in MongoDB, not as absent keys.
+        # "$exists: False" would never match null-valued fields, excluding everyone.
+        # Use "$or" to match both "field is null" and "field doesn't exist" (legacy docs).
         query: dict = {
             "account_type": "crew",
-            "is_active": {"$ne": False},      # exclude suspended accounts
-            "deleted_at": {"$exists": False},  # exclude soft-deleted accounts
+            "is_active": {"$ne": False},   # exclude suspended accounts (is_active = False)
+            "$or": [
+                {"deleted_at": {"$exists": False}},  # very old docs without the field
+                {"deleted_at": None},                # normal Beanie docs (stored as null)
+            ],
         }
         if q:
             query["$or"] = [
