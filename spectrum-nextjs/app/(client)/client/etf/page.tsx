@@ -82,7 +82,7 @@ export default function ClientEtfPage() {
     <>
       <section className="mb-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-          <h1 className="text-4xl font-bold text-gray-900">ETF — Earn Trust</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900">ETF — Earn Trust</h1>
           {level && <EtfBadge level={level} size="md" />}
         </div>
         <p className="text-gray-600">
@@ -167,7 +167,7 @@ export default function ClientEtfPage() {
       <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-2">What you unlock at each level</h2>
         <p className="text-sm text-gray-600 mb-6">Higher ETF levels make you a more trusted client — giving you access to top-ranked creators faster.</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
               level: 'Bronze', icon: 'fa-medal', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200',
@@ -209,7 +209,7 @@ export default function ClientEtfPage() {
           Genuine, on-platform activity is rewarded. Self-jobs, fake projects, and duplicate
           accounts never earn points.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
             { icon: 'fa-bullhorn',       label: 'Post a project',        pts: '+5' },
             { icon: 'fa-handshake',      label: 'Hire a creator',        pts: '+20' },

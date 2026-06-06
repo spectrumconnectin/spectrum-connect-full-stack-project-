@@ -196,7 +196,7 @@ export default function ClientDisputesPage() {
     <>
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Disputes</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Disputes</h1>
           <p className="text-lg text-gray-600">Manage project issues and track their resolution status.</p>
         </div>
         <button onClick={() => setShowModal(true)}

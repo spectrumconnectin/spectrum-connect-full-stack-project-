@@ -58,7 +58,7 @@ export default function CreatorDashboardPage() {
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-300 rounded-full opacity-20 blur-3xl" />
           <div className="relative z-10 max-w-3xl">
             <p className="text-blue-200 font-semibold uppercase tracking-widest text-sm mb-2">Welcome back</p>
-            <h1 className="text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
             <p className="text-blue-100 text-lg">
               {stats?.active_projects
                 ? `You have ${stats.active_projects} active project${stats.active_projects !== 1 ? 's' : ''}.`
@@ -74,7 +74,7 @@ export default function CreatorDashboardPage() {
       </section>
 
       {/* Stats strip */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {[
           {
             label: 'Total Earnings',
@@ -345,7 +345,7 @@ export default function CreatorDashboardPage() {
       {/* Quick actions */}
       <section className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-8">
         <h2 className="text-lg font-bold text-gray-900 mb-5">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { href: '/creator/projects', icon: 'fa-search', label: 'Find Projects', color: 'bg-blue-100 text-cobalt' },
             { href: '/creator/smart-connect', icon: 'fa-bolt', label: 'Smart Connect', color: 'bg-purple-100 text-purple-600' },

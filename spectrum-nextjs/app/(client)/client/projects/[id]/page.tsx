@@ -330,7 +330,7 @@ export default function ClientProjectDetailPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold text-gray-900 truncate">{job.title}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 truncate">{job.title}</h1>
               <span className={`text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0 ${
                 job.status === 'open' && (job.proposal_count ?? 0) > 0 ? 'bg-amber-100 text-amber-700' : STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'
               }`}>
@@ -508,14 +508,14 @@ export default function ClientProjectDetailPage() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Overview */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Job Overview</h2>
             {job.description ? (
               <p className="text-gray-600 leading-relaxed mb-6 whitespace-pre-line">{job.description}</p>
             ) : (
               <p className="text-gray-400 italic mb-6">No description provided.</p>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Budget',      value: budget,                           icon: 'fa-wallet' },
                 { label: 'Complexity',  value: job.complexity,                   icon: 'fa-gauge-high' },
@@ -533,7 +533,7 @@ export default function ClientProjectDetailPage() {
 
           {/* Skills */}
           {job.skills && job.skills.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Required Skills</h2>
               <div className="flex flex-wrap gap-2">
                 {job.skills.map(s => (
@@ -545,7 +545,7 @@ export default function ClientProjectDetailPage() {
 
           {/* Tags */}
           {job.tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Project Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {job.tags.map(t => (
@@ -566,9 +566,9 @@ export default function ClientProjectDetailPage() {
           />
 
           {/* Stats */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-5">Activity</h2>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-xl">
                 <div className="text-3xl font-bold text-cobalt">{job.proposal_count}</div>
                 <p className="text-sm text-gray-600 mt-1">Proposals received</p>

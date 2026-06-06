@@ -84,7 +84,7 @@ export default function ApplicantsPage() {
             <i className="fa-solid fa-arrow-left text-gray-600"></i>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Applicants</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Applicants</h1>
             <p className="text-gray-500">
               {loading ? 'Loading…' : `${applicants.length} application${applicants.length !== 1 ? 's' : ''} received`}
             </p>
@@ -133,7 +133,7 @@ export default function ApplicantsPage() {
       ) : (
         <div className="space-y-5">
           {filtered.map(a => (
-            <div key={a.id} className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm hover:border-cobalt transition">
+            <div key={a.id} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm hover:border-cobalt transition">
               <div className="flex items-start gap-5">
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">

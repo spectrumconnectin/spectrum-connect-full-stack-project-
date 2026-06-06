@@ -768,7 +768,7 @@ export default function ProfilePage() {
 
       {/* ── Right: tabs ── */}
       <div className="lg:col-span-2 space-y-6">
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto">
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition ${tab === t.key ? 'bg-white text-cobalt shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
@@ -779,9 +779,9 @@ export default function ProfilePage() {
 
         {/* Profile tab */}
         {tab === 'profile' && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-8">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
             <h3 className="text-xl font-bold text-gray-900 mb-6">Account Settings</h3>
-            <div className="grid sm:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <Field label="First Name"><input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={inp} /></Field>
               <Field label="Last Name"><input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className={inp} /></Field>
               <Field label="Email"><input type="email" value={user?.email ?? ''} readOnly className={inp + ' bg-gray-50 text-gray-400 cursor-not-allowed'} /></Field>
@@ -857,7 +857,7 @@ export default function ProfilePage() {
             {showExpForm && (
               <div className="border-2 border-cobalt rounded-2xl p-6">
                 <h4 className="font-bold text-gray-900 mb-5">{editExpIdx !== null ? 'Edit' : 'Add'} Experience</h4>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Job Title *"><input type="text" value={expForm.title} onChange={e => setExpForm(f => ({ ...f, title: e.target.value }))} className={inp} /></Field>
                   <Field label="Company"><input type="text" value={expForm.company ?? ''} onChange={e => setExpForm(f => ({ ...f, company: e.target.value }))} className={inp} /></Field>
                   <Field label="Location"><input type="text" value={expForm.location ?? ''} onChange={e => setExpForm(f => ({ ...f, location: e.target.value }))} placeholder="City, Country" className={inp} /></Field>
@@ -910,7 +910,7 @@ export default function ProfilePage() {
             {showEduForm && (
               <div className="border-2 border-cobalt rounded-2xl p-6 mb-8">
                 <h4 className="font-bold text-gray-900 mb-5">{editEduIdx !== null ? 'Edit' : 'Add'} Education</h4>
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Degree *"><input type="text" value={eduForm.degree} onChange={e => setEduForm(f => ({ ...f, degree: e.target.value }))} placeholder="Bachelor of Arts" className={inp} /></Field>
                   <Field label="Institution *"><input type="text" value={eduForm.institution} onChange={e => setEduForm(f => ({ ...f, institution: e.target.value }))} placeholder="UCLA" className={inp} /></Field>
                   <Field label="Field of Study"><input type="text" value={eduForm.field_of_study ?? ''} onChange={e => setEduForm(f => ({ ...f, field_of_study: e.target.value }))} placeholder="Film Production" className={inp} /></Field>
@@ -949,7 +949,7 @@ export default function ProfilePage() {
               {showCertForm && (
                 <div className="border-2 border-cobalt rounded-2xl p-6">
                   <h4 className="font-bold text-gray-900 mb-4">{editCertIdx !== null ? 'Edit' : 'Add'} Certification</h4>
-                  <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Name *"><input type="text" value={certForm.name} onChange={e => setCertForm(f => ({ ...f, name: e.target.value }))} className={inp} /></Field>
                     <Field label="Issuing Organization *"><input type="text" value={certForm.issuing_organization} onChange={e => setCertForm(f => ({ ...f, issuing_organization: e.target.value }))} className={inp} /></Field>
                     <Field label="Issue Date *"><input type="date" value={certForm.issue_date} onChange={e => setCertForm(f => ({ ...f, issue_date: e.target.value }))} className={inp} /></Field>

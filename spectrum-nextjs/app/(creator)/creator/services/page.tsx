@@ -544,7 +544,7 @@ export default function ServicesPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">My Services</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">My Services</h1>
           <p className="text-lg text-gray-600">Manage your gigs and offerings for clients.</p>
         </div>
         <button onClick={openCreate} className="px-5 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm">
@@ -553,7 +553,7 @@ export default function ServicesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {[
           { label: 'Active Services', value: activeCount, icon: 'fa-circle-check', color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Total Orders', value: totalOrders, icon: 'fa-bag-shopping', color: 'text-cobalt', bg: 'bg-blue-50' },
@@ -609,7 +609,7 @@ export default function ServicesPage() {
           )}
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filtered.map(s => (
             <ServiceCardItem key={s.id} service={s} onEdit={openEdit} onToggle={handleToggle} onDelete={handleDelete} />
           ))}

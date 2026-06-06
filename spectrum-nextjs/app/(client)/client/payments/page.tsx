@@ -864,7 +864,7 @@ export default function PaymentsPage() {
       ) : (
         <>
           {/* Summary cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
             <div className="bg-gradient-to-br from-cobalt to-blue-600 text-white rounded-2xl p-6 shadow-lg">
               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-4">
                 <i className="fa-solid fa-wallet text-lg"></i>
@@ -919,7 +919,7 @@ export default function PaymentsPage() {
           )}
 
           {/* Transactions table */}
-          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden overflow-x-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 flex-wrap gap-4">
               <div className="flex items-center gap-3 flex-wrap">
                 <h2 className="text-xl font-bold text-gray-900">Transaction History</h2>

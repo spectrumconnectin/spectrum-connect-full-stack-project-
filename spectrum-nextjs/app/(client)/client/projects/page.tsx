@@ -95,7 +95,7 @@ export default function ClientProjectsPage() {
       <section className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">My Projects</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">My Projects</h1>
             <p className="text-gray-600">Manage and track all your job postings</p>
           </div>
           <Link href="/client/projects/create"
@@ -122,7 +122,7 @@ export default function ClientProjectsPage() {
             <div className="relative">
               <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
               <input type="text" placeholder="Search projects" value={search} onChange={e => setSearch(e.target.value)}
-                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-cobalt focus:outline-none w-64" />
+                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-cobalt focus:outline-none w-full sm:w-64" />
             </div>
           </div>
         </div>
@@ -179,7 +179,7 @@ export default function ClientProjectsPage() {
                       )}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                     <div><p className="text-gray-500 mb-1">Budget</p><p className="font-semibold text-gray-900">{formatBudget(p)}</p></div>
                     <div><p className="text-gray-500 mb-1">Complexity</p><p className="font-semibold text-gray-900 capitalize">{p.complexity}</p></div>
                     <div><p className="text-gray-500 mb-1">Crew Size</p><p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p></div>

@@ -110,7 +110,7 @@ export default function CreatorSmartConnectPage() {
     <>
       <section className="mb-10">
         <div className="max-w-3xl">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Smart Connect</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">Smart Connect</h1>
           <p className="text-lg text-gray-600 mb-1">Projects matched to your skills — no searching, no guesswork.</p>
           <p className="text-sm text-gray-500">Updated automatically as new jobs are posted.</p>
         </div>

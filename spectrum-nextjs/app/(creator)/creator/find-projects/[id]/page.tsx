@@ -94,7 +94,7 @@ export default function JobDetailPage() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Header */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
               <div>
                 <div className="flex items-center gap-3 flex-wrap mb-2">
@@ -162,7 +162,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Description */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Project Description</h2>
             {job.description ? (
               <p className="text-gray-600 leading-relaxed whitespace-pre-line">{job.description}</p>
@@ -173,7 +173,7 @@ export default function JobDetailPage() {
 
           {/* Skills */}
           {job.skills && job.skills.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Required Skills</h2>
               <div className="flex flex-wrap gap-2">
                 {job.skills.map(s => (
@@ -185,7 +185,7 @@ export default function JobDetailPage() {
 
           {/* Tags */}
           {job.tags && job.tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {job.tags.map(t => (

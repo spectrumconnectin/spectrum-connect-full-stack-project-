@@ -150,7 +150,7 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
   const visibleMsgs = msgs.filter(m => !m.is_deleted);
 
   return (
-    <div className="flex flex-col" style={{ height: '640px' }}>
+    <div className="flex flex-col" style={{ height: 'min(640px, calc(100vh - 200px))' }}>
 
       {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 bg-gray-50/60 rounded-2xl border border-gray-100 mb-3">
@@ -372,7 +372,7 @@ function MilestonesTab({ escrowDetail, role, onRefresh, onRequestRevision }: {
       </div>
 
       {/* Escrow summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Total', value: `$${escrowDetail.total_amount.toLocaleString()}`, color: 'text-gray-900' },
           { label: 'In Escrow', value: `$${(escrowDetail.funded_amount - escrowDetail.released_amount).toLocaleString()}`, color: 'text-cobalt' },
@@ -1298,7 +1298,7 @@ function ProgressTab({ projectId, role, escrowDetail }: {
             <div className={`h-3 rounded-full transition-all duration-500 ${paymentPct === 100 ? 'bg-emerald-500' : 'bg-cobalt'}`}
               style={{ width: `${paymentPct}%` }} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { label: 'Escrow total',  value: `$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: 'text-gray-700' },
               { label: 'Locked',        value: `$${(total - released).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: total > released ? 'text-cobalt' : 'text-gray-400' },

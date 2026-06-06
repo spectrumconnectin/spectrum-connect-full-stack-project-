@@ -429,7 +429,7 @@ export default function CreatorWorkspacePage() {
 
       {/* Escrow status bar (if hired) */}
       {data.status === 'accepted' && escrow && (
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
             <p className="text-xs text-gray-500 mb-1">Total Escrow</p>
             <p className="text-2xl font-bold text-gray-900">${escrow.total_amount.toLocaleString()}</p>

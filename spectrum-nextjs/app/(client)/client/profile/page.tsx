@@ -404,9 +404,9 @@ export default function ClientProfilePage() {
       <div className="lg:col-span-2 space-y-6">
 
         {/* Account Settings */}
-        <div id="settings" className="bg-white rounded-2xl border border-gray-200 p-8 scroll-mt-24">
+        <div id="settings" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 scroll-mt-24">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Account Settings</h3>
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Field label="First Name">
               <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={inp} />
             </Field>
@@ -462,7 +462,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Change Password */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Change Password</h3>
           <div className="space-y-4 max-w-md">
             <Field label="Current Password">
@@ -485,7 +485,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Notifications */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Notifications</h3>
           <div className="space-y-1">
             {notifDefs.map(n => (
@@ -537,7 +537,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white rounded-2xl border border-rose-200 p-8">
+        <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-rose-700 mb-2">Danger Zone</h3>
           <p className="text-sm text-gray-600 mb-5">
             Deactivating your account will hide your profile from creators. You can reactivate any time.

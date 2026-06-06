@@ -91,7 +91,7 @@ export default function ClientDashboardPage() {
               <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-2">
                 {hasProjects ? 'Welcome back' : 'Welcome to Spectrum Connect'}
               </p>
-              <h1 className="text-4xl font-bold mb-3">{userName || 'Client'}</h1>
+              <h1 className="text-2xl md:text-4xl font-bold mb-3">{userName || 'Client'}</h1>
               <p className="text-blue-100 text-lg max-w-md">
                 {hasProjects
                   ? `You have ${jobs.filter(j => j.status !== 'draft' && j.status !== 'completed').length} active project${jobs.filter(j => j.status !== 'draft' && j.status !== 'completed').length !== 1 ? 's' : ''}.`

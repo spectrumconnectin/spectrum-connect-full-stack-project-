@@ -166,7 +166,7 @@ export default function ProjectApplicationPage() {
             )}
 
             {/* Cover letter */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
                   <i className="fa-solid fa-pen text-cobalt text-sm"></i>
@@ -185,7 +185,7 @@ export default function ProjectApplicationPage() {
             </div>
 
             {/* Proposal */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
                   <i className="fa-solid fa-wallet text-green-600 text-sm"></i>
@@ -250,7 +250,7 @@ export default function ProjectApplicationPage() {
             </div>
 
             {/* Portfolio / Drive link */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
                   <i className="fa-brands fa-google-drive text-purple-600 text-sm"></i>

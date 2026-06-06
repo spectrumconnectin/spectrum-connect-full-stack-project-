@@ -146,7 +146,7 @@ function MyWorkInner() {
       <section className="mb-8">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">My Work</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">My Work</h1>
             <p className="text-gray-600">Your applications and active projects, all in one place.</p>
           </div>
           <Link href="/creator/find-projects"
@@ -157,7 +157,7 @@ function MyWorkInner() {
       </section>
 
       {/* Stats */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         {[
           { label: 'Total Applied',  value: appCounts.total,       icon: 'fa-paper-plane',  bg: 'bg-blue-50',    iconColor: 'text-cobalt' },
           { label: 'Under Review',   value: appCounts.submitted,   icon: 'fa-clock',        bg: 'bg-amber-50',   iconColor: 'text-amber-600' },

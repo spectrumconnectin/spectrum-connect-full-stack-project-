@@ -288,7 +288,7 @@ export default function CollaboratorProfilePage() {
 
           {/* Bio & Skills */}
           {(pr?.bio || pr?.tagline || skills.length > 0) && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">About</h2>
               {pr?.tagline && <p className="text-cobalt font-semibold mb-3 text-base">{pr.tagline}</p>}
               {pr?.bio && <p className="text-gray-600 leading-relaxed whitespace-pre-line">{pr.bio}</p>}
@@ -306,7 +306,7 @@ export default function CollaboratorProfilePage() {
           )}
 
           {/* Portfolio — the most important section for decision-making */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-1">Portfolio</h2>
             <p className="text-sm text-gray-500 mb-5">Up to 2 videos and 3 images</p>
             <PortfolioSection editable={false} userId={id as string} />
@@ -314,7 +314,7 @@ export default function CollaboratorProfilePage() {
 
           {/* Experience */}
           {experience.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Experience</h2>
               <div className="space-y-5">
                 {experience.map((exp, i) => (
@@ -341,7 +341,7 @@ export default function CollaboratorProfilePage() {
 
           {/* Education */}
           {education.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Education</h2>
               <div className="space-y-5">
                 {education.map((edu, i) => (
@@ -365,7 +365,7 @@ export default function CollaboratorProfilePage() {
 
           {/* Certifications */}
           {certifications.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Certifications</h2>
               <div className="space-y-4">
                 {certifications.map((cert, i) => (
@@ -385,7 +385,7 @@ export default function CollaboratorProfilePage() {
           )}
 
           {/* ── Reviews Section ── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Client Reviews</h2>

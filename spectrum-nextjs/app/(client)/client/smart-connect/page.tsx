@@ -161,13 +161,13 @@ function SmartConnectInner() {
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Smart Connect</h1>
+        <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Smart Connect</h1>
         <p className="text-lg text-gray-600">Discover and connect with top creative talent for your projects.</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
         <section className="lg:col-span-1">
-          <div className="bg-white rounded-2xl border border-gray-200 p-7 sticky top-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 md:p-7 sticky top-6">
             <h2 className="text-lg font-bold text-gray-900 mb-5">Find Creators</h2>
             <form onSubmit={handleSearch} className="space-y-4">
               <div>

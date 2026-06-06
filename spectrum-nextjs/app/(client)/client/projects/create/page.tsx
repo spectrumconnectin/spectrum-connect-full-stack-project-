@@ -198,7 +198,7 @@ function FeePreview({ budget }: { budget: string }) {
         <i className="fa-solid fa-receipt text-cobalt text-sm"></i>
         <span className="text-sm font-bold text-cobalt">Fee Preview — based on ${fmt(amount)}</span>
       </div>
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4">
         {/* Client side */}
         <div className="bg-white rounded-xl p-4 border border-blue-100">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
@@ -453,7 +453,7 @@ export default function CreateProjectPage() {
           <i className="fa-solid fa-arrow-left text-gray-600 text-sm"></i>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Create a Project</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Create a Project</h1>
           <p className="text-gray-500 text-sm mt-0.5">Fill in your project details and publish to start receiving proposals</p>
         </div>
       </div>
@@ -545,7 +545,7 @@ export default function CreateProjectPage() {
       <form onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0 order-1">
 
         {/* ── 1. Project Information ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('circle-info', 'bg-blue-100 text-cobalt', 'Project Information', 'What are you working on?')}
           <div className="space-y-5">
             <div>
@@ -588,7 +588,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 2. Project Goals ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('bullseye', 'bg-purple-100 text-purple-600', 'Project Goals', 'What are you trying to achieve?')}
           <div className="space-y-2">
             {tagInput(goalInput, setGoalInput, () => addItem(goalInput, goals, setGoals, setGoalInput), 'e.g. Increase brand awareness, Launch product — press Enter')}
@@ -607,7 +607,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 3. Deliverables ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('box-open', 'bg-emerald-100 text-emerald-600', 'Deliverables', 'What should the creator produce?')}
           <div className="space-y-2">
             {tagInput(delivInput, setDelivInput, () => addItem(delivInput, deliverables, setDeliverables, setDelivInput), 'e.g. 60-second video, 3 logo concepts — press Enter')}
@@ -626,7 +626,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 4. Budget ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Project Budget', 'Fixed price — what is this project worth?')}
           <div className="space-y-5">
             {/* Quick-select chips */}
@@ -678,7 +678,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 5. Location & Work Type ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('location-dot', 'bg-rose-100 text-rose-600', 'Location & Work Type', 'Is this an in-person, on-site, or remote project?')}
           <div className="space-y-5">
             {/* Work type */}
@@ -732,7 +732,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 6. Timeline & Skills ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
           {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
           <div className="space-y-5">
             <div>

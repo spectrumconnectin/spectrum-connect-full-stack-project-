@@ -83,7 +83,7 @@ export default function EarningsPage() {
 
   return (
     <>
-      <div className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Earnings</h1>
           <p className="text-lg text-gray-600">Your income, payouts, and pending balances at a glance.</p>
@@ -109,7 +109,7 @@ export default function EarningsPage() {
       ) : (
         <>
           {/* Balance cards */}
-          <div className="grid lg:grid-cols-3 gap-6 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
             <div className="lg:col-span-2 bg-gradient-to-br from-cobalt via-blue-600 to-blue-500 rounded-3xl p-10 text-white relative overflow-hidden shadow-xl">
               <div className="absolute top-0 right-0 w-96 h-96 bg-purple-400 rounded-full opacity-20 blur-3xl pointer-events-none"></div>
               <div className="relative">

@@ -109,7 +109,7 @@ export default function FindProjectsPage() {
       {/* ── Hero search ── */}
       <section className="mb-8">
         <div className="max-w-3xl mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Find Projects</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Find Projects</h1>
           <p className="text-lg text-gray-500">Browse film & creative opportunities that match your skills.</p>
         </div>
 
