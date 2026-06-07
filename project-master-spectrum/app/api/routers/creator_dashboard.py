@@ -208,7 +208,7 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
             for app in apps:
                 job = team_job_map.get(str(app.project_id))
                 # Skip jobs that are fully completed — only show genuinely active work
-                if not job or job.status in ("completed", "cancelled", "rejected"):
+                if not job or job.status in ("completed", "approved", "cancelled", "rejected", "closed"):
                     continue
                 deadline = job.deadline if job else None
                 remaining_days = max(0, (deadline - datetime.utcnow()).days) if deadline else None
