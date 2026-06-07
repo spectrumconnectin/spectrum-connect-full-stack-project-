@@ -75,8 +75,7 @@ export const metadata: Metadata = {
     canonical: BASE_URL,
   },
   verification: {
-    // Add your Google Search Console verification code here after claiming:
-    // google: "YOUR_GSC_VERIFICATION_CODE",
+    google: "XR80nGBlQlsK6W0ImCuz448NXGFBHc_SBpnN0UrEHyw",
   },
 };
 
