@@ -32,6 +32,9 @@ from beanie import PydanticObjectId
 
 from app.models.schema import User, CrewProfile
 from app.services.workforce_balance_service import WorkforceBalanceService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -170,11 +173,18 @@ class SmartConnectService:
                 score_breakdown["location"] = loc_score
 
                 # 5. Rating bonus (max 5 pts)
+                # Primary: CrewProfile.rating (synced by proposals_router on submission).
+                # Fallback: User.profile.rating (where review writes it).
                 rating_score = 0
-                if crew_profile.rating and crew_profile.rating.overall:
-                    rating_score = min(5, int(crew_profile.rating.overall))
-                    if crew_profile.rating.overall >= 4.5:
-                        reasons.append(f"Highly rated ({crew_profile.rating.overall:.1f})")
+                _rating_val = (
+                    (crew_profile.rating.overall if crew_profile.rating else None)
+                    or (user.profile.rating if user.profile else None)
+                    or 0.0
+                )
+                if _rating_val:
+                    rating_score = min(5, int(_rating_val))
+                    if _rating_val >= 4.5:
+                        reasons.append(f"Highly rated ({_rating_val:.1f})")
                 score += rating_score
                 score_breakdown["rating"] = rating_score
 
@@ -230,6 +240,50 @@ class SmartConnectService:
                 score += portfolio_bonus
                 score_breakdown["portfolio"] = portfolio_bonus
 
+                # 10. Previous Projects / track record (max 10 pts).
+                # Rewards creators who have successfully completed projects on the platform.
+                prev_score = 0
+                if user.stats and user.stats.projects_completed:
+                    completed = user.stats.projects_completed
+                    if completed >= 10:
+                        prev_score = 10
+                        reasons.append(f"Experienced: {completed} projects completed")
+                    elif completed >= 5:
+                        prev_score = 7
+                        reasons.append(f"{completed} projects completed")
+                    elif completed >= 1:
+                        prev_score = 3
+                score += prev_score
+                score_breakdown["previous_projects"] = prev_score
+
+                # 11. Response Rate / speed (max 5 pts).
+                # Faster responders score higher — response_time is in hours.
+                response_score = 0
+                if user.stats and user.stats.response_time is not None:
+                    rt = user.stats.response_time
+                    if rt <= 2:
+                        response_score = 5
+                        reasons.append("Fast responder (<2h)")
+                    elif rt <= 12:
+                        response_score = 3
+                        reasons.append(f"~{rt}h response time")
+                    elif rt <= 24:
+                        response_score = 1
+                score += response_score
+                score_breakdown["response_rate"] = response_score
+
+                # 12. Category / department experience (max 10 pts).
+                # Bonus when the project's type aligns with the creator's listed departments.
+                category_score = 0
+                if project_type and crew_profile.departments:
+                    for dept in crew_profile.departments:
+                        if project_type.lower() in dept.lower() or dept.lower() in project_type.lower():
+                            category_score = 10
+                            reasons.append(f"Category match: {dept}")
+                            break
+                score += category_score
+                score_breakdown["category_experience"] = category_score
+
                 # Threshold and match level
                 if score < 20:
                     continue
@@ -252,9 +306,15 @@ class SmartConnectService:
                         "role": crew_profile.title,
                         "avatar": user.profile.profile_picture,
                         "location": user.profile.location,
-                        "rating": crew_profile.rating.overall if crew_profile.rating else 0.0,
+                        "rating": (
+                            (crew_profile.rating.overall if crew_profile.rating else None)
+                            or getattr(user, "rating", None)
+                            or 0.0
+                        ),
                         "total_reviews": (
-                            crew_profile.rating.total_reviews if crew_profile.rating else 0
+                            (crew_profile.rating.total_reviews if crew_profile.rating else None)
+                            or getattr(user, "review_count", None)
+                            or 0
                         ),
                         "skills": [
                             s.name if hasattr(s, "name") else s
@@ -266,7 +326,7 @@ class SmartConnectService:
                         ),
                         "bio": user.profile.bio,
                         "daily_rate": crew_profile.daily_rate,
-                        "availability": "Available" if crew_profile.availability else None,
+                        "availability": (user.settings.availability_status if user.settings and user.settings.availability_status else ("available" if crew_profile.availability else None)),
                         "active_project_count": crew_profile.active_project_count,
                         "workload_capacity": crew_profile.workload_capacity,
                         "trust_tier": tier_label,
@@ -311,7 +371,7 @@ class SmartConnectService:
             }
 
         except Exception as e:
-            print(f"[SmartConnectService] smart_match error: {e}")
+            logger.error("[SmartConnectService] smart_match error: %s", e)
             return {"matches": [], "total_matches": 0, "search_criteria": {}}
 
     @staticmethod
@@ -437,7 +497,7 @@ class SmartConnectService:
             }
 
         except Exception as e:
-            print(f"[SmartConnectService] search_creatives error: {e}")
+            logger.error("[SmartConnectService] search_creatives error: %s", e)
             return {"creatives": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
 
     @staticmethod
@@ -495,7 +555,7 @@ class SmartConnectService:
             return creatives
 
         except Exception as e:
-            print(f"[SmartConnectService] get_featured_creatives error: {e}")
+            logger.error("[SmartConnectService] get_featured_creatives error: %s", e)
             return []
 
     @staticmethod
@@ -517,7 +577,7 @@ class SmartConnectService:
             return {"success": True, "message": "Profile saved successfully"}
 
         except Exception as e:
-            print(f"[SmartConnectService] save_profile error: {e}")
+            logger.error("[SmartConnectService] save_profile error: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -577,5 +637,5 @@ class SmartConnectService:
             return {"profiles": profiles, "total": len(profiles)}
 
         except Exception as e:
-            print(f"[SmartConnectService] get_saved_profiles error: {e}")
+            logger.error("[SmartConnectService] get_saved_profiles error: %s", e)
             return {"profiles": [], "total": 0}

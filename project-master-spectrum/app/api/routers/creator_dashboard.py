@@ -84,8 +84,6 @@ def _skill_set(user: User) -> set[str]:
 
 @router.get("", response_model=CreatorDashboardResponse)
 async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
-    # Stats
-    stats = current_user.stats or {}
     name = (
         (current_user.profile.display_name if current_user.profile else None)
         or (
@@ -95,13 +93,74 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
         )
         or current_user.username
     )
+
+    # ── Compute stats live from real data ────────────────────────────────────
+    active_projects_count = 0
+    projects_completed_count = 0
+    total_earnings = 0.0
+
+    try:
+        # Fetch all accepted applications in one query
+        all_apps = await Application.find(
+            {"crew_id": current_user.id, "status": "accepted"}
+        ).to_list()
+
+        project_ids = [app.project_id for app in all_apps if app.project_id]
+        if project_ids:
+            # Single batch query instead of N individual gets
+            all_jobs = await JobPost.find({"_id": {"$in": project_ids}}).to_list()
+            job_status_map = {str(j.id): j.status for j in all_jobs}
+            for pid in project_ids:
+                status = job_status_map.get(str(pid), "")
+                if status == "completed":
+                    projects_completed_count += 1
+                elif status in ("in_progress", "delivered", "approved", "pending_funding"):
+                    active_projects_count += 1
+    except Exception:
+        pass
+
+    try:
+        from app.models.schema import Transaction as TxModel
+        # Transaction uses to_user_id for the recipient (creator)
+        txns = await TxModel.find({
+            "to_user_id": current_user.id,
+            "status": "completed",
+        }).to_list()
+        total_earnings = round(sum(float(t.net_amount or 0) for t in txns), 2)
+    except Exception:
+        total_earnings = 0.0
+
+    # client_satisfaction from User.profile.rating (where reviews write it)
+    satisfaction = (current_user.profile.rating if current_user.profile else None) or 0.0
+    # Convert 0–5 star rating to a 0–100% value for the UI
+    satisfaction_pct = round(satisfaction * 20, 1) if satisfaction else 0.0
+
+    # response_time is stored on user.stats if set
+    response_time_h = 0
+    if current_user.stats and getattr(current_user.stats, "response_time", None):
+        response_time_h = current_user.stats.response_time
+
+    # Persist computed stats back to user.stats so other views (public profile) also benefit
+    try:
+        from app.models.schema import UserStats
+        if not current_user.stats:
+            current_user.stats = UserStats()
+        current_user.stats.active_projects = active_projects_count
+        current_user.stats.projects_completed = projects_completed_count
+        current_user.stats.completed_credits = projects_completed_count
+        current_user.stats.total_earnings = total_earnings
+        current_user.stats.client_satisfaction = satisfaction_pct
+        await current_user.save()
+    except Exception:
+        pass
+
     dashboard_stats = DashboardStats(
         name=name,
-        total_earnings=stats.total_earnings if hasattr(stats, "total_earnings") else 0,
-        active_projects=stats.active_projects if hasattr(stats, "active_projects") else 0,
-        projects_completed=getattr(stats, "projects_completed", 0),
-        client_satisfaction=getattr(stats, "client_satisfaction", 0),
-        response_time_hours=stats.response_time if hasattr(stats, "response_time") else 0,
+        total_earnings=total_earnings,
+        active_projects=active_projects_count,
+        projects_completed=projects_completed_count,
+        client_satisfaction=satisfaction_pct if satisfaction_pct else None,
+        response_time_hours=response_time_h,
     )
 
     # Opportunities (simple match using overlap of skills with open jobs)
@@ -133,7 +192,7 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
     except Exception:
         opportunities = []
 
-    # Active teams (accepted/shortlisted applications)
+    # Active teams — batch job lookup (no N+1)
     active_teams: List[ActiveTeam] = []
     try:
         apps = await Application.find(
@@ -142,52 +201,66 @@ async def get_creator_dashboard(current_user: User = Depends(get_current_user)):
                 "status": {"$in": ["accepted", "in_progress", "shortlisted", "interviewing"]},
             }
         ).to_list(5)
-        for app in apps:
-            job = await JobPost.get(app.project_id) if app.project_id else None
-            deadline = job.deadline if job else None
-            remaining_days = None
-            if deadline:
-                remaining_days = max(0, (deadline - datetime.utcnow()).days)
-            active_teams.append(
-                ActiveTeam(
+        if apps:
+            team_job_ids = [app.project_id for app in apps if app.project_id]
+            team_jobs = await JobPost.find({"_id": {"$in": team_job_ids}}).to_list()
+            team_job_map = {str(j.id): j for j in team_jobs}
+            for app in apps:
+                job = team_job_map.get(str(app.project_id))
+                deadline = job.deadline if job else None
+                remaining_days = max(0, (deadline - datetime.utcnow()).days) if deadline else None
+                active_teams.append(ActiveTeam(
                     project_id=str(app.project_id),
                     title=job.title if job else "Project",
                     role=app.role,
                     status=app.status,
                     time_remaining_days=remaining_days,
                     avatar_urls=[],
-                )
-            )
+                ))
     except Exception:
         active_teams = []
 
-    # Recent messages (conversation last_message)
+    # Recent messages — batch user lookup (no N+1)
     messages: List[MessagePreview] = []
     try:
-        # New Conversation model has participants as list of user_id strings
-        conversations = await Conversation.find({"participants": str(current_user.id)}).sort("-last_message_at").limit(5).to_list()
+        conversations = await Conversation.find(
+            {"participants": str(current_user.id)}
+        ).sort("-last_message_at").limit(5).to_list()
+
+        # Collect all other-participant IDs, then fetch in one batch
+        other_ids = []
         for conv in conversations:
             if not conv.last_message:
                 continue
-            # Find other participant (participants is now a list of user_id strings)
-            other_participant_id = next(
-                (p for p in conv.participants if str(p) != str(current_user.id)), None
-            )
-            other_user: Optional[User] = None
-            if other_participant_id:
-                try:
-                    other_user = await User.get(other_participant_id)
-                except Exception:
-                    other_user = None
-            messages.append(
-                MessagePreview(
-                    id=str(conv.id),
-                    name=other_user.profile.display_name if other_user and other_user.profile else (conv.job_title or "Conversation"),
-                    text=conv.last_message,
-                    timestamp=conv.last_message_at,
-                    avatar=other_user.profile.profile_picture if other_user and other_user.profile else None,
-                )
-            )
+            oid = next((p for p in conv.participants if str(p) != str(current_user.id)), None)
+            if oid:
+                other_ids.append(oid)
+
+        if other_ids:
+            from beanie import PydanticObjectId as _OID
+            try:
+                other_users_list = await User.find(
+                    {"_id": {"$in": [_OID(x) for x in other_ids]}}
+                ).to_list()
+                user_map = {str(u.id): u for u in other_users_list}
+            except Exception:
+                user_map = {}
+        else:
+            user_map = {}
+
+        for conv in conversations:
+            if not conv.last_message:
+                continue
+            oid = next((p for p in conv.participants if str(p) != str(current_user.id)), None)
+            other_user = user_map.get(str(oid)) if oid else None
+            messages.append(MessagePreview(
+                id=str(conv.id),
+                name=other_user.profile.display_name if other_user and other_user.profile
+                     else (conv.job_title or "Conversation"),
+                text=conv.last_message,
+                timestamp=conv.last_message_at,
+                avatar=other_user.profile.profile_picture if other_user and other_user.profile else None,
+            ))
     except Exception:
         messages = []
 

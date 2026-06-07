@@ -65,7 +65,7 @@ export default function AcceptableUsePage() {
       <p>
         If you have a legitimate reason to convert a Spectrum Connect engagement to an
         off-platform one (full-time hire, retainer that needs custom invoicing), email{' '}
-        <a href="mailto:legal@spectrumconnect.co">legal@spectrumconnect.co</a>. We almost
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>. We almost
         always say yes; we just need to know.
       </p>
 
@@ -81,7 +81,7 @@ export default function AcceptableUsePage() {
       <ul>
         <li>Scraping, crawling, or harvesting data from Spectrum Connect except through our public API and within its rate limits.</li>
         <li>Reverse-engineering, decompiling, or attempting to extract source code.</li>
-        <li>Probing for security vulnerabilities outside our responsible-disclosure programme. (For the record, the programme is at <a href="mailto:security@spectrumconnect.co">security@spectrumconnect.co</a>; we appreciate ethical reports.)</li>
+        <li>Probing for security vulnerabilities outside our responsible-disclosure programme. (For the record, the programme is at <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>; we appreciate ethical reports.)</li>
         <li>Uploading malware, phishing pages, or content designed to compromise other users.</li>
         <li>Stress-testing our rate limits or overloading our infrastructure on purpose.</li>
       </ul>
@@ -131,7 +131,7 @@ export default function AcceptableUsePage() {
       <p>
         For things that look criminal we may freeze the account immediately and refer the
         matter to law enforcement. If your account is suspended you can appeal in writing to{' '}
-        <a href="mailto:appeals@spectrumconnect.co">appeals@spectrumconnect.co</a>; we&apos;ll
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>; we&apos;ll
         respond within 14 days.
       </p>
 
@@ -139,7 +139,7 @@ export default function AcceptableUsePage() {
       <p>
         Most pages have a small &ldquo;Report&rdquo; control. Use it. Reports come into our
         trust &amp; safety queue and are read by a real person. You can also email{' '}
-        <a href="mailto:trust@spectrumconnect.co">trust@spectrumconnect.co</a> with the URL of
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a> with the URL of
         the content and a one-line description of the problem.
       </p>
       <p>

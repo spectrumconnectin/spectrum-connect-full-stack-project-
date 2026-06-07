@@ -144,7 +144,7 @@ export default function RefundsPage() {
         or &ldquo;Open dispute&rdquo;. Both buttons start the same workflow and put your case
         in front of our team. If you can&apos;t access the product or your account is locked,
         email{' '}
-        <a href="mailto:support@spectrumconnect.co">support@spectrumconnect.co</a>{' '}
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>{' '}
         with the project ID and a short explanation.
       </p>
     </LegalPage>

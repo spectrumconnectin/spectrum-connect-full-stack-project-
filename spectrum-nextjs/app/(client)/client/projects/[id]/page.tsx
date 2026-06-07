@@ -3,31 +3,72 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, messaging, proposals, escrow, auth, JobPostItem, formatJobBudget, JobProposalItem, EscrowListItem, EscrowDetail } from '@/lib/api';
+
+// ── Deadline countdown hook ───────────────────────────────────────────────────
+function useDeadlineCountdown(deadlineAt?: string) {
+  const [label, setLabel] = useState('');
+  const [expired, setExpired] = useState(false);
+  const [urgency, setUrgency] = useState<'ok' | 'soon' | 'overdue'>('ok');
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const tick = () => {
+      const diff = new Date(deadlineAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setExpired(true);
+        setUrgency('overdue');
+        const over = Math.abs(diff);
+        const d = Math.floor(over / 86400000);
+        setLabel(d > 0 ? `${d}d overdue` : 'Due today — overdue');
+        return;
+      }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      if (diff < 3 * 86400000) setUrgency('soon');
+      else setUrgency('ok');
+      if (d > 0) setLabel(`${d}d ${h}h left`);
+      else setLabel(`${h}h left`);
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [deadlineAt]);
+
+  return { label, expired, urgency };
+}
+import ProjectWorkspace from '@/components/ProjectWorkspace';
 
 const STATUS_STYLE: Record<string, string> = {
-  open:        'bg-green-100 text-green-700',
-  draft:       'bg-gray-100 text-gray-600',
-  paused:      'bg-yellow-100 text-yellow-700',
-  in_progress: 'bg-blue-100 text-blue-700',
-  closed:      'bg-orange-100 text-orange-600',
-  completed:   'bg-purple-100 text-purple-700',
-  cancelled:   'bg-red-100 text-red-600',
+  open:               'bg-green-100 text-green-700',
+  in_review:          'bg-amber-100 text-amber-700',
+  pending_funding:    'bg-orange-100 text-orange-700',
+  draft:              'bg-gray-100 text-gray-600',
+  in_progress:        'bg-blue-100 text-blue-700',
+  delivered:          'bg-indigo-100 text-indigo-700',
+  revision_requested: 'bg-orange-100 text-orange-700',
+  approved:           'bg-teal-100 text-teal-700',
+  closed:             'bg-blue-100 text-blue-700',
+  completed:          'bg-emerald-100 text-emerald-700',
 };
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, sfx = '') => {
-    if (!min && !max) return 'TBD';
-    if (min && max) return `$${min.toLocaleString()}–$${max.toLocaleString()}${sfx}`;
-    if (min) return `$${min.toLocaleString()}+${sfx}`;
-    return `Up to $${max?.toLocaleString()}${sfx}`;
+function jobStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    open:               'Open',
+    in_review:          'In Review',
+    pending_funding:    'Pending Funding',
+    in_progress:        'Active',
+    delivered:          'Delivered',
+    revision_requested: 'Revision Requested',
+    approved:           'Approved',
+    closed:             'Active',
+    completed:          'Completed',
+    draft:              'Draft',
   };
-  if (p.budget_type === 'fixed')      return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly')     return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily')      return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly')     return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
+  return map[status] ?? status;
 }
+
+const formatBudget = formatJobBudget;
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '—';
@@ -40,15 +81,54 @@ export default function ClientProjectDetailPage() {
 
   const [job, setJob] = useState<JobPostItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [myUserId, setMyUserId] = useState('');
+
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [hiredCreator, setHiredCreator] = useState<JobProposalItem | null>(null);
+  const [allHiredCreators, setAllHiredCreators] = useState<JobProposalItem[]>([]);
+  const [projectEscrow, setProjectEscrow] = useState<EscrowListItem | null>(null);
+  const [showFutureWorkModal, setShowFutureWorkModal] = useState(false);
+  const [futureWorkMessage, setFutureWorkMessage] = useState('');
+  const [sendingFutureWork, setSendingFutureWork] = useState(false);
+  const [futureWorkSent, setFutureWorkSent] = useState(false);
+  const [showRehireModal, setShowRehireModal] = useState(false);
+
+  // Release Funds modal state
+  const [showReleaseFundsModal, setShowReleaseFundsModal] = useState(false);
+  const [releasingFunds, setReleasingFunds] = useState(false);
+  const [releaseFundsSuccess, setReleaseFundsSuccess] = useState(false);
+  const [escrowDetailForRelease, setEscrowDetailForRelease] = useState<EscrowDetail | null>(null);
+  // Delivery review — milestone ID of the first delivered milestone
+  const [deliveredMilestoneId, setDeliveredMilestoneId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    jobs.getById(id)
-      .then(data => setJob(data))
-      .catch(e => setError((e as Error).message))
-      .finally(() => setLoading(false));
+    // Fire all 4 requests simultaneously — no waterfall
+    Promise.allSettled([
+      jobs.getById(id),
+      proposals.getForJob(id),
+      escrow.list({ role: 'client', limit: 50 }),
+      auth.me(),
+    ]).then(([jobRes, propRes, escRes, meRes]) => {
+      if (jobRes.status === 'fulfilled') {
+        setJob(jobRes.value);
+      } else {
+        setError('Project not found.');
+      }
+      if (propRes.status === 'fulfilled') {
+        const propList = propRes.value?.proposals ?? (Array.isArray(propRes.value) ? propRes.value : []);
+        const acceptedAll = propList.filter((p: JobProposalItem) => p.status === 'accepted');
+        const accepted = acceptedAll[0] ?? null;
+        if (accepted) setHiredCreator(accepted);
+        if (acceptedAll.length > 0) setAllHiredCreators(acceptedAll);
+      }
+      if (escRes.status === 'fulfilled') {
+        const linked = escRes.value.escrows.find((e: EscrowListItem) => e.job_post_id === id);
+        if (linked) setProjectEscrow(linked);
+      }
+      if (meRes.status === 'fulfilled') setMyUserId(meRes.value.id);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   const handleStatusChange = async (newStatus: string) => {
@@ -57,6 +137,10 @@ export default function ClientProjectDetailPage() {
     try {
       const updated = await jobs.updateStatus(id, newStatus);
       setJob(updated);
+      if (newStatus === 'completed') {
+        // Navigate to projects list so user sees the updated state
+        setTimeout(() => router.push('/client/projects'), 800);
+      }
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -73,6 +157,86 @@ export default function ClientProjectDetailPage() {
       alert((e as Error).message);
     }
   };
+
+  const handleOpenReleaseFunds = async () => {
+    if (!projectEscrow) return;
+    try {
+      const detail = await escrow.getById(projectEscrow.escrow_id);
+      setEscrowDetailForRelease(detail);
+      setReleaseFundsSuccess(false);
+      // Store the first delivered milestone ID for the review page link
+      const deliveredM = detail.milestones.find(m => ['delivered', 'approved'].includes(m.status));
+      if (deliveredM) setDeliveredMilestoneId(deliveredM.milestone_id);
+      setShowReleaseFundsModal(true);
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  // Navigate to the delivery review page — loads escrow detail first to get milestone ID
+  const handleReviewDelivery = async () => {
+    if (!projectEscrow) return;
+    if (deliveredMilestoneId) {
+      router.push(`/client/projects/${id}/delivery/${deliveredMilestoneId}`);
+      return;
+    }
+    try {
+      const detail = await escrow.getById(projectEscrow.escrow_id);
+      const deliveredM = detail.milestones.find(m => ['delivered', 'approved'].includes(m.status));
+      if (deliveredM) {
+        router.push(`/client/projects/${id}/delivery/${deliveredM.milestone_id}`);
+      } else {
+        // Fallback: open release funds modal
+        setEscrowDetailForRelease(detail);
+        setReleaseFundsSuccess(false);
+        setShowReleaseFundsModal(true);
+      }
+    } catch (e) {
+      alert((e as Error).message);
+    }
+  };
+
+  const handleConfirmReleaseFunds = async () => {
+    if (!escrowDetailForRelease) return;
+    setReleasingFunds(true);
+    try {
+      // Only release milestones that are already approved (went through the full review gate).
+      // Milestones still in 'delivered' state require the client to go through the
+      // dedicated delivery review page (open link → confirm review → approve) first.
+      const eligibleMilestones = escrowDetailForRelease.milestones.filter(
+        m => m.status === 'approved'
+      );
+
+      if (eligibleMilestones.length === 0) {
+        // All eligible milestones are still in 'delivered' — redirect to review page
+        const deliveredM = escrowDetailForRelease.milestones.find(m => m.status === 'delivered');
+        if (deliveredM) {
+          router.push(`/client/projects/${id}/delivery/${deliveredM.milestone_id}`);
+          return;
+        }
+      }
+
+      for (const m of eligibleMilestones) {
+        await escrow.releaseMilestone(escrowDetailForRelease.escrow_id, m.milestone_id);
+      }
+      setReleaseFundsSuccess(true);
+      // Reload job + escrow data in the background
+      Promise.all([
+        jobs.getById(id).then(updated => setJob(updated)),
+        escrow.list({ role: 'client', limit: 50 }).then(res => {
+          const linked = res.escrows.find((e: EscrowListItem) => e.job_post_id === id);
+          if (linked) setProjectEscrow(linked);
+        }),
+      ]).catch(() => {});
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setReleasingFunds(false);
+    }
+  };
+
+  // Deadline from the hired creator's proposal — must be called before any early return
+  const deadline = useDeadlineCountdown(hiredCreator?.deadline_at);
 
   if (loading) {
     return (
@@ -97,10 +261,55 @@ export default function ClientProjectDetailPage() {
   }
 
   const budget = formatBudget(job);
-  const canClose    = job.status === 'open';
-  const canPublish  = job.status === 'draft' || job.status === 'paused';
-  const canComplete = job.status === 'in_progress';
+  const deadlineExpired = deadline.expired &&
+    !['completed', 'delivered', 'approved', 'revision_requested'].includes(job.status);
+
+  const canPublish  = job.status === 'draft';
+  const canStart    = (job.status === 'open' || job.status === 'closed' || job.status === 'pending_funding') && !!hiredCreator && (!!(projectEscrow && projectEscrow.funded_amount > 0) || job.status !== 'pending_funding');
   const canDelete   = job.status === 'draft';
+  const canReleaseFunds = ['delivered', 'approved'].includes(job.status) &&
+    !!projectEscrow && projectEscrow.funded_amount > 0;
+
+  // Completion checklist — all gates must pass before marking complete
+  const checklistItems = [
+    {
+      id: 'hired',
+      label: 'Creator hired',
+      done: !!hiredCreator,
+      info: null,
+    },
+    {
+      id: 'funded',
+      label: 'Escrow funded',
+      done: !!(projectEscrow && projectEscrow.funded_amount > 0),
+      info: projectEscrow && projectEscrow.funded_amount > 0
+        ? `$${projectEscrow.funded_amount.toLocaleString()} secured`
+        : 'Client must fund escrow',
+    },
+    {
+      id: 'delivered',
+      label: 'Delivery submitted',
+      done: ['delivered', 'approved', 'completed'].includes(job.status),
+      info: ['delivered', 'approved', 'completed'].includes(job.status)
+        ? 'Google Drive link provided'
+        : 'Creator must submit work',
+    },
+    {
+      id: 'released',
+      label: 'Payment released',
+      done: !!(projectEscrow &&
+        projectEscrow.funded_milestones > 0 &&
+        projectEscrow.released_milestones >= projectEscrow.funded_milestones),
+      info: projectEscrow && projectEscrow.released_milestones > 0
+        ? `${projectEscrow.released_milestones}/${projectEscrow.funded_milestones} milestone${projectEscrow.funded_milestones !== 1 ? 's' : ''} released`
+        : 'Must release funds to creator',
+    },
+  ];
+  const allChecksPassed  = checklistItems.every(c => c.done);
+  const paymentReleased  = checklistItems.find(c => c.id === 'released')!.done;
+  // Can only complete after payment has been released
+  const canComplete      = job.status === 'in_progress' && paymentReleased;
+  const completionBlocked = ['in_progress', 'delivered', 'approved'].includes(job.status) && !paymentReleased;
 
   return (
     <>
@@ -113,10 +322,23 @@ export default function ClientProjectDetailPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold text-gray-900 truncate">{job.title}</h1>
-              <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize flex-shrink-0 ${STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                {job.status.replace('_', ' ')}
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 truncate">{job.title}</h1>
+              <span className={`text-xs font-semibold px-3 py-1 rounded-full flex-shrink-0 ${
+                job.status === 'open' && (job.proposal_count ?? 0) > 0 ? 'bg-amber-100 text-amber-700' : STATUS_STYLE[job.status] ?? 'bg-gray-100 text-gray-600'
+              }`}>
+                {jobStatusLabel(job.status)}
               </span>
+              {/* Delivery deadline countdown */}
+              {hiredCreator?.deadline_at && !['completed'].includes(job.status) && deadline.label && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 ${
+                  deadline.urgency === 'overdue' ? 'bg-red-100 text-red-700' :
+                  deadline.urgency === 'soon'    ? 'bg-amber-100 text-amber-700' :
+                                                   'bg-blue-50 text-cobalt'
+                }`}>
+                  <i className="fa-solid fa-clock text-[10px]"></i>
+                  Delivery: {deadline.label}
+                </span>
+              )}
             </div>
             <p className="text-gray-500 mt-1 text-sm">
               {job.department}{job.role ? ` · ${job.role}` : ''} · Posted {formatDate(job.created_at)}
@@ -137,19 +359,155 @@ export default function ClientProjectDetailPage() {
         </div>
       </section>
 
+      {/* Deadline expired — creator has not delivered yet */}
+      {deadlineExpired && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-triangle-exclamation text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-red-900 text-lg">Delivery Deadline Passed</p>
+            <p className="text-red-700 text-sm mt-0.5 leading-relaxed">
+              {hiredCreator?.creator_name?.split(' ')[0] ?? 'The creator'} agreed to deliver by this date but has not submitted yet.
+              You can message them for an update, find a replacement, or cancel the project and get a refund.
+            </p>
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {hiredCreator?.creator_id && (
+                <Link href={`/client/messaging?userId=${hiredCreator.creator_id}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                  <i className="fa-solid fa-comment text-xs"></i>Message Creator
+                </Link>
+              )}
+              <Link href={`/client/projects/${id}/applicants`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition">
+                <i className="fa-solid fa-user-plus text-xs"></i>Find New Creator
+              </Link>
+              {projectEscrow && projectEscrow.funded_amount > 0 && (
+                <Link href="/client/payments"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-300 text-red-700 text-sm font-semibold rounded-xl hover:bg-red-50 transition">
+                  <i className="fa-solid fa-rotate-left text-xs"></i>Cancel &amp; Refund
+                </Link>
+              )}
+            </div>
+          </div>
+          <span className="bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 mt-0.5 whitespace-nowrap">
+            {deadline.label}
+          </span>
+        </div>
+      )}
+
+      {/* Payment completed — project finished + review CTA */}
+      {job.status === 'completed' && (
+        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-trophy text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-emerald-900 text-lg">Payment Completed — Project Finished</p>
+            <p className="text-emerald-700 text-sm mt-1 leading-relaxed">
+              All payments have been released. Help other clients by leaving a review of the creator.
+            </p>
+            <Link href={`/client/projects/${id}/review`}
+              className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition">
+              <i className="fa-solid fa-star text-xs"></i>Leave a Review
+            </Link>
+          </div>
+          <span className="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Completed
+          </span>
+        </div>
+      )}
+
+      {/* Approved — escrow eligible for release */}
+      {job.status === 'approved' && (
+        <div className="bg-teal-50 border-2 border-teal-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-circle-check text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-teal-900 text-lg">Work Approved — Ready to Release Funds</p>
+            <p className="text-teal-700 text-sm mt-0.5 leading-relaxed">
+              You have approved the work. Release funds from escrow to pay the creator and complete this project.
+            </p>
+            {canReleaseFunds && (
+              <button onClick={handleOpenReleaseFunds}
+                className="inline-flex items-center gap-2 mt-3 px-5 py-2.5 bg-teal-600 text-white text-sm font-bold rounded-xl hover:bg-teal-700 transition">
+                <i className="fa-solid fa-coins text-xs"></i>Release Funds
+              </button>
+            )}
+          </div>
+          <span className="bg-teal-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Approved
+          </span>
+        </div>
+      )}
+
+      {/* Revision requested — waiting on creator */}
+      {job.status === 'revision_requested' && (
+        <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-rotate-left text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-orange-900 text-lg">Revision Requested</p>
+            <p className="text-orange-700 text-sm mt-0.5 leading-relaxed">
+              You have requested revisions. The creator has been notified and will resubmit updated work. Funds remain locked in escrow.
+            </p>
+          </div>
+          <span className="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            In Progress
+          </span>
+        </div>
+      )}
+
+      {/* Delivery received banner — action required */}
+      {job.status === 'delivered' && (
+        <div className="bg-indigo-50 border-2 border-indigo-300 rounded-2xl px-6 py-5 mb-6 flex items-start gap-4">
+          <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fa-solid fa-box-open text-white text-xl"></i>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-indigo-900 text-lg">Work Delivered — Review Required</p>
+            <p className="text-indigo-700 text-sm mt-0.5 leading-relaxed">
+              The creator has submitted (or resubmitted) their work via Google Drive.
+              Open the link, review the deliverables, then approve the work or request further changes.
+              <span className="font-semibold"> Payment auto-releases in 48 hours if no action is taken.</span>
+            </p>
+            {projectEscrow && (
+              <div className="flex gap-3 mt-3 flex-wrap">
+                <button
+                  onClick={handleReviewDelivery}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition">
+                  <i className="fa-solid fa-magnifying-glass text-xs"></i>Review Delivery
+                </button>
+                {canReleaseFunds && (
+                  <button onClick={handleOpenReleaseFunds}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 border-2 border-indigo-300 text-indigo-700 text-sm font-bold rounded-xl hover:bg-indigo-50 transition">
+                    <i className="fa-solid fa-coins text-xs"></i>Release Payment
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          <span className="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full flex-shrink-0 mt-0.5">
+            Delivered
+          </span>
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-3 gap-8">
         {/* ── Main content ── */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Overview */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Job Overview</h2>
             {job.description ? (
               <p className="text-gray-600 leading-relaxed mb-6 whitespace-pre-line">{job.description}</p>
             ) : (
               <p className="text-gray-400 italic mb-6">No description provided.</p>
             )}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Budget',      value: budget,                           icon: 'fa-wallet' },
                 { label: 'Complexity',  value: job.complexity,                   icon: 'fa-gauge-high' },
@@ -167,7 +525,7 @@ export default function ClientProjectDetailPage() {
 
           {/* Skills */}
           {job.skills && job.skills.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Required Skills</h2>
               <div className="flex flex-wrap gap-2">
                 {job.skills.map(s => (
@@ -179,7 +537,7 @@ export default function ClientProjectDetailPage() {
 
           {/* Tags */}
           {job.tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Project Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {job.tags.map(t => (
@@ -189,10 +547,20 @@ export default function ClientProjectDetailPage() {
             </div>
           )}
 
+          {/* Project Workspace — Chat, Timeline, Milestones, Deliverables, Files, Progress */}
+          <ProjectWorkspace
+            jobId={id}
+            role="client"
+            myUserId={myUserId}
+            jobStatus={job.status}
+            proposalId={hiredCreator?.id}
+            jobTitle={job.title}
+          />
+
           {/* Stats */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-5">Activity</h2>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="text-center p-4 bg-blue-50 rounded-xl">
                 <div className="text-3xl font-bold text-cobalt">{job.proposal_count}</div>
                 <p className="text-sm text-gray-600 mt-1">Proposals received</p>
@@ -216,6 +584,35 @@ export default function ClientProjectDetailPage() {
           {/* Status management */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="font-bold text-gray-900 mb-4">Manage Job</h2>
+
+            {/* Pending Funding CTA — shown when creator is hired but escrow unfunded */}
+            {job.status === 'pending_funding' && (!projectEscrow || projectEscrow.funded_amount === 0) && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <i className="fa-solid fa-hourglass-half text-orange-600"></i>
+                  <span className="font-bold text-orange-800 text-sm">Pending Funding</span>
+                </div>
+                <p className="text-xs text-orange-700 mb-3 leading-relaxed">
+                  A creator has been accepted. Fund the escrow to secure their work and allow them to begin.
+                </p>
+                <Link href="/client/payments"
+                  className="block text-center py-2 px-4 bg-orange-600 text-white text-xs font-bold rounded-lg hover:bg-orange-700 transition">
+                  <i className="fa-solid fa-lock mr-1.5"></i>Fund Escrow Now
+                </Link>
+              </div>
+            )}
+
+            {/* Escrow funded status (shown once funded) */}
+            {hiredCreator && projectEscrow && projectEscrow.funded_amount > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-xl mb-4 text-sm font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
+                <i className="fa-solid fa-lock"></i>
+                <div>
+                  <div>Funded — In Escrow</div>
+                  <div className="text-xs font-normal opacity-80">${projectEscrow.funded_amount.toLocaleString()} secured</div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3">
               {canPublish && (
                 <button disabled={updatingStatus} onClick={() => handleStatusChange('open')}
@@ -224,22 +621,44 @@ export default function ClientProjectDetailPage() {
                   {job.status === 'draft' ? 'Publish Job' : 'Re-activate'}
                 </button>
               )}
-              {canClose && (
-                <button disabled={updatingStatus} onClick={() => handleStatusChange('closed')}
-                  className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 disabled:opacity-50">
-                  <i className="fa-solid fa-lock text-orange-500"></i>Close to New Proposals
-                </button>
-              )}
-              {canClose && (
-                <button disabled={updatingStatus} onClick={() => handleStatusChange('paused')}
-                  className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200 disabled:opacity-50">
-                  <i className="fa-solid fa-pause text-yellow-500"></i>Pause Job
+              {canStart && (
+                <button disabled={updatingStatus} onClick={() => handleStatusChange('in_progress')}
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm disabled:opacity-50">
+                  <i className="fa-solid fa-play"></i>
+                  Start Project
+                  {hiredCreator && <span className="ml-auto text-emerald-200 text-xs font-normal truncate max-w-[100px]">with {hiredCreator.creator_name.split(' ')[0]}</span>}
                 </button>
               )}
               {canComplete && (
                 <button disabled={updatingStatus} onClick={() => handleStatusChange('completed')}
-                  className="flex items-center gap-3 w-full bg-emerald-50 text-emerald-700 px-4 py-3 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm border border-emerald-200 disabled:opacity-50">
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm disabled:opacity-50">
                   <i className="fa-solid fa-circle-check"></i>Mark Completed
+                </button>
+              )}
+              {/* Payment gate — block completion with clear message */}
+              {completionBlocked && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <div className="flex items-start gap-2 mb-2">
+                    <i className="fa-solid fa-lock text-red-500 mt-0.5 flex-shrink-0 text-sm"></i>
+                    <p className="text-xs font-bold text-red-800">
+                      Payment must be released before this project can be completed.
+                    </p>
+                  </div>
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    Release the escrow funds to the creator first, then you&apos;ll be able to mark this project as complete.
+                  </p>
+                </div>
+              )}
+              {canReleaseFunds && (
+                <button onClick={handleOpenReleaseFunds}
+                  className="flex items-center gap-3 w-full bg-emerald-600 text-white px-4 py-3 rounded-xl font-semibold hover:bg-emerald-700 transition text-sm">
+                  <i className="fa-solid fa-coins"></i>
+                  Release Funds
+                  {projectEscrow && (
+                    <span className="ml-auto text-emerald-200 text-xs font-normal">
+                      ${projectEscrow.funded_amount.toLocaleString()} in escrow
+                    </span>
+                  )}
                 </button>
               )}
               <Link href={`/client/projects/${id}/applicants`}
@@ -247,6 +666,13 @@ export default function ClientProjectDetailPage() {
                 <i className="fa-solid fa-users text-cobalt"></i>
                 Review Applicants {job.proposal_count > 0 && `(${job.proposal_count})`}
               </Link>
+              {(job.status === 'open' || job.status === 'in_progress') && (
+                <Link href={`/client/smart-connect?project=${id}`}
+                  className="flex items-center gap-3 w-full bg-purple-50 text-purple-700 px-4 py-3 rounded-xl font-semibold hover:bg-purple-100 transition text-sm border border-purple-200">
+                  <i className="fa-solid fa-bolt text-purple-500"></i>
+                  Find Matching Creators
+                </Link>
+              )}
               {canDelete && (
                 <button onClick={handleDelete}
                   className="flex items-center gap-3 w-full bg-red-50 text-red-600 px-4 py-3 rounded-xl font-semibold hover:bg-red-100 transition text-sm border border-red-100">
@@ -254,13 +680,128 @@ export default function ClientProjectDetailPage() {
                 </button>
               )}
               {job.status === 'completed' && (
-                <Link href={`/client/projects/${id}/review`}
-                  className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
-                  <i className="fa-solid fa-star"></i>Leave a Review
-                </Link>
+                <>
+                  <Link href={`/client/projects/${id}/review`}
+                    className="flex items-center gap-3 w-full bg-amber-50 text-amber-700 px-4 py-3 rounded-xl font-semibold hover:bg-amber-100 transition text-sm border border-amber-200">
+                    <i className="fa-solid fa-star"></i>Leave a Review
+                  </Link>
+                  {/* Rehire same team (crew) or single creator */}
+                  {allHiredCreators.length > 1 ? (
+                    <button
+                      onClick={() => setShowRehireModal(true)}
+                      className="flex items-center gap-3 w-full bg-emerald-50 text-emerald-700 px-4 py-3 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm border border-emerald-200">
+                      <i className="fa-solid fa-users-gear"></i>Rehire This Team
+                    </button>
+                  ) : hiredCreator && !futureWorkSent ? (
+                    <button
+                      onClick={() => {
+                        setFutureWorkMessage(`Hi ${hiredCreator.creator_name},\n\nI really enjoyed working with you on "${job.title}". I'd love to collaborate again — would you be available?`);
+                        setShowFutureWorkModal(true);
+                      }}
+                      className="flex items-center gap-3 w-full bg-blue-50 text-cobalt px-4 py-3 rounded-xl font-semibold hover:bg-blue-100 transition text-sm border border-blue-200">
+                      <i className="fa-solid fa-rotate-right"></i>Request Future Work
+                    </button>
+                  ) : null}
+                  {futureWorkSent && (
+                    <div className="flex items-center gap-2 w-full bg-green-50 text-green-700 px-4 py-3 rounded-xl text-sm border border-green-200 font-semibold">
+                      <i className="fa-solid fa-check"></i>Message sent!
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
+
+          {/* Completion Checklist — shown for active/in-flight jobs */}
+          {!['draft', 'open', 'completed'].includes(job.status) && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold text-gray-900">Completion Checklist</h2>
+                {allChecksPassed ? (
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    All done ✓
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-gray-500">
+                    {checklistItems.filter(c => c.done).length}/{checklistItems.length}
+                  </span>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+                <div
+                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: `${(checklistItems.filter(c => c.done).length / checklistItems.length) * 100}%` }}
+                />
+              </div>
+
+              <div className="space-y-3">
+                {checklistItems.map(item => (
+                  <div key={item.id} className={`flex items-start gap-3 p-3 rounded-xl border transition ${
+                    item.done
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      item.done ? 'bg-emerald-500' : 'bg-gray-200'
+                    }`}>
+                      {item.done
+                        ? <i className="fa-solid fa-check text-white text-[10px]"></i>
+                        : <i className="fa-solid fa-lock text-gray-400 text-[10px]"></i>
+                      }
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${item.done ? 'text-emerald-800' : 'text-gray-600'}`}>
+                        {item.label}
+                      </p>
+                      {item.info && (
+                        <p className={`text-xs mt-0.5 ${item.done ? 'text-emerald-600' : 'text-gray-400'}`}>
+                          {item.info}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Final gate message */}
+              {!paymentReleased && job.status !== 'open' && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                  <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5 flex-shrink-0 text-sm"></i>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <span className="font-semibold">Release payment</span> to unlock project completion.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hired creator card — shown when a creator is hired but project not yet started */}
+          {hiredCreator && job.status !== 'completed' && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 shadow-sm">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-3">Creator Hired</p>
+              <div className="flex items-center gap-3 mb-4">
+                {hiredCreator.creator_avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hiredCreator.creator_avatar} alt={hiredCreator.creator_name}
+                    className="w-10 h-10 rounded-full border-2 border-emerald-300 object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {hiredCreator.creator_name[0].toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm truncate">{hiredCreator.creator_name}</p>
+                  {hiredCreator.creator_title && <p className="text-xs text-gray-500 truncate">{hiredCreator.creator_title}</p>}
+                </div>
+              </div>
+              <Link href={`/client/messaging?userId=${hiredCreator.creator_id}`}
+                className="flex items-center justify-center gap-2 w-full bg-white border border-emerald-300 text-emerald-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-emerald-100 transition text-sm">
+                <i className="fa-solid fa-comment"></i>Message
+              </Link>
+            </div>
+          )}
 
           {/* Job details */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -271,6 +812,9 @@ export default function ClientProjectDetailPage() {
                 { label: 'Budget',       value: budget },
                 { label: 'Department',   value: job.department },
                 { label: 'Role',         value: job.role },
+                { label: 'Location',     value: (job as typeof job & { location?: string }).location },
+                { label: 'Event Date',   value: (job as typeof job & { event_date?: string }).event_date ? formatDate((job as typeof job & { event_date?: string }).event_date) : undefined },
+                { label: 'Work Type',    value: (job as typeof job & { is_remote?: boolean }).is_remote === true ? 'Remote' : (job as typeof job & { is_remote?: boolean }).is_remote === false ? 'In-Person / On-Site' : undefined },
                 { label: 'Experience',   value: job.experience_level },
                 { label: 'Complexity',   value: job.complexity },
                 { label: 'Crew size',    value: job.crew_size },
@@ -286,6 +830,272 @@ export default function ClientProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Release Funds Modal ── */}
+      {showReleaseFundsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => { if (!releasingFunds) setShowReleaseFundsModal(false); }}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+
+            {releaseFundsSuccess ? (
+              /* ── Success state ── */
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <i className="fa-solid fa-circle-check text-emerald-600 text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Funds Released!</h3>
+                <p className="text-gray-500 text-sm mb-1">
+                  Payment of{' '}
+                  <strong>${escrowDetailForRelease?.total_amount?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '—'}</strong>{' '}
+                  has been released to{' '}
+                  <strong>{hiredCreator?.creator_name ?? 'the creator'}</strong>.
+                </p>
+                <p className="text-gray-400 text-xs mb-6">
+                  The project is now complete. You can leave a review from this page.
+                </p>
+                <button onClick={() => setShowReleaseFundsModal(false)}
+                  className="px-8 py-2.5 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
+                  Done
+                </button>
+              </div>
+            ) : (
+              /* ── Confirmation state ── */
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Release Funds</h3>
+                    <p className="text-sm text-gray-500 mt-0.5 truncate max-w-[280px]">{job?.title}</p>
+                  </div>
+                  <button onClick={() => setShowReleaseFundsModal(false)} disabled={releasingFunds}
+                    className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                {/* Creator info */}
+                {hiredCreator && (
+                  <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 mb-4">
+                    {hiredCreator.creator_avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={hiredCreator.creator_avatar} alt={hiredCreator.creator_name}
+                        className="w-10 h-10 rounded-full border-2 border-gray-200 object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-cobalt flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        {hiredCreator.creator_name[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{hiredCreator.creator_name}</p>
+                      {hiredCreator.creator_title && (
+                        <p className="text-xs text-gray-500">{hiredCreator.creator_title}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Amount summary */}
+                {escrowDetailForRelease && (
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-blue-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-cobalt">
+                        ${escrowDetailForRelease.total_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-gray-500">Project Budget</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-xl p-3 text-center">
+                      <p className="text-lg font-bold text-emerald-600">
+                        ${escrowDetailForRelease.funded_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-gray-500">Funds in Escrow</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Milestones being released */}
+                {escrowDetailForRelease && escrowDetailForRelease.milestones.filter(m => ['delivered', 'approved'].includes(m.status)).length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Milestones to Release</p>
+                    <div className="space-y-1.5">
+                      {escrowDetailForRelease.milestones
+                        .filter(m => ['delivered', 'approved'].includes(m.status))
+                        .map(m => (
+                          <div key={m.milestone_id}
+                            className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <i className="fa-solid fa-circle-check text-emerald-500 text-sm flex-shrink-0"></i>
+                              <span className="text-sm text-gray-800 truncate">{m.title}</span>
+                            </div>
+                            <span className="text-sm font-bold text-gray-700 flex-shrink-0 ml-2">
+                              ${m.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+
+                {/* Warning */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5 flex items-start gap-2">
+                  <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm mt-0.5 flex-shrink-0"></i>
+                  <p className="text-xs text-amber-700 leading-relaxed">
+                    <strong>This action cannot be undone.</strong> Funds will be immediately transferred from escrow to the creator&apos;s account.
+                  </p>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  <button onClick={() => setShowReleaseFundsModal(false)} disabled={releasingFunds}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmReleaseFunds} disabled={releasingFunds}
+                    className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    {releasingFunds
+                      ? <><i className="fa-solid fa-spinner animate-spin"></i> Releasing…</>
+                      : <><i className="fa-solid fa-coins"></i> Release Funds</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Future Work Modal ── */}
+      {showFutureWorkModal && hiredCreator && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowFutureWorkModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <i className="fa-solid fa-rotate-right text-cobalt"></i>
+                Request Future Work
+              </h3>
+              <button onClick={() => setShowFutureWorkModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
+              <div className="w-10 h-10 rounded-full bg-cobalt flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {(hiredCreator.creator_name || '?')[0].toUpperCase()}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">{hiredCreator.creator_name}</p>
+                <p className="text-xs text-gray-500">Previously hired for: {job?.title}</p>
+              </div>
+            </div>
+            <textarea
+              value={futureWorkMessage}
+              onChange={e => setFutureWorkMessage(e.target.value)}
+              rows={6}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 resize-none leading-relaxed mb-4"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowFutureWorkModal(false)}
+                className="flex-1 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!hiredCreator.creator_id || !futureWorkMessage.trim()) return;
+                  setSendingFutureWork(true);
+                  try {
+                    await messaging.createConversation([hiredCreator.creator_id], id, futureWorkMessage.trim());
+                    setFutureWorkSent(true);
+                    setShowFutureWorkModal(false);
+                  } catch { /* ignore */ } finally {
+                    setSendingFutureWork(false);
+                  }
+                }}
+                disabled={!futureWorkMessage.trim() || sendingFutureWork}
+                className="flex-1 bg-cobalt text-white py-3 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition text-sm flex items-center justify-center gap-2"
+              >
+                {sendingFutureWork
+                  ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                  : <><i className="fa-solid fa-paper-plane"></i> Send Message</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rehire Team Modal ── */}
+      {showRehireModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowRehireModal(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-6 py-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <i className="fa-solid fa-users-gear text-lg"></i>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Rehire This Team</h3>
+                  <p className="text-emerald-100 text-xs mt-0.5">From: {job?.title}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-5 leading-relaxed">
+                Contact your previous creators and create a new project together.
+                Your past collaboration history makes rehiring faster and more trusted.
+              </p>
+
+              {/* Creator list */}
+              <div className="space-y-3 mb-6">
+                {allHiredCreators.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-cobalt font-bold text-sm flex-shrink-0">
+                      {c.creator_avatar
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={c.creator_avatar} alt={c.creator_name} className="w-10 h-10 rounded-xl object-cover" />
+                        : c.creator_name[0]?.toUpperCase()
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{c.creator_name}</p>
+                      <p className="text-xs text-gray-500 truncate">{c.creator_title ?? c.role ?? 'Creator'}</p>
+                    </div>
+                    <Link
+                      href={`/client/messaging?userId=${c.creator_id}`}
+                      onClick={() => setShowRehireModal(false)}
+                      className="flex-shrink-0 px-3 py-1.5 bg-cobalt text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition">
+                      Message
+                    </Link>
+                  </div>
+                ))}
+              </div>
+
+              {/* New project CTA */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+                <p className="text-xs font-semibold text-emerald-800 mb-2">
+                  <i className="fa-solid fa-lightbulb mr-1.5"></i>
+                  Ready to start a new project with this team?
+                </p>
+                <p className="text-xs text-emerald-700 mb-3">
+                  Message each creator to confirm availability, then post the new project and invite them directly.
+                </p>
+                <Link href="/client/projects/create"
+                  onClick={() => setShowRehireModal(false)}
+                  className="block text-center py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition">
+                  <i className="fa-solid fa-plus mr-1.5"></i>Post a New Project
+                </Link>
+              </div>
+
+              <button onClick={() => setShowRehireModal(false)}
+                className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200 transition">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

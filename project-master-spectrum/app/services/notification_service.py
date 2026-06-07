@@ -43,6 +43,9 @@ async def _get_user_name(user_id: str) -> tuple[str, Optional[str]]:
         return "Someone", None
 
 
+_DEDUP_WINDOW_SECONDS = 300  # 5 minutes — identical notifications within this window are collapsed
+
+
 async def send(
     *,
     user_id: str,
@@ -56,18 +59,49 @@ async def send(
     actor_name: Optional[str] = None,
     actor_image: Optional[str] = None,
 ) -> None:
-    """Create and insert a single Notification document. Never raises."""
+    """Create and insert a single Notification document.
+    Deduplicates: if an identical (user, type, actor) notification was inserted
+    within the last 5 minutes, the count is incremented instead of a new doc created.
+    Never raises.
+    """
     try:
+        from datetime import datetime, timedelta
         from app.models.schema import Notification, NotificationChannels
+        from beanie import PydanticObjectId as _OID
+
+        uid = _OID(user_id)
+        aid = _OID(actor_id) if actor_id else None
+        window_start = datetime.utcnow() - timedelta(seconds=_DEDUP_WINDOW_SECONDS)
+
+        # Check for a recent duplicate
+        existing = await Notification.find_one({
+            "user_id": uid,
+            "type": type,
+            "actor_id": aid,
+            "is_read": False,
+            "created_at": {"$gte": window_start},
+        })
+
+        if existing:
+            # Collapse: increment count and refresh the title so the badge shows e.g. "(3 new)"
+            count = (getattr(existing, "count", None) or 1) + 1
+            await existing.update({"$set": {
+                "count": count,
+                "title": title,   # refresh with latest
+                "message": message,
+                "created_at": datetime.utcnow(),  # bump so it stays within window
+            }})
+            return
+
         notif = Notification(
-            user_id=PydanticObjectId(user_id),
+            user_id=uid,
             type=type,
             category=category,
             title=title,
             message=message,
             action_url=action_url,
             action_text=action_text,
-            actor_id=PydanticObjectId(actor_id) if actor_id else None,
+            actor_id=aid,
             actor_name=actor_name,
             actor_image=actor_image,
             is_read=False,
@@ -111,7 +145,7 @@ class NotificationService:
             category="success",
             title=f"🎉 You've been hired for '{job_title}'!",
             message=f"{client_name} accepted your proposal. Head to the project to get started.",
-            action_url=f"/creator/projects/{job_id}",
+            action_url=f"/creator/projects?tab=applications",
             action_text="View project",
             actor_id=client_id,
             actor_name=client_name,
@@ -193,13 +227,22 @@ class NotificationService:
     async def dispute_opened(*, other_user_id: str, opener_id: str, reason: str, escrow_id: str) -> None:
         """Notify the other party that a dispute was opened against them."""
         opener_name, opener_avatar = await _get_user_name(opener_id)
+        # Route to the correct dispute page based on the notified user's account type
+        try:
+            from app.models.schema import User as _User
+            from beanie import PydanticObjectId as _OID
+            notified = await _User.get(_OID(other_user_id))
+            account_type = getattr(notified, "account_type", "client") if notified else "client"
+            dispute_url = "/creator/disputes" if account_type == "creator" else "/client/disputes"
+        except Exception:
+            dispute_url = "/client/disputes"
         await send(
             user_id=other_user_id,
             type="system",
             category="alert",
             title="A dispute has been opened",
             message=f"{opener_name} opened a dispute: '{reason[:100]}'. Our team will review within 48 hours.",
-            action_url=f"/client/disputes",
+            action_url=dispute_url,
             action_text="View dispute",
             actor_id=opener_id,
             actor_name=opener_name,
@@ -231,7 +274,7 @@ class NotificationService:
             category="success",
             title=f"Project completed — '{job_title}'",
             message=f"Great work! {client_name} marked the project as complete.",
-            action_url=f"/creator/projects/{job_id}",
+            action_url=f"/creator/projects?tab=applications",
             action_text="View project",
             actor_id=client_id,
             actor_name=client_name,

@@ -292,7 +292,7 @@ export default function HomePage() {
 
       {/* ═══ TRUST & FAIRNESS ═══ */}
       <section style={{ padding: '90px 24px', background: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
+        <div className="trust-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
           <div className="mk-reveal-x" style={{ background: 'linear-gradient(135deg, #f8faff, #eff6ff)', border: '1px solid #bfdbfe', borderRadius: 24, padding: 36 }}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trust Score</div>
@@ -346,46 +346,21 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ PRICING ═══ */}
+      {/* ═══ JOIN FREE CTA ═══ */}
       <section style={{ padding: '90px 24px', background: '#f8fafc' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <div className="mk-reveal" style={{ textAlign: 'center', marginBottom: 52 }}>
-            <h2 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.025em', color: '#111827', margin: '0 0 12px' }}>Simple, Transparent Pricing</h2>
-            <p style={{ fontSize: 15, color: '#6b7280', maxWidth: 460, margin: '0 auto', lineHeight: 1.6 }}>No surprises. Pay only for what you use.</p>
-          </div>
-          <div className="mk-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, alignItems: 'start' }}>
-            {[
-              { name: 'Free to Join', price: 'Free', sub: 'forever', highlight: false, features: ['Create your profile', 'Browse all projects', 'Apply to 3 projects/month', 'Basic messaging'], cta: 'Get Started', href: '/signup' },
-              { name: 'Pro Plan', price: '$15', sub: 'per month', highlight: true, features: ['Unlimited applications', 'Smart Connect AI matching', 'Priority profile placement', 'Advanced analytics', 'Escrow payments'], cta: 'Start Free Trial', href: '/signup' },
-              { name: 'Certification', price: '$20', sub: 'one-time', highlight: false, features: ['Verified badge on profile', 'Skill challenge access', 'Trust score boost', 'Featured in search results'], cta: 'Get Certified', href: '/signup' },
-            ].map(plan => (
-              <div key={plan.name} className="home-card" style={{ background: plan.highlight ? 'linear-gradient(135deg,#1e3a8a,#2563eb)' : '#fff', border: plan.highlight ? '2px solid #2563eb' : '1px solid #e5e7eb', borderRadius: 22, padding: '32px 28px', color: plan.highlight ? '#fff' : '#111827', boxShadow: plan.highlight ? '0 12px 40px rgba(37,99,235,0.25)' : '0 2px 12px rgba(0,0,0,0.05)', position: 'relative' }}>
-                {plan.highlight && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#f59e0b', color: '#fff', borderRadius: 999, padding: '4px 14px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
-                <div style={{ fontSize: 14, fontWeight: 600, opacity: 0.8, marginBottom: 8 }}>{plan.name}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                  <span style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-0.03em' }}>{plan.price}</span>
-                  <span style={{ fontSize: 13, opacity: 0.7 }}>{plan.sub}</span>
-                </div>
-                <div style={{ height: 1, background: plan.highlight ? 'rgba(255,255,255,0.2)' : '#f3f4f6', margin: '20px 0' }} />
-                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {plan.features.map(f => (
-                    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-                      <span style={{ color: plan.highlight ? '#86efac' : '#10b981', flexShrink: 0, display: 'inline-flex' }}><Icon.Check /></span>{f}
-                    </li>
-                  ))}
-                </ul>
-                <Link href={plan.href} style={{ display: 'block', textAlign: 'center', background: plan.highlight ? '#fff' : '#2563eb', color: plan.highlight ? '#1e3a8a' : '#fff', padding: '13px 0', borderRadius: 12, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>{plan.cta}</Link>
-              </div>
-            ))}
-          </div>
-          <div className="mk-reveal" style={{ marginTop: 28, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 16, padding: '18px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-            <div>
-              <span style={{ fontWeight: 700, color: '#1e40af', fontSize: 15 }}>Small Project? We&apos;ve Got You Covered</span>
-              <p style={{ fontSize: 13, color: '#3b82f6', margin: '4px 0 0' }}>For projects under $5k, use our lightweight fixed-fee plan — no monthly subscription needed.</p>
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Link href="/signup" style={{ background: '#2563eb', color: '#fff', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Start Free</Link>
-              <Link href="/pricing" style={{ border: '1px solid #bfdbfe', color: '#2563eb', borderRadius: 10, padding: '10px 20px', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>See Pricing</Link>
+        <div style={{ maxWidth: 680, margin: '0 auto', textAlign: 'center' }}>
+          <div className="mk-reveal">
+            <h2 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.025em', color: '#111827', margin: '0 0 14px' }}>Free to join. Free to post.</h2>
+            <p style={{ fontSize: 16, color: '#6b7280', lineHeight: 1.7, marginBottom: 36 }}>
+              Create an account, post your project, and let Spectrum Connect match you with the right creator — at no cost to get started.
+            </p>
+            <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Link href="/signup" style={{ background: '#2563eb', color: '#fff', borderRadius: 12, padding: '14px 32px', fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                Create a Free Account <Icon.ArrowRight />
+              </Link>
+              <Link href="/login" style={{ background: '#fff', color: '#374151', border: '1.5px solid #e5e7eb', borderRadius: 12, padding: '14px 28px', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>
+                Sign In
+              </Link>
             </div>
           </div>
         </div>
@@ -416,27 +391,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ COMMUNITY STATS ═══ */}
-      <section style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #7c3aed 100%)', padding: '70px 24px', color: '#fff' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <h2 className="mk-reveal" style={{ fontSize: 32, fontWeight: 800, textAlign: 'center', margin: '0 0 48px', letterSpacing: '-0.02em' }}>Join a Thriving Creative Community</h2>
-          <div className="mk-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 32, textAlign: 'center' }}>
-            {[
-              { v: '15K+', l: 'Active Creators' },
-              { v: '12K+', l: 'Projects Posted' },
-              { v: '8K+', l: 'Teams Formed' },
-              { v: '6K+', l: 'Clients Hiring' },
-            ].map(s => (
-              <div key={s.l}>
-                <div style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>{s.v}</div>
-                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', marginTop: 8, fontWeight: 500 }}>{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ EVERYTHING IN ONE PLACE ═══ */}
+{/* ═══ EVERYTHING IN ONE PLACE ═══ */}
       <section style={{ padding: '90px 24px', background: '#f8fafc' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div className="mk-reveal" style={{ textAlign: 'center', marginBottom: 56 }}>

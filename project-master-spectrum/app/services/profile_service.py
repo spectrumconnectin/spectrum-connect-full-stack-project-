@@ -131,8 +131,22 @@ class ProfileService:
         return user
 
     @staticmethod
+    def _validate_url(url: str, field: str = "URL") -> str:
+        """Reject javascript: and data: URIs that could be used for XSS."""
+        from fastapi import HTTPException, status as _status
+        stripped = url.strip().lower()
+        if stripped.startswith("javascript:") or stripped.startswith("data:"):
+            raise HTTPException(
+                status_code=_status.HTTP_400_BAD_REQUEST,
+                detail=f"{field} must be a valid https:// URL.",
+            )
+        return url
+
+    @staticmethod
     async def update_profile_picture(user: User, picture_url: str) -> User:
         """Update user profile picture"""
+
+        ProfileService._validate_url(picture_url, "Profile picture URL")
 
         if not user.profile:
             user.profile = Profile()
@@ -144,6 +158,8 @@ class ProfileService:
     @staticmethod
     async def update_cover_image(user: User, cover_url: str) -> User:
         """Update user cover image"""
+
+        ProfileService._validate_url(cover_url, "Cover image URL")
 
         if not user.profile:
             user.profile = Profile()
@@ -163,6 +179,16 @@ class ProfileService:
     @staticmethod
     async def get_public_profile(user: User) -> dict:
         """Get public profile data (respecting privacy settings)"""
+        from app.models.message import UserPresence
+
+        # Get user's online status
+        is_online = False
+        try:
+            presence = await UserPresence.find_one({"user_id": str(user.id)})
+            if presence:
+                is_online = presence.is_online
+        except Exception:
+            is_online = False
 
         public_data = {
             "id": str(user.id),
@@ -170,6 +196,20 @@ class ProfileService:
             "account_type": user.account_type,
             "is_verified": user.is_verified,
             "verification_badge": user.verification_badge,
+            "is_online": is_online,
+            # Availability status (set during onboarding / profile settings)
+            "availability_status": (
+                user.settings.availability_status if user.settings else "available"
+            ),
+            # Rating aggregate from review submissions — stored on user.profile
+            "rating": (user.profile.rating if user.profile else None),
+            "review_count": (user.profile.review_count if user.profile else None),
+            # Completed projects count (from stats)
+            "completed_projects": (
+                (user.stats.completed_credits if user.stats else None)
+                or (user.stats.active_projects if user.stats else None)
+                or 0
+            ),
         }
 
         # Check privacy settings
@@ -205,22 +245,63 @@ class ProfileService:
 
             public_data["profile"] = profile_data
 
+        # ── Compute live stats — batch query, no N+1 ─────────────────────────
+        active_projects_count = 0
+        projects_completed_count = 0
+        try:
+            from app.models.schema import Application, JobPost
+            # If cached stats are recent enough, use them (avoid DB round-trip on every profile view)
+            cached_active = user.stats.active_projects if user.stats else None
+            cached_completed = user.stats.completed_credits if user.stats else None
+            if cached_active is not None and cached_completed is not None:
+                active_projects_count = cached_active
+                projects_completed_count = cached_completed
+            else:
+                # Compute from DB with single batch query
+                apps = await Application.find(
+                    {"crew_id": user.id, "status": "accepted"}
+                ).to_list()
+                pids = [a.project_id for a in apps if a.project_id]
+                if pids:
+                    jobs_batch = await JobPost.find({"_id": {"$in": pids}}).to_list()
+                    for j in jobs_batch:
+                        if j.status == "completed":
+                            projects_completed_count += 1
+                        elif j.status in ("in_progress", "delivered", "approved", "pending_funding"):
+                            active_projects_count += 1
+                # Persist so next profile load uses the cache
+                try:
+                    from app.models.schema import UserStats
+                    if not user.stats:
+                        user.stats = UserStats()
+                    user.stats.active_projects = active_projects_count
+                    user.stats.completed_credits = projects_completed_count
+                    user.stats.projects_completed = projects_completed_count
+                    await user.save()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Override completed_projects in public_data with live value
+        public_data["completed_projects"] = projects_completed_count
+
         # Add stats (respecting privacy)
-        if user.stats:
-            stats_data = {
-                "total_credits": user.stats.total_credits,
-                "completed_credits": user.stats.completed_credits,
-                "success_rate": user.stats.success_rate,
-                "response_time": user.stats.response_time,
-                "profile_views": user.stats.profile_views,
-                "total_connections": user.stats.total_connections,
-            }
+        stats_data = {
+            "active_projects": active_projects_count,
+            "completed_credits": projects_completed_count,
+            "success_rate": (user.stats.success_rate if user.stats else None) or 0,
+            "response_time": (user.stats.response_time if user.stats else None) or 0,
+            "profile_views": (user.stats.profile_views if user.stats else None) or 0,
+            "total_connections": (user.stats.total_connections if user.stats else None) or 0,
+            "client_satisfaction": round((getattr(user, "rating", 0) or 0) * 20, 1),
+        }
 
-            # Show earnings only if user allows
-            if user.settings and user.settings.show_earnings:
-                stats_data["total_earnings"] = user.stats.total_earnings
+        # Show earnings only if user allows
+        if user.settings and user.settings.show_earnings:
+            stats_data["total_earnings"] = user.stats.total_earnings if user.stats else 0
 
-            public_data["stats"] = stats_data
+        public_data["stats"] = stats_data
 
         return public_data
 

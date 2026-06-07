@@ -449,7 +449,7 @@ async def endorse_skill(
     # Get the crew profile
     try:
         target_user_id = PydanticObjectId(user_id)
-    except:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid user ID"
@@ -489,7 +489,7 @@ async def get_crew_profile_by_user(user_id: str):
 
     try:
         target_user_id = PydanticObjectId(user_id)
-    except:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid user ID"

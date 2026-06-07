@@ -126,32 +126,54 @@ class ScreeningQuestionRead(BaseModel):
 
 class JobPostCreate(BaseModel):
     """Create a new job post"""
-    title: str = Field(..., min_length=10, max_length=100, description="Job title")
-    description: str = Field(..., min_length=50, max_length=10000, description="Detailed job description")
-    department: str = Field(..., description="Film department (Camera, Sound, Lighting, etc.)")
-    role: Optional[str] = Field(None, description="Specific role (Cinematographer, Gaffer, etc.)")
-    tags: List[str] = Field(..., min_items=1, max_items=20, description="Job tags for search")
+    title: str = Field(..., min_length=5, max_length=200, description="Job title")
+    description: str = Field(..., min_length=20, max_length=10000, description="Detailed job description")
+    department: str = Field(..., description="Project category (Design, Film & Video, etc.)")
+    role: Optional[str] = Field(None, description="Specific role (optional)")
+    tags: Optional[List[str]] = Field(None, max_items=20, description="Job tags (optional)")
 
-    # Project scope
-    crew_size: str = Field(..., description="individual, small_crew, or full_crew")
-    complexity: str = Field(..., description="simple, intermediate, or complex")
+    # Goals & Deliverables (spec requirements)
+    goals: Optional[List[str]] = Field(None, max_items=20, description="Project goals")
+    deliverables: Optional[List[str]] = Field(None, max_items=20, description="What will be delivered")
+
+    # Project scope (optional — don't block posting)
+    crew_size: Optional[str] = Field(None, description="individual, small_crew, or full_crew")
+    complexity: Optional[str] = Field(None, description="simple, intermediate, or complex")
 
     # Budget & Rates
-    budget_type: str = Field(..., description="fixed, hourly, daily, or weekly")
+    budget_type: Optional[str] = Field(None, description="fixed, hourly, daily, weekly, or negotiable")
     budget: Optional[BudgetCreate] = Field(None, description="For fixed budget")
     hourly_rate: Optional[RateCreate] = Field(None, description="For hourly budget")
     daily_rate: Optional[RateCreate] = Field(None, description="For daily budget")
     weekly_rate: Optional[RateCreate] = Field(None, description="For weekly budget")
+    currency: Optional[str] = Field("USD", description="ISO 4217 currency code e.g. USD, LKR, EUR")
+
+    @validator('budget', always=True)
+    def budget_minimum(cls, v):
+        """Enforce $5 minimum on fixed budgets."""
+        if v is None:
+            return v
+        min_val = v.min or 0
+        max_val = v.max or 0
+        effective = max_val or min_val
+        if effective > 0 and effective < 5:
+            raise ValueError('Projects must have a minimum budget of $5.')
+        return v
+
+    # Location & event details (required for in-person / on-site work)
+    location: Optional[str] = Field(None, max_length=200, description="Physical location e.g. 'Colombo, Sri Lanka'")
+    event_date: Optional[datetime] = Field(None, description="Specific event date for event-based projects")
+    is_remote: Optional[bool] = Field(None, description="True = remote only, False = in-person, None = flexible")
 
     # Timeline
-    duration: Optional[str] = Field(None, description="Project duration description")
+    duration: Optional[str] = Field(None, description="Timeline description e.g. '2 weeks', 'by end of July'")
     estimated_duration: Optional[int] = Field(None, ge=1, le=365, description="Estimated days")
     start_date: Optional[datetime] = None
     deadline: Optional[datetime] = None
 
     # Requirements
-    skills: List[str] = Field(..., min_items=1, max_items=30, description="Required skills")
-    experience_level: str = Field(..., description="student, entry, intermediate, or expert")
+    skills: Optional[List[str]] = Field(None, max_items=30, description="Required skills")
+    experience_level: Optional[str] = Field(None, description="student, entry, intermediate, or expert")
 
     # Crew calls
     crew_call: Optional[List[CrewCallCreate]] = Field(None, max_items=20)
@@ -167,13 +189,19 @@ class JobPostCreate(BaseModel):
 
     @validator('department')
     def validate_department(cls, v):
+        # Accept both the new frontend categories and legacy film-crew values
         allowed = [
+            # New frontend categories (Stage 2 form)
+            'Design', 'Film & Video', 'Writing & Content', 'Marketing & Strategy',
+            'Music & Audio', 'Digital & Interactive', 'Photography', 'Branding',
+            # Legacy film-crew departments (kept for backwards compatibility)
             'Camera', 'Sound', 'Lighting', 'Grip', 'Electric',
             'Art Department', 'Costume', 'Makeup & Hair', 'VFX',
             'Post-Production', 'Editing', 'Color Grading', 'Sound Design',
             'Music Composition', 'Production Management', 'Directing',
             'Producing', 'Cinematography', 'Scripting', 'Storyboarding',
-            'Animation', '3D Modeling', 'Motion Graphics', 'Other'
+            'Animation', '3D Modeling', 'Motion Graphics',
+            'Other',
         ]
         if v not in allowed:
             raise ValueError(f'Department must be one of: {", ".join(allowed)}')
@@ -181,25 +209,25 @@ class JobPostCreate(BaseModel):
 
     @validator('crew_size')
     def validate_crew_size(cls, v):
-        if v not in ['individual', 'small_crew', 'full_crew']:
+        if v and v not in ['individual', 'small_crew', 'full_crew']:
             raise ValueError('crew_size must be: individual, small_crew, or full_crew')
         return v
 
     @validator('complexity')
     def validate_complexity(cls, v):
-        if v not in ['simple', 'intermediate', 'complex']:
+        if v and v not in ['simple', 'intermediate', 'complex']:
             raise ValueError('complexity must be: simple, intermediate, or complex')
         return v
 
     @validator('budget_type')
     def validate_budget_type(cls, v):
-        if v not in ['fixed', 'hourly', 'daily', 'weekly']:
-            raise ValueError('budget_type must be: fixed, hourly, daily, or weekly')
+        if v and v not in ['fixed', 'hourly', 'daily', 'weekly', 'negotiable']:
+            raise ValueError('budget_type must be: fixed, hourly, daily, weekly, or negotiable')
         return v
 
     @validator('experience_level')
     def validate_experience_level(cls, v):
-        if v not in ['student', 'entry', 'intermediate', 'expert']:
+        if v and v not in ['student', 'entry', 'intermediate', 'expert']:
             raise ValueError('experience_level must be: student, entry, intermediate, or expert')
         return v
 
@@ -232,6 +260,10 @@ class JobPostUpdate(BaseModel):
     hourly_rate: Optional[RateCreate] = None
     daily_rate: Optional[RateCreate] = None
     weekly_rate: Optional[RateCreate] = None
+
+    location: Optional[str] = Field(None, max_length=200)
+    event_date: Optional[datetime] = None
+    is_remote: Optional[bool] = None
 
     duration: Optional[str] = None
     estimated_duration: Optional[int] = Field(None, ge=1, le=365)
@@ -270,40 +302,44 @@ class JobPostRead(BaseModel):
     description: str
     department: str
     role: Optional[str] = None
-    tags: List[str]
+    tags: Optional[List[str]] = []
 
-    crew_size: str
-    complexity: str
+    crew_size: Optional[str] = None
+    complexity: Optional[str] = None
 
-    budget_type: str
+    budget_type: Optional[str] = None
     budget: Optional[dict] = None
     hourly_rate: Optional[dict] = None
     daily_rate: Optional[dict] = None
     weekly_rate: Optional[dict] = None
+
+    location: Optional[str] = None
+    event_date: Optional[datetime] = None
+    is_remote: Optional[bool] = None
 
     duration: Optional[str] = None
     estimated_duration: Optional[int] = None
     start_date: Optional[datetime] = None
     deadline: Optional[datetime] = None
 
-    skills: List[str]
-    experience_level: str
+    skills: Optional[List[str]] = []
+    experience_level: Optional[str] = None
 
     crew_call: Optional[List[CrewCallRead]] = None
     attachments: Optional[List[AttachmentRead]] = None
 
-    visibility: str
+    visibility: Optional[str] = "public"
     invited_crew: Optional[List[str]] = None
 
     proposal_settings: Optional[ProposalSettingsRead] = None
     questions: Optional[List[ScreeningQuestionRead]] = None
 
     status: str
-    proposal_count: int
-    view_count: int
+    proposal_count: int = 0
+    view_count: int = 0
     hired_crew: Optional[List[str]] = None
     cover_image: Optional[str] = None
-    workspace: Optional[dict] = None  # includes progress, roles_filled/required
+    workspace: Optional[dict] = None
 
     published_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
@@ -317,21 +353,21 @@ class JobPostListRead(BaseModel):
     title: str
     department: str
     role: Optional[str] = None
-    tags: List[str]
+    tags: Optional[List[str]] = []
 
-    crew_size: str
-    complexity: str
-    budget_type: str
+    crew_size: Optional[str] = None
+    complexity: Optional[str] = None
+    budget_type: Optional[str] = None
     budget: Optional[dict] = None
 
-    skills: List[str]
-    experience_level: str
+    skills: Optional[List[str]] = []
+    experience_level: Optional[str] = None
 
     status: str
-    proposal_count: int
-    view_count: int
+    proposal_count: int = 0
+    view_count: int = 0
     cover_image: Optional[str] = None
-    workspace: Optional[dict] = None  # includes progress, roles_filled/required
+    workspace: Optional[dict] = None
 
     published_at: Optional[datetime] = None
     deadline: Optional[datetime] = None

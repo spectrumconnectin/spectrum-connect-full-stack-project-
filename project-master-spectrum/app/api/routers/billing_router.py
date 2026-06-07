@@ -4,6 +4,8 @@ Billing API Routes
 Endpoints for subscription management and billing
 """
 
+import logging
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
@@ -93,7 +95,7 @@ async def get_checkout_info(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get checkout info: {str(e)}"
+            detail="Unable to load checkout information. Please try again."
         )
 
 
@@ -132,7 +134,7 @@ async def create_subscription(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create subscription: {str(e)}"
+            detail="Unable to create subscription. Please try again."
         )
 
 
@@ -164,7 +166,7 @@ async def cancel_subscription(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to cancel subscription: {str(e)}"
+            detail="Unable to cancel subscription. Please try again."
         )
 
 
@@ -194,5 +196,5 @@ async def get_billing_history(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get billing history: {str(e)}"
+            detail="Unable to load billing history. Please try again."
         )

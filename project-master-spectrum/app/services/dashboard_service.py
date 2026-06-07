@@ -12,7 +12,7 @@ from beanie import PydanticObjectId
 from app.models.schema import User, JobPost
 from app.models.project import Project, ActivityLog, ProjectDeadline
 from app.models.message import Conversation, Message
-from app.models.project import Project
+from app.services.project_service import ProjectService
 
 class DashboardService:
     """Service for dashboard data aggregation"""

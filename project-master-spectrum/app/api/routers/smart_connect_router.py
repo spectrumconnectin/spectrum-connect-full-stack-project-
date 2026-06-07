@@ -81,6 +81,56 @@ async def smart_match(
         )
 
 
+# ── Project-linked auto-match ─────────────────────────────────────────────────
+
+@router.get("/match-for-project/{job_id}", response_model=SmartMatchResponse)
+async def match_for_project(
+    job_id: str,
+    limit: int = Query(default=12, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Automatically generate Smart Connect matches for a specific published project.
+    Reads project title, description, category, skills, and location from the
+    job post and runs the full scoring algorithm.
+
+    Used when a client clicks 'Find Matching Creators' on their project page.
+    """
+    from app.models.schema import JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        job = await JobPost.get(PydanticObjectId(job_id))
+    except Exception:
+        job = None
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+    if job.status not in ("open", "in_progress"):
+        raise HTTPException(status_code=400, detail="Project must be published (open) to find matches")
+
+    try:
+        result = await SmartConnectService.smart_match(
+            project_description=job.description,
+            project_type=job.department or "",
+            roles_needed=[job.role] if job.role else [],
+            timeline=job.duration,
+            skills_required=job.skills or [],
+            location=None,  # optional per spec
+            is_remote=False,
+            workload_aware=True,
+            limit=limit,
+        )
+        return SmartMatchResponse(**result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Smart matching failed: {str(e)}",
+        )
+
+
 # ── Search ─────────────────────────────────────────────────────────────────────
 
 @router.post("/search", response_model=CreativeSearchResponse)
@@ -280,3 +330,73 @@ async def get_stats():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch stats: {str(e)}",
         )
+
+# ── Match History ──────────────────────────────────────────────────────────────
+
+from app.models.smart_connect_history import SmartConnectHistory
+from datetime import datetime
+from pydantic import BaseModel as PydanticBase
+from typing import Optional as Opt
+
+class HistoryRecordRequest(PydanticBase):
+    match_title: str
+    match_subtitle: Opt[str] = None
+    match_avatar: Opt[str] = None
+    match_score: Opt[int] = None
+    match_user_id: Opt[str] = None
+    match_job_id: Opt[str] = None
+    action: str  # "applied" | "invited" | "saved" | "messaged"
+
+
+@router.post("/history/record")
+async def record_match_action(
+    payload: HistoryRecordRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Record when a user acts on a Smart Connect match recommendation."""
+    try:
+        entry = SmartConnectHistory(
+            user_id=str(current_user.id),
+            match_title=payload.match_title,
+            match_subtitle=payload.match_subtitle,
+            match_avatar=payload.match_avatar,
+            match_score=payload.match_score,
+            match_user_id=payload.match_user_id,
+            match_job_id=payload.match_job_id,
+            action=payload.action,
+        )
+        await entry.insert()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history")
+async def get_match_history(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """Get the current user's Smart Connect match history (most recent first)."""
+    try:
+        entries = await SmartConnectHistory.find(
+            SmartConnectHistory.user_id == str(current_user.id)
+        ).sort(-SmartConnectHistory.created_at).limit(limit).to_list()
+
+        return {
+            "history": [
+                {
+                    "id": str(e.id),
+                    "match_title": e.match_title,
+                    "match_subtitle": e.match_subtitle,
+                    "match_avatar": e.match_avatar,
+                    "match_score": e.match_score,
+                    "match_user_id": e.match_user_id,
+                    "match_job_id": e.match_job_id,
+                    "action": e.action,
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in entries
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

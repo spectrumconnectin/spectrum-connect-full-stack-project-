@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { jobs, proposals, JobPostItem } from '@/lib/api';
+import { useParams, useRouter, usePathname } from 'next/navigation';
+import { jobs, proposals, profile as profileApi, JobPostItem, formatJobBudget, currencySymbol } from '@/lib/api';
 
 const DURATION_OPTIONS = [
   { label: 'Less than 1 week', value: 1 },
@@ -15,42 +15,48 @@ const DURATION_OPTIONS = [
   { label: '3–6 months', value: 20 },
 ];
 
-function budgetLabel(job: JobPostItem): string {
-  if (job.budget?.min && job.budget?.max) {
-    return `$${job.budget.min.toLocaleString()} – $${job.budget.max.toLocaleString()}`;
-  }
-  if (job.budget?.min) return `From $${job.budget.min.toLocaleString()}`;
-  if (job.daily_rate?.min || job.daily_rate?.max) {
-    const min = job.daily_rate.min ?? 0;
-    const max = job.daily_rate.max;
-    return max ? `$${min}–$${max}/day` : `From $${min}/day`;
-  }
-  if (job.hourly_rate?.min || job.hourly_rate?.max) {
-    const min = job.hourly_rate.min ?? 0;
-    const max = job.hourly_rate.max;
-    return max ? `$${min}–$${max}/hr` : `From $${min}/hr`;
-  }
-  return 'Negotiable';
+const budgetLabel = formatJobBudget;
+
+function isFixedPrice(job: JobPostItem): boolean {
+  return job.budget_type === 'fixed' &&
+    !!job.budget?.min && !!job.budget?.max &&
+    job.budget.min === job.budget.max;
 }
 
 export default function ProjectApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const backHref = pathname.includes('/find-projects/')
+    ? `/creator/find-projects/${id}`
+    : '/creator/find-projects';
 
   const [job, setJob] = useState<JobPostItem | null>(null);
   const [loadingJob, setLoadingJob] = useState(true);
+  const [isOwnJob, setIsOwnJob] = useState(false);
 
   const [coverLetter, setCoverLetter] = useState('');
   const [proposedBudget, setProposedBudget] = useState('');
   const [proposedDuration, setProposedDuration] = useState('');
+  const [portfolioUrl, setPortfolioUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    jobs.getById(id)
-      .then(setJob)
+    Promise.all([jobs.getById(id), profileApi.getMe()])
+      .then(([jobData, me]) => {
+        setJob(jobData);
+        // For fixed-price jobs, lock the proposed budget to the exact fixed price
+        if (isFixedPrice(jobData) && jobData.budget?.min) {
+          setProposedBudget(String(jobData.budget.min));
+        }
+        // Block self-application: job's client_id matches the logged-in user
+        if (jobData.client_id && me.id && String(jobData.client_id) === String(me.id)) {
+          setIsOwnJob(true);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoadingJob(false));
   }, [id]);
@@ -65,6 +71,7 @@ export default function ProjectApplicationPage() {
         cover_letter: coverLetter,
         proposed_budget: proposedBudget ? Number(proposedBudget) : undefined,
         proposed_duration: proposedDuration ? Number(proposedDuration) : undefined,
+        portfolio_url: portfolioUrl.trim() || undefined,
       });
       setSubmitted(true);
       setTimeout(() => router.push('/creator/projects?tab=applications'), 1800);
@@ -78,7 +85,7 @@ export default function ProjectApplicationPage() {
   return (
     <>
       <div className="mb-6">
-        <Link href={`/creator/projects/${id}`} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium">
+        <Link href={backHref} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium">
           <i className="fa-solid fa-arrow-left"></i>Back to Project
         </Link>
       </div>
@@ -111,7 +118,19 @@ export default function ProjectApplicationPage() {
           )}
         </div>
 
-        {submitted ? (
+        {isOwnJob ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-10 text-center shadow-sm">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-ban text-amber-500 text-3xl"></i>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">You can&apos;t apply to your own job</h2>
+            <p className="text-gray-600 text-sm mb-6">This project was posted from your account. You cannot apply to or hire yourself.</p>
+            <Link href="/creator/find-projects"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+              <i className="fa-solid fa-magnifying-glass"></i>Find Other Projects
+            </Link>
+          </div>
+        ) : submitted ? (
           <div className="bg-white rounded-2xl border border-emerald-200 p-12 text-center shadow-sm">
             <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <i className="fa-solid fa-circle-check text-emerald-500 text-3xl"></i>
@@ -130,7 +149,7 @@ export default function ProjectApplicationPage() {
             )}
 
             {/* Cover letter */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
                   <i className="fa-solid fa-pen text-cobalt text-sm"></i>
@@ -149,18 +168,40 @@ export default function ProjectApplicationPage() {
             </div>
 
             {/* Proposal */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
                   <i className="fa-solid fa-wallet text-green-600 text-sm"></i>
                 </div>
                 <h2 className="text-lg font-bold text-gray-900">Your Proposal</h2>
               </div>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Your Rate ($)</label>
+
+              {/* Fixed-price notice — rate is not negotiable */}
+              {job && isFixedPrice(job) ? (
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3.5 mb-4">
+                    <i className="fa-solid fa-tag text-emerald-600 text-lg flex-shrink-0"></i>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900">Fixed Price Project</p>
+                      <p className="text-xs text-emerald-700 mt-0.5">
+                        This project has a fixed price of{' '}
+                        <strong>{currencySymbol(job.budget?.currency)}{job.budget!.min!.toLocaleString()}</strong>.
+                        The rate is non-negotiable — you apply at this price or not at all.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    <span className="text-sm font-semibold text-gray-700">Your payout (after 8% fee)</span>
+                    <span className="text-lg font-bold text-emerald-600">
+                      {currencySymbol(job.budget?.currency)}{(job.budget!.min! * 0.92).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Your Rate ({currencySymbol(job?.budget?.currency).trim()})</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">{currencySymbol(job?.budget?.currency)}</span>
                     <input
                       type="number"
                       min="1"
@@ -174,36 +215,43 @@ export default function ProjectApplicationPage() {
                     <p className="text-xs text-gray-400 mt-1.5">Client budget: {budgetLabel(job)}</p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Estimated Timeline</label>
-                  <select
-                    value={proposedDuration}
-                    onChange={e => setProposedDuration(e.target.value)}
-                    className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900"
-                  >
-                    <option value="">Select timeline</option>
-                    {DURATION_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">Estimated Timeline</label>
+                <select
+                  value={proposedDuration}
+                  onChange={e => setProposedDuration(e.target.value)}
+                  className="w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900"
+                >
+                  <option value="">Select timeline</option>
+                  {DURATION_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Portfolio note */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            {/* Portfolio / Drive link */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <i className="fa-solid fa-images text-purple-600 text-sm"></i>
+                  <i className="fa-brands fa-google-drive text-purple-600 text-sm"></i>
                 </div>
-                <h2 className="text-lg font-bold text-gray-900">Portfolio</h2>
+                <h2 className="text-lg font-bold text-gray-900">Portfolio / Work Samples</h2>
               </div>
-              <p className="text-sm text-gray-500">
-                Your profile portfolio is automatically shared with the client.{' '}
-                <Link href="/creator/profile" className="text-cobalt font-semibold hover:underline">
-                  Update your portfolio
-                </Link>{' '}
-                to make the best impression.
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Google Drive or Portfolio Link <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={portfolioUrl}
+                onChange={e => setPortfolioUrl(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/..."
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Paste a link to your Google Drive folder, Vimeo reel, Behance, or any portfolio that showcases your relevant work. Clients can click it directly from your proposal.
               </p>
             </div>
 

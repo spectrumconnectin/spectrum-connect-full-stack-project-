@@ -83,9 +83,17 @@ export default function EarningsPage() {
 
   return (
     <>
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Earnings</h1>
-        <p className="text-lg text-gray-600">Your income, payouts, and pending balances at a glance.</p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Earnings</h1>
+          <p className="text-lg text-gray-600">Your income, payouts, and pending balances at a glance.</p>
+        </div>
+        <button
+          onClick={() => earnings.downloadCreatorCSV()}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-50 transition shadow-sm">
+          <i className="fa-solid fa-download text-cobalt"></i>
+          Download Earnings Report (CSV)
+        </button>
       </div>
 
       {loading ? (
@@ -101,7 +109,7 @@ export default function EarningsPage() {
       ) : (
         <>
           {/* Balance cards */}
-          <div className="grid lg:grid-cols-3 gap-6 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
             <div className="lg:col-span-2 bg-gradient-to-br from-cobalt via-blue-600 to-blue-500 rounded-3xl p-10 text-white relative overflow-hidden shadow-xl">
               <div className="absolute top-0 right-0 w-96 h-96 bg-purple-400 rounded-full opacity-20 blur-3xl pointer-events-none"></div>
               <div className="relative">
@@ -141,6 +149,36 @@ export default function EarningsPage() {
                   ${(stats?.this_month ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">{stats?.transaction_count ?? 0} total transactions</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Platform Fee Info Banner */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 mb-8">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-cobalt rounded-xl flex items-center justify-center flex-shrink-0">
+                <i className="fa-solid fa-receipt text-white text-sm"></i>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 mb-1">Platform Fee: 8% per payout</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Spectrum Connect deducts an 8% platform fee from each milestone payment. You receive 92% of the agreed project amount.
+                </p>
+                <div className="flex flex-wrap gap-4 mt-3 text-sm">
+                  {[
+                    { label: 'Example — $100 project', value: null },
+                    { label: 'Project amount',    value: '$100.00',   color: 'text-gray-700' },
+                    { label: 'Platform fee (8%)', value: '−$8.00',    color: 'text-rose-600' },
+                    { label: 'You receive',       value: '$92.00',    color: 'text-emerald-600 font-bold' },
+                  ].map(({ label, value, color }) => value ? (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className="text-gray-500 text-xs">{label}:</span>
+                      <span className={`text-xs font-semibold ${color ?? ''}`}>{value}</span>
+                    </div>
+                  ) : (
+                    <span key={label} className="text-xs text-gray-400 italic self-center">{label}</span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

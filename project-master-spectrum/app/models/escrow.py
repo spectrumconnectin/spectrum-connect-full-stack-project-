@@ -45,17 +45,48 @@ class EscrowMilestone(BaseModel):
     amount: float
     currency: str = "USD"
 
-    # Status machine: funded → released | disputed | refunded
+    # Status machine
     status: str = "pending"
-    # pending   – defined but not yet funded by client
-    # funded    – client has deposited funds
-    # released  – client approved, funds sent to creator
-    # disputed  – dispute raised on this milestone
-    # refunded  – funds returned to client
+    # pending            – defined but not yet funded by client
+    # funded             – client has deposited funds; creator can begin work
+    # delivered          – creator submitted delivery; awaiting client review
+    # revision_requested – client requested changes; creator must resubmit
+    # approved           – client approved the work (alias for released trigger)
+    # released           – client confirmed, funds sent to creator
+    # disputed           – dispute raised on this milestone
+    # refunded           – funds returned to client
 
     funded_at:   Optional[datetime] = None
     released_at: Optional[datetime] = None
     refunded_at: Optional[datetime] = None
+
+    # Delivery details — set when creator calls deliver_milestone
+    google_drive_link: Optional[str] = None   # REQUIRED when submitting delivery
+    delivery_notes:    Optional[str] = None   # optional message from creator
+    delivered_at:      Optional[datetime] = None
+    auto_release_at:   Optional[datetime] = None  # delivered_at + 48h
+    auto_released:     bool = False                # True if system auto-released
+
+    # ── Review-gating audit trail ─────────────────────────────────────────────
+    # Funds cannot be released until the client has actively opened the Drive link
+    # AND explicitly confirmed they have reviewed the delivered work.
+    drive_link_opened_at: Optional[datetime] = None  # first time client clicked "Open Drive Link"
+    client_reviewed_at:   Optional[datetime] = None  # client confirmed review via the review checkbox
+
+    # Revision tracking
+    revision_count:    int = 0                     # number of revisions requested
+    revision_notes:    Optional[str] = None        # latest revision feedback from client
+
+    # Full delivery history — every version the creator has submitted.
+    # Entries are appended (never removed) so the complete audit trail is preserved.
+    delivery_history: List[dict] = Field(default_factory=list)
+    # Each entry shape:
+    # {
+    #   "version": int,          # 1-based submission number
+    #   "google_drive_link": str,
+    #   "delivery_notes": str | None,
+    #   "submitted_at": ISO str,
+    # }
 
     # Optional link to a ProjectDeadline document
     deadline_id: Optional[str] = None

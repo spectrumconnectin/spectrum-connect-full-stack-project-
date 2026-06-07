@@ -107,7 +107,7 @@ export default function TermsPage() {
       <p>
         If you genuinely want to hire someone you met here as a full-time employee,
         we&apos;re happy to talk about a conversion fee instead of fighting about it. Email{' '}
-        <a href="mailto:legal@spectrumconnect.co">legal@spectrumconnect.co</a>.
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.
       </p>
 
       <h2>7. Content and intellectual property</h2>
@@ -231,8 +231,8 @@ export default function TermsPage() {
 
       <h2>18. How to reach us</h2>
       <p>
-        For legal questions: <a href="mailto:legal@spectrumconnect.co">legal@spectrumconnect.co</a>.<br />
-        For everything else: <a href="mailto:support@spectrumconnect.co">support@spectrumconnect.co</a>.<br />
+        For legal questions: <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.<br />
+        For everything else: <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>.<br />
         By post: Spectrum Connect, Inc., Legal Department, 340 Pine Street, Suite 800, San
         Francisco, CA 94104, USA.
       </p>

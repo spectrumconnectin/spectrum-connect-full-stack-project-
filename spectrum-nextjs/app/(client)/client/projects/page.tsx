@@ -2,31 +2,41 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
-const STATUS_FILTERS = ['All', 'open', 'draft', 'paused', 'closed', 'completed'];
+const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'approved', 'completed', 'draft'];
+
+// Map raw status → display label
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    open:               'Open',
+    in_review:          'In Review',
+    pending_funding:    'Pending Funding',
+    in_progress:        'Active',
+    delivered:          'Delivered',
+    revision_requested: 'Revision Requested',
+    approved:           'Approved',
+    completed:          'Completed',
+    draft:              'Draft',
+    closed:             'Active',  // legacy
+  };
+  return labels[status] ?? status;
+}
 
 const STATUS_STYLES: Record<string, string> = {
-  open: 'bg-green-100 text-green-700',
-  draft: 'bg-gray-100 text-gray-600',
-  paused: 'bg-yellow-100 text-yellow-700',
-  closed: 'bg-red-100 text-red-600',
-  completed: 'bg-blue-100 text-blue-700',
+  open:               'bg-green-100 text-green-700',
+  in_review:          'bg-amber-100 text-amber-700',
+  pending_funding:    'bg-orange-100 text-orange-700',
+  in_progress:        'bg-blue-100 text-blue-700',
+  delivered:          'bg-indigo-100 text-indigo-700',
+  revision_requested: 'bg-orange-100 text-orange-700',
+  approved:           'bg-teal-100 text-teal-700',
+  completed:          'bg-emerald-100 text-emerald-700',
+  draft:              'bg-gray-100 text-gray-500',
+  closed:             'bg-blue-100 text-blue-700',
 };
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, suffix = '') => {
-    if (!min && !max) return 'TBD';
-    if (min && max) return `$${min.toLocaleString()}–$${max.toLocaleString()}${suffix}`;
-    if (min) return `$${min.toLocaleString()}+${suffix}`;
-    return `$${max?.toLocaleString()}${suffix}`;
-  };
-  if (p.budget_type === 'fixed') return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily') return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 function formatPosted(dateStr?: string): string {
   if (!dateStr) return '—';
@@ -64,12 +74,16 @@ export default function ClientProjectsPage() {
     return matchFilter && matchSearch;
   });
 
+  // Split active projects from completed history
+  const activeProjects    = filtered.filter(p => p.status !== 'completed');
+  const completedProjects = filtered.filter(p => p.status === 'completed');
+
   return (
     <>
       <section className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">My Projects</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">My Projects</h1>
             <p className="text-gray-600">Manage and track all your job postings</p>
           </div>
           <Link href="/client/projects/create"
@@ -83,17 +97,20 @@ export default function ClientProjectsPage() {
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-2 flex-wrap">
-              {STATUS_FILTERS.map(f => (
-                <button key={f} onClick={() => setActiveFilter(f)}
-                  className={`px-4 py-2.5 text-sm rounded-lg font-medium transition capitalize ${activeFilter === f ? 'font-semibold text-cobalt bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
-                  {f}
-                </button>
-              ))}
+              {STATUS_FILTERS.map(f => {
+                const label = f === 'All' ? 'All' : statusLabel(f);
+                return (
+                  <button key={f} onClick={() => setActiveFilter(f)}
+                    className={`px-4 py-2.5 text-sm rounded-lg font-medium transition ${activeFilter === f ? 'font-semibold text-cobalt bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    {label}
+                  </button>
+                );
+              })}
             </div>
             <div className="relative">
               <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
               <input type="text" placeholder="Search projects" value={search} onChange={e => setSearch(e.target.value)}
-                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-cobalt focus:outline-none w-64" />
+                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:border-cobalt focus:outline-none w-full sm:w-64" />
             </div>
           </div>
         </div>
@@ -115,67 +132,96 @@ export default function ClientProjectsPage() {
           </button>
         </div>
       ) : (
-        <section className="space-y-4">
-          {filtered.map(p => (
-            <Link key={p.id} href={`/client/projects/${p.id}`}
-              className="block bg-white rounded-2xl border border-gray-200 p-6 hover:border-cobalt transition shadow-sm group">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition mb-1">{p.title}</h3>
-                  <p className="text-sm text-gray-500 capitalize">{p.department}{p.role ? ` · ${p.role}` : ''}</p>
-                </div>
-                <span className={`text-xs font-semibold px-3 py-1.5 rounded-full capitalize ${STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {p.status}
-                </span>
-              </div>
-
-              {p.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {p.tags.slice(0, 5).map(t => (
-                    <span key={t} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{t}</span>
-                  ))}
-                  {p.tags.length > 5 && (
-                    <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{p.tags.length - 5}</span>
-                  )}
-                </div>
+        <section className="space-y-8">
+          {/* Active projects */}
+          {(activeFilter === 'All' || activeFilter !== 'completed') && (
+            <div className="space-y-4">
+              {activeFilter === 'All' && activeProjects.length > 0 && (
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                  Active Projects ({activeProjects.length})
+                </h2>
               )}
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                <div>
-                  <p className="text-gray-500 mb-1">Budget</p>
-                  <p className="font-semibold text-gray-900">{formatBudget(p)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Complexity</p>
-                  <p className="font-semibold text-gray-900 capitalize">{p.complexity}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Crew Size</p>
-                  <p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Proposals</p>
-                  <p className="font-semibold text-gray-900">
-                    {p.proposal_count > 0 ? `${p.proposal_count} received` : 'None yet'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-xs text-gray-400">Posted {formatPosted(p.created_at)}</span>
-                <div className="flex items-center gap-3 text-sm">
-                  {p.proposal_count > 0 && p.status === 'open' && (
-                    <Link href={`/client/projects/${p.id}/applicants`}
-                      className="text-cobalt font-semibold hover:underline"
-                      onClick={e => e.stopPropagation()}>
-                      Review {p.proposal_count} applicants
-                    </Link>
+              {activeProjects.map(p => (
+                <Link key={p.id} href={`/client/projects/${p.id}`}
+                  className="block bg-white rounded-2xl border border-gray-200 p-6 hover:border-cobalt transition shadow-sm group">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition mb-1">{p.title}</h3>
+                      <p className="text-sm text-gray-500 capitalize">{p.department}{p.role ? ` · ${p.role}` : ''}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${
+                      p.status === 'open' && p.proposal_count > 0
+                        ? 'bg-amber-100 text-amber-700'
+                        : STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {statusLabel(p.status)}
+                    </span>
+                  </div>
+                  {p.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {p.tags.slice(0, 5).map(t => (
+                        <span key={t} className="text-xs px-2.5 py-1 bg-blue-50 text-cobalt rounded-full font-medium">{t}</span>
+                      ))}
+                      {p.tags.length > 5 && (
+                        <span className="text-xs px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full">+{p.tags.length - 5}</span>
+                      )}
+                    </div>
                   )}
-                  <span className="text-gray-400">→</span>
-                </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                    <div><p className="text-gray-500 mb-1">Budget</p><p className="font-semibold text-gray-900">{formatBudget(p)}</p></div>
+                    <div><p className="text-gray-500 mb-1">Complexity</p><p className="font-semibold text-gray-900 capitalize">{p.complexity}</p></div>
+                    <div><p className="text-gray-500 mb-1">Crew Size</p><p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p></div>
+                    <div><p className="text-gray-500 mb-1">Proposals</p><p className="font-semibold text-gray-900">{p.proposal_count > 0 ? `${p.proposal_count} received` : 'None yet'}</p></div>
+                  </div>
+                  <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Posted {formatPosted(p.created_at)}</span>
+                    <div className="flex items-center gap-3 text-sm">
+                      {p.proposal_count > 0 && p.status === 'open' && (
+                        <Link href={`/client/projects/${p.id}/applicants`}
+                          className="text-cobalt font-semibold hover:underline"
+                          onClick={e => e.stopPropagation()}>
+                          Review {p.proposal_count} applicants
+                        </Link>
+                      )}
+                      <span className="text-gray-400">→</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Completed History */}
+          {completedProjects.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                  <i className="fa-solid fa-trophy text-emerald-500 mr-1.5"></i>
+                  Completed History ({completedProjects.length})
+                </h2>
+                <div className="flex-1 h-px bg-gray-200"></div>
               </div>
-            </Link>
-          ))}
+              {completedProjects.map(p => (
+                <Link key={p.id} href={`/client/projects/${p.id}`}
+                  className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 px-5 py-4 hover:border-emerald-400 hover:bg-emerald-50/30 transition group">
+                  <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i className="fa-solid fa-check text-emerald-600 text-sm"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate group-hover:text-emerald-700">{p.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {p.department}{p.role ? ` · ${p.role}` : ''} · {formatBudget(p)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-gray-400">{formatPosted(p.created_at)}</span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Completed</span>
+                    <i className="fa-solid fa-chevron-right text-xs text-gray-300 group-hover:text-emerald-500 transition"></i>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">

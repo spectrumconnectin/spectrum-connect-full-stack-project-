@@ -29,6 +29,15 @@ class MilestoneDetail(BaseModel):
     refunded_at: Optional[datetime] = None
     release_transaction_id: Optional[str] = None
     deadline_id: Optional[str] = None
+    # Delivery fields — populated when creator submits work
+    google_drive_link: Optional[str] = None
+    delivery_notes: Optional[str] = None
+    delivered_at: Optional[datetime] = None
+    auto_release_at: Optional[datetime] = None
+    auto_released: bool = False
+    # Review-gating audit trail
+    drive_link_opened_at: Optional[datetime] = None
+    client_reviewed_at: Optional[datetime] = None
 
 
 class UserBrief(BaseModel):
@@ -92,6 +101,7 @@ class EscrowListItem(BaseModel):
     released_amount: float
     currency: str
     project_id: Optional[str] = None
+    job_post_id: Optional[str] = None
     client_id: str
     creator_id: str
     milestone_count: int

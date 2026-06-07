@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { proposals, JobProposalItem } from '@/lib/api';
+import { proposals, profile as profileApi, JobProposalItem } from '@/lib/api';
 
 const STATUS_FILTERS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected'];
 
@@ -41,11 +41,18 @@ export default function ApplicantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    proposals.getForJob(id)
-      .then(data => setApplicants(data || []))
+    Promise.all([
+      proposals.getForJob(id),
+      profileApi.getMe(),
+    ])
+      .then(([data, me]) => {
+        setApplicants((data?.proposals ?? data ?? []) as JobProposalItem[]);
+        setMyUserId(me.id ?? null);
+      })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -77,7 +84,7 @@ export default function ApplicantsPage() {
             <i className="fa-solid fa-arrow-left text-gray-600"></i>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Applicants</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Applicants</h1>
             <p className="text-gray-500">
               {loading ? 'Loading…' : `${applicants.length} application${applicants.length !== 1 ? 's' : ''} received`}
             </p>
@@ -126,7 +133,7 @@ export default function ApplicantsPage() {
       ) : (
         <div className="space-y-5">
           {filtered.map(a => (
-            <div key={a.id} className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm hover:border-cobalt transition">
+            <div key={a.id} className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm hover:border-cobalt transition">
               <div className="flex items-start gap-5">
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
@@ -179,6 +186,18 @@ export default function ApplicantsPage() {
                       <p className="text-sm text-gray-600 line-clamp-3 italic">&ldquo;{a.cover_letter}&rdquo;</p>
                     </div>
                   )}
+
+                  {/* Portfolio / Drive link */}
+                  {a.portfolio_url && (
+                    <div className="mt-2">
+                      <a href={a.portfolio_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-cobalt font-semibold hover:underline bg-blue-50 px-3 py-1.5 rounded-lg">
+                        <i className="fa-brands fa-google-drive text-xs"></i>
+                        View Portfolio / Work Samples
+                        <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -186,6 +205,11 @@ export default function ApplicantsPage() {
               <div className="flex gap-3 mt-5 pt-5 border-t border-gray-100 flex-wrap">
                 {a.status !== 'accepted' && a.status !== 'rejected' && (
                   <>
+                    {myUserId && a.creator_id === myUserId ? (
+                      <div className="flex-1 min-w-[120px] flex items-center gap-2 text-amber-600 text-sm font-semibold bg-amber-50 border border-amber-200 px-4 py-3 rounded-xl">
+                        <i className="fa-solid fa-ban"></i>Can&apos;t hire yourself
+                      </div>
+                    ) : (
                     <button
                       disabled={updating === a.id}
                       onClick={() => handleStatus(a.id, 'accepted')}
@@ -193,6 +217,7 @@ export default function ApplicantsPage() {
                       {updating === a.id ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-check mr-2"></i>}
                       Hire {a.creator_name.split(' ')[0]}
                     </button>
+                    )}
                     {a.status !== 'shortlisted' && (
                       <button
                         disabled={updating === a.id}

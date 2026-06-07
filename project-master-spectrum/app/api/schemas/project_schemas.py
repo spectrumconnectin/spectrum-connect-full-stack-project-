@@ -55,6 +55,7 @@ class ProjectCreate(BaseModel):
     location: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    job_post_id: Optional[str] = None   # link to the originating JobPost
 
 
 class ProjectUpdate(BaseModel):

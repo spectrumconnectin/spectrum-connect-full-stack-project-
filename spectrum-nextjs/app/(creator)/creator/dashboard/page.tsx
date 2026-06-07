@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, type CreatorDashboardResponse } from '@/lib/api';
+import { dashboard, auth, escrow as escrowApi, type CreatorDashboardResponse } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 
 const difficultyStyles: Record<string, string> = {
@@ -14,14 +14,23 @@ const difficultyStyles: Record<string, string> = {
 export default function CreatorDashboardPage() {
   const [data, setData] = useState<CreatorDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inEscrow, setInEscrow] = useState(0);
+  const [pendingRelease, setPendingRelease] = useState(0);
+  const [totalEarned, setTotalEarned] = useState(0);
 
   useEffect(() => {
-    dashboard.getCreator()
-      .then(setData)
-      .catch(() => {
-        // if auth fails, let it silently show empty state (user may not be logged in yet)
-      })
-      .finally(() => setLoading(false));
+    Promise.allSettled([
+      dashboard.getCreator(),
+      escrowApi.list({ role: 'creator', limit: 50 }),
+    ]).then(([dashResult, escrowResult]) => {
+      if (dashResult.status === 'fulfilled') setData(dashResult.value);
+      if (escrowResult.status === 'fulfilled') {
+        const escrows = escrowResult.value.escrows || [];
+        setInEscrow(escrows.reduce((s, e) => s + (e.funded_amount - e.released_amount), 0));
+        setPendingRelease(escrows.filter(e => e.funded_milestones > e.released_milestones).reduce((s, e) => s + (e.funded_amount - e.released_amount), 0));
+        setTotalEarned(escrows.reduce((s, e) => s + e.released_amount, 0));
+      }
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const stats = data?.stats;
@@ -49,7 +58,7 @@ export default function CreatorDashboardPage() {
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-300 rounded-full opacity-20 blur-3xl" />
           <div className="relative z-10 max-w-3xl">
             <p className="text-blue-200 font-semibold uppercase tracking-widest text-sm mb-2">Welcome back</p>
-            <h1 className="text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
             <p className="text-blue-100 text-lg">
               {stats?.active_projects
                 ? `You have ${stats.active_projects} active project${stats.active_projects !== 1 ? 's' : ''}.`
@@ -65,21 +74,94 @@ export default function CreatorDashboardPage() {
       </section>
 
       {/* Stats strip */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         {[
-          { label: 'Total Earnings', value: `$${(stats?.total_earnings ?? 0).toLocaleString()}`, icon: 'fa-wallet', color: 'bg-green-100 text-green-600' },
-          { label: 'Active Projects', value: String(stats?.active_projects ?? 0), icon: 'fa-briefcase', color: 'bg-blue-100 text-cobalt' },
-          { label: 'Completed', value: String(stats?.projects_completed ?? 0), icon: 'fa-check-circle', color: 'bg-purple-100 text-purple-600' },
-          { label: 'Satisfaction', value: stats?.client_satisfaction ? `${stats.client_satisfaction}%` : '—', icon: 'fa-star', color: 'bg-amber-100 text-amber-600' },
+          {
+            label: 'Total Earnings',
+            value: `$${(stats?.total_earnings ?? 0).toLocaleString()}`,
+            sub: stats?.total_earnings ? 'after platform fees' : 'No payouts yet',
+            icon: 'fa-wallet',
+            color: 'bg-green-100 text-green-600',
+          },
+          {
+            label: 'Active Projects',
+            value: String(stats?.active_projects ?? 0),
+            sub: stats?.active_projects ? `project${(stats.active_projects ?? 0) !== 1 ? 's' : ''} in progress` : 'None active',
+            icon: 'fa-briefcase',
+            color: 'bg-blue-100 text-cobalt',
+          },
+          {
+            label: 'Completed',
+            value: String(stats?.projects_completed ?? 0),
+            sub: stats?.projects_completed ? `project${(stats.projects_completed ?? 0) !== 1 ? 's' : ''} delivered` : 'None yet',
+            icon: 'fa-circle-check',
+            color: 'bg-purple-100 text-purple-600',
+          },
+          {
+            label: 'Response Time',
+            value: (() => {
+              const rt = stats?.response_time_hours;
+              if (!rt || rt === 0) return '—';
+              if (rt < 1) return '< 1h';
+              if (rt < 24) return `~${Math.round(rt)}h`;
+              return `~${Math.round(rt / 24)}d`;
+            })(),
+            sub: stats?.response_time_hours && stats.response_time_hours > 0
+              ? 'avg reply time'
+              : 'Send messages to track',
+            icon: 'fa-clock',
+            color: 'bg-sky-100 text-sky-600',
+          },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
             <div className={`w-12 h-12 ${s.color} rounded-xl flex items-center justify-center mb-4`}>
               <i className={`fa-solid ${s.icon} text-xl`} />
             </div>
             <div className="text-3xl font-bold text-gray-900 mb-1">{s.value}</div>
-            <div className="text-sm text-gray-500">{s.label}</div>
+            <div className="text-sm font-medium text-gray-600">{s.label}</div>
+            <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
           </div>
         ))}
+      </section>
+
+      {/* Earnings & Escrow Panel */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Earnings</h2>
+          <Link href="/creator/earnings" className="text-sm text-cobalt font-semibold hover:underline">View details →</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-blue-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-lock text-cobalt text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">In Escrow</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${inEscrow.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Secured — waiting for release</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-amber-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-hourglass-half text-amber-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Pending Release</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${pendingRelease.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Awaiting client approval</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-emerald-100 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <i className="fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+              </div>
+              <span className="text-sm font-semibold text-gray-600">Total Released</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">${totalEarned.toLocaleString()}</div>
+            <p className="text-xs text-gray-400 mt-1">Paid to your account</p>
+          </div>
+        </div>
       </section>
 
       <div className="grid lg:grid-cols-3 gap-8 mb-10">
@@ -263,7 +345,7 @@ export default function CreatorDashboardPage() {
       {/* Quick actions */}
       <section className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-8">
         <h2 className="text-lg font-bold text-gray-900 mb-5">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { href: '/creator/projects', icon: 'fa-search', label: 'Find Projects', color: 'bg-blue-100 text-cobalt' },
             { href: '/creator/smart-connect', icon: 'fa-bolt', label: 'Smart Connect', color: 'bg-purple-100 text-purple-600' },

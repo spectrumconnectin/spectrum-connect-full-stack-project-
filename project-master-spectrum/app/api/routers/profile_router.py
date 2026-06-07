@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from typing import Optional
 
 from app.models.schema import User
-from app.auth.auth import get_current_user
+from app.models.message import UserPresence
+from app.auth.auth import get_current_user, get_current_user_optional
 from app.services.profile_service import ProfileService
 from app.api.schemas.profile_schemas import (
     UserProfileRead,
@@ -39,6 +40,22 @@ router = APIRouter()
 # CURRENT USER PROFILE ENDPOINTS
 # ============================================================================
 
+def _safe_user_dict(user: User) -> dict:
+    """Return a safe dict from a User document — strip ALL sensitive fields.
+
+    Never use `user.model_dump()` directly in a response: it includes
+    `password_hash`, `oauth` access/refresh tokens, and `login_history`.
+    """
+    return user.model_dump(
+        exclude={
+            "password_hash",
+            "oauth",           # contains raw access/refresh tokens from Google/FB etc.
+            "login_history",   # IP addresses — only accessible server-side
+            "deleted_at",      # internal soft-delete field
+        }
+    )
+
+
 @router.get("/me", response_model=UserProfileRead, summary="Get current user profile")
 async def get_my_profile(current_user: User = Depends(get_current_user)):
     """
@@ -47,8 +64,18 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
     Returns:
         - Full user profile including settings, stats, and all personal information
     """
-    user_dict = current_user.model_dump()
+    user_dict = _safe_user_dict(current_user)
     user_dict['id'] = str(current_user.id)
+
+    # Add online status
+    try:
+        presence = await UserPresence.find_one({"user_id": str(current_user.id)})
+        if presence:
+            user_dict['is_online'] = presence.is_online
+            user_dict['last_seen'] = presence.last_seen.isoformat() if presence.last_seen else None
+    except Exception:
+        user_dict['is_online'] = False
+
     return user_dict
 
 
@@ -72,7 +99,7 @@ async def update_my_profile(
         - Updated user profile
     """
     updated_user = await ProfileService.update_profile(current_user, profile_data)
-    user_dict = updated_user.model_dump()
+    user_dict = _safe_user_dict(updated_user)
     user_dict['id'] = str(updated_user.id)
     return user_dict
 
@@ -130,7 +157,7 @@ async def update_account_type(
         - both: Both crew and producer
     """
     updated_user = await ProfileService.update_account_type(current_user, account_type_data)
-    user_dict = updated_user.model_dump()
+    user_dict = _safe_user_dict(updated_user)
     user_dict['id'] = str(updated_user.id)
     return user_dict
 
@@ -251,10 +278,66 @@ async def get_my_stats(current_user: User = Depends(get_current_user)):
 # PUBLIC PROFILE ENDPOINTS (View Other Users)
 # ============================================================================
 
+@router.get("/{user_id}/reviews", summary="Get public reviews for a creator")
+async def get_user_reviews(user_id: str):
+    """
+    Returns all client reviews left for this creator, most recent first.
+    Only reviews from completed projects are returned (client_rating is set).
+    No auth required — reviews are public trust signals.
+    """
+    from app.models.schema import Application, JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        target_id = PydanticObjectId(user_id)
+    except Exception:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    # Fetch all accepted/hired applications for this creator that have a review
+    try:
+        apps = await Application.find(Application.crew_id == target_id).to_list()
+    except Exception:
+        return {"reviews": [], "total": 0}
+
+    results = []
+    for app in apps:
+        cr = app.client_rating
+        if not cr:
+            continue
+
+        # Optionally enrich with job title
+        job_title = None
+        try:
+            job = await JobPost.get(app.project_id)
+            if job:
+                job_title = job.title
+        except Exception:
+            pass
+
+        results.append({
+            "proposal_id": str(app.id),
+            "overall": cr.get("overall", 0),
+            "ratings": cr.get("ratings", {}),
+            "review": cr.get("review", ""),
+            "tags": cr.get("tags", []),
+            "reviewed_at": cr.get("reviewed_at"),
+            "job_title": job_title,
+        })
+
+    # Sort by reviewed_at descending (most recent first)
+    results.sort(
+        key=lambda r: r["reviewed_at"] or "",
+        reverse=True,
+    )
+
+    return {"reviews": results[:30], "total": len(results)}
+
+
 @router.get("/{user_id}", summary="Get user profile by ID")
 async def get_user_profile(
     user_id: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get a user's public profile by their ID.
@@ -275,7 +358,7 @@ async def get_user_profile(
 @router.get("/username/{username}", summary="Get user profile by username")
 async def get_user_profile_by_username(
     username: str,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get a user's public profile by their username."""
     user = await ProfileService.get_user_by_username(username)

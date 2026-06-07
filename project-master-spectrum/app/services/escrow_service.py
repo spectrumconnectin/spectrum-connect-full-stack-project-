@@ -199,16 +199,19 @@ class EscrowService:
         escrow_id: str,
         milestone_id: str,
         client_id: str,
+        is_auto_release: bool = False,
     ) -> Dict[str, Any]:
         """
         Client approves completed work and releases milestone funds to creator.
         Creates an immutable Transaction record.
+        Set is_auto_release=True to bypass the client_id ownership check
+        (used by the auto-release background job).
         """
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
             raise HTTPException(status_code=404, detail="Escrow not found.")
 
-        if str(escrow.client_id) != client_id:
+        if not is_auto_release and str(escrow.client_id) != client_id:
             raise HTTPException(status_code=403, detail="Only the client can release milestones.")
 
         if escrow.status not in {"active"}:
@@ -223,14 +226,69 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        if milestone.status != "funded":
+        # Allow 'delivered' for auto-release only, 'approved' for manual release.
+        # Funded milestones cannot be released without delivery.
+        allowed_statuses = ("funded", "approved", "delivered")
+        if milestone.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
-                detail=f"Milestone must be 'funded' before release (current: '{milestone.status}').",
+                detail=f"Milestone must be approved or delivered before release (current: '{milestone.status}').",
             )
+
+        # Payment-protection gate: manual releases from 'delivered' state require the
+        # client to have opened the Drive link AND confirmed the review.
+        # Auto-releases (is_auto_release=True) bypass this guard — the 48h window
+        # gives the client ample time; auto-release is a fallback, not a shortcut.
+        if milestone.status == "delivered" and not is_auto_release:
+            if not getattr(milestone, "drive_link_opened_at", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Payment cannot be released without reviewing the delivery. "
+                        "Open the Google Drive link on the Delivery Review page first."
+                    ),
+                )
+            if not getattr(milestone, "client_reviewed_at", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Please confirm you have reviewed the delivered work before releasing payment. "
+                        "Go to the Delivery Review page and confirm your review."
+                    ),
+                )
+
+        # If in 'delivered' state, auto-approve before release
+        if milestone.status == "delivered":
+            milestone.status = "approved"
 
         now = datetime.utcnow()
         tx_id = str(uuid.uuid4())
+
+        # ── Idempotency guard against rapid double-click / concurrent requests ──
+        # Atomically flip the milestone status from (approved/delivered) → released.
+        # If another request already changed it to 'released', this update will
+        # match 0 documents and we raise a 409 instead of creating a duplicate
+        # transaction.  We use the raw motor collection for the atomic update.
+        try:
+            from pymongo import ReturnDocument
+            result = await escrow.get_motor_collection().find_one_and_update(
+                {
+                    "_id": escrow.id,
+                    "milestones.milestone_id": milestone_id,
+                    "milestones.status": {"$in": ["approved", "delivered"]},
+                },
+                {"$set": {"milestones.$.status": "releasing"}},
+                return_document=ReturnDocument.AFTER,
+            )
+            if result is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Milestone is already being released or has already been paid. Duplicate release prevented.",
+                )
+        except HTTPException:
+            raise
+        except ImportError:
+            pass  # pymongo not available in test environment — skip atomic guard
 
         # Apply v1 8/4 commission split — see app/services/commission_service.py.
         fees = calc_commission(milestone.amount, currency=escrow.currency)
@@ -551,6 +609,7 @@ class EscrowService:
                 "released_amount": e.released_amount,
                 "currency": e.currency,
                 "project_id": str(e.project_id) if e.project_id else None,
+                "job_post_id": str(e.job_post_id) if e.job_post_id else None,
                 "client_id": str(e.client_id),
                 "creator_id": str(e.creator_id),
                 "milestone_count": len(e.milestones),

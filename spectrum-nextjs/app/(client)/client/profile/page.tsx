@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import OnlineStatusBadge from '@/components/OnlineStatusBadge';
 import { useRouter } from 'next/navigation';
 import {
   profile as profileApi,
@@ -313,10 +314,15 @@ export default function ClientProfilePage() {
                 <h2 className="text-xl font-bold text-gray-900">{nameDisplay}</h2>
                 <p className="text-sm text-gray-600 capitalize">{user?.account_type ?? 'Client'}</p>
               </div>
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full">
-                <i className="fa-solid fa-circle text-[8px] mr-1" />
-                {user?.is_verified ? 'Verified' : 'Online'}
-              </span>
+              <div className="flex items-center gap-2">
+                <OnlineStatusBadge isOnline={user?.is_online ?? false} showLabel />
+                {user?.is_verified && (
+                  <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-full">
+                    <i className="fa-solid fa-circle text-[8px] mr-1" />
+                    Verified
+                  </span>
+                )}
+              </div>
             </div>
 
             <p className="text-sm text-gray-400 mt-1">@{user?.username}</p>
@@ -398,9 +404,9 @@ export default function ClientProfilePage() {
       <div className="lg:col-span-2 space-y-6">
 
         {/* Account Settings */}
-        <div id="settings" className="bg-white rounded-2xl border border-gray-200 p-8 scroll-mt-24">
+        <div id="settings" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 scroll-mt-24">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Account Settings</h3>
-          <div className="grid sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Field label="First Name">
               <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={inp} />
             </Field>
@@ -456,7 +462,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Change Password */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Change Password</h3>
           <div className="space-y-4 max-w-md">
             <Field label="Current Password">
@@ -479,7 +485,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Notifications */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Notifications</h3>
           <div className="space-y-1">
             {notifDefs.map(n => (
@@ -531,7 +537,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Danger Zone */}
-        <div className="bg-white rounded-2xl border border-rose-200 p-8">
+        <div className="bg-white rounded-2xl border border-rose-200 p-4 sm:p-6 md:p-8">
           <h3 className="text-xl font-bold text-rose-700 mb-2">Danger Zone</h3>
           <p className="text-sm text-gray-600 mb-5">
             Deactivating your account will hide your profile from creators. You can reactivate any time.

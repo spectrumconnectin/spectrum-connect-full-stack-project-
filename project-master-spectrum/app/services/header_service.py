@@ -8,6 +8,8 @@ from typing import Dict, Any, Optional
 from beanie import PydanticObjectId
 
 from app.models.schema import User, Notification
+import logging
+logger = logging.getLogger(__name__)
 
 
 class HeaderService:
@@ -80,7 +82,7 @@ class HeaderService:
             }
 
         except Exception as e:
-            print(f"Error in HeaderService.get_header_data: {e}")
+            logger.error("Error in HeaderService.get_header_data: %s", e)
             return {
                 "user": None,
                 "notifications": {"unread_count": 0, "has_unread": False}

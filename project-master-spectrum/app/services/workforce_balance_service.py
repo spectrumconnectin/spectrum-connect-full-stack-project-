@@ -49,6 +49,9 @@ from beanie import PydanticObjectId
 
 from app.models.schema import User, CrewProfile
 from app.models.project import Project
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
@@ -183,7 +186,7 @@ class WorkforceBalanceService:
             return active_count
 
         except Exception as e:
-            print(f"[WorkforceBalanceService] update_active_project_count error: {e}")
+            logger.error("[WorkforceBalanceService] update_active_project_count error: %s", e)
             return 0
 
     @staticmethod
@@ -225,11 +228,11 @@ class WorkforceBalanceService:
                     updated += 1
 
                 except Exception as inner_e:
-                    print(f"[WorkforceBalanceService] bulk_sync error for {crew_profile.user_id}: {inner_e}")
+                    logger.error("[WorkforceBalanceService] bulk_sync error for {crew_profile.user_id}: %s", inner_e)
                     errors += 1
 
         except Exception as e:
-            print(f"[WorkforceBalanceService] bulk_sync_project_counts fatal: {e}")
+            logger.error("[WorkforceBalanceService] bulk_sync_project_counts fatal: %s", e)
 
         return {"updated": updated, "errors": errors}
 
@@ -300,7 +303,7 @@ class WorkforceBalanceService:
             }
 
         except Exception as e:
-            print(f"[WorkforceBalanceService] get_workload_distribution error: {e}")
+            logger.error("[WorkforceBalanceService] get_workload_distribution error: %s", e)
             return {}
 
     # ------------------------------------------------------------------ #
@@ -344,5 +347,5 @@ class WorkforceBalanceService:
             }
 
         except Exception as e:
-            print(f"[WorkforceBalanceService] update_workload_capacity error: {e}")
+            logger.error("[WorkforceBalanceService] update_workload_capacity error: %s", e)
             return {"success": False, "message": str(e)}

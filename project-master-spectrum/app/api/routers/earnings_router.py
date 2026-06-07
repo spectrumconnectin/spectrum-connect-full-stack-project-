@@ -9,8 +9,9 @@ Uses the Transaction model (schema.py).
 """
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 from typing import Optional
-from bson import ObjectId
+from datetime import datetime
 
 from app.models.schema import User, Transaction
 from app.auth.auth import get_current_user
@@ -76,37 +77,134 @@ async def get_earnings_stats(
     current_user: User = Depends(get_current_user),
 ):
     uid = current_user.id
-
-    all_txns = await Transaction.find({"to_user_id": uid}).to_list()
-
-    total_earned  = sum(t.net_amount for t in all_txns if t.status == "completed")
-    pending       = sum(t.net_amount for t in all_txns if t.status in ("pending", "processing"))
-    this_month_txns = [
-        t for t in all_txns
-        if t.status == "completed" and t.initiated_at and t.initiated_at.month == __import__("datetime").datetime.utcnow().month
-    ]
-    this_month = sum(t.net_amount for t in this_month_txns)
-
-    # Monthly breakdown for chart (last 6 months)
-    from datetime import datetime, timedelta
     now = datetime.utcnow()
-    monthly: dict[str, float] = {}
-    for i in range(5, -1, -1):
-        month_dt = now.replace(day=1) - timedelta(days=i * 30)
-        key = month_dt.strftime("%b")
-        monthly[key] = 0.0
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    six_months_ago = now.replace(day=1) - __import__("datetime").timedelta(days=5 * 30)
 
-    for t in all_txns:
-        if t.status == "completed" and t.initiated_at:
-            age = (now - t.initiated_at).days
-            if age <= 180:
-                key = t.initiated_at.strftime("%b")
-                monthly[key] = monthly.get(key, 0.0) + t.net_amount
+    # Use aggregation pipeline — one DB round-trip instead of loading all transactions
+    pipeline = [
+        {"$match": {"to_user_id": uid}},
+        {"$group": {
+            "_id": None,
+            "total_earned":       {"$sum": {"$cond": [{"$eq": ["$status", "completed"]}, "$net_amount", 0]}},
+            "pending":            {"$sum": {"$cond": [{"$in": ["$status", ["pending", "processing"]]}, "$net_amount", 0]}},
+            "this_month":         {"$sum": {"$cond": [
+                {"$and": [{"$eq": ["$status", "completed"]}, {"$gte": ["$initiated_at", month_start]}]},
+                "$net_amount", 0
+            ]}},
+            "transaction_count":  {"$sum": 1},
+        }},
+    ]
+    agg = await Transaction.aggregate(pipeline).to_list()
+    if agg:
+        total_earned       = round(agg[0].get("total_earned", 0), 2)
+        pending            = round(agg[0].get("pending", 0), 2)
+        this_month         = round(agg[0].get("this_month", 0), 2)
+        transaction_count  = int(agg[0].get("transaction_count", 0))
+    else:
+        total_earned = pending = this_month = 0.0
+        transaction_count = 0
+
+    # Monthly breakdown for chart — aggregate per month label
+    monthly_pipeline = [
+        {"$match": {"to_user_id": uid, "status": "completed", "initiated_at": {"$gte": six_months_ago}}},
+        {"$group": {
+            "_id": {"$dateToString": {"format": "%b", "date": "$initiated_at"}},
+            "amount": {"$sum": "$net_amount"},
+        }},
+        {"$sort": {"_id": 1}},
+    ]
+    monthly_raw = await Transaction.aggregate(monthly_pipeline).to_list()
+    monthly_map = {r["_id"]: round(r["amount"], 2) for r in monthly_raw}
+
+    # Ensure all 6 months are represented (even empty ones)
+    monthly_breakdown = []
+    for i in range(5, -1, -1):
+        import datetime as _dt_mod
+        month_dt = now.replace(day=1) - _dt_mod.timedelta(days=i * 30)
+        key = month_dt.strftime("%b")
+        monthly_breakdown.append({"month": key, "amount": monthly_map.get(key, 0.0)})
 
     return {
-        "total_earned": round(total_earned, 2),
-        "pending": round(pending, 2),
-        "this_month": round(this_month, 2),
-        "monthly_breakdown": [{"month": m, "amount": round(v, 2)} for m, v in monthly.items()],
-        "transaction_count": len(all_txns),
+        "total_earned":      total_earned,
+        "pending":           pending,
+        "this_month":        this_month,
+        "monthly_breakdown": monthly_breakdown,
+        "transaction_count": transaction_count,
     }
+
+
+@router.get("/invoice/csv", summary="Download earnings report as CSV")
+async def download_earnings_csv(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a CSV earnings report for the authenticated creator.
+    Includes all completed transactions with amounts and fee breakdowns.
+    Returns a text/csv response for direct browser download.
+    """
+    uid = current_user.id
+    txns = (
+        await Transaction.find({"to_user_id": uid, "status": "completed"})
+        .sort(-Transaction.initiated_at)
+        .to_list()
+    )
+
+    rows = [
+        "Date,Transaction ID,Project,Milestone,Gross Amount,Platform Fee (8%),Net Payout,Currency"
+    ]
+    for t in txns:
+        date_str = t.completed_at.strftime("%Y-%m-%d") if t.completed_at else (t.initiated_at.strftime("%Y-%m-%d") if t.initiated_at else "")
+        project = (t.metadata.project_title if t.metadata and t.metadata.project_title else "").replace(",", " ")
+        milestone = (t.metadata.milestone_title if t.metadata and t.metadata.milestone_title else "").replace(",", " ")
+        creator_fee = getattr(t, "creator_fee", 0.0) or 0.0
+        rows.append(
+            f'{date_str},{t.transaction_id},{project},{milestone},'
+            f'{t.amount:.2f},{creator_fee:.2f},{t.net_amount:.2f},{t.currency}'
+        )
+
+    now_str = datetime.utcnow().strftime("%Y%m%d")
+    filename = f"spectrum_earnings_{now_str}.csv"
+    return PlainTextResponse(
+        content="\n".join(rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/invoice/client-csv", summary="Download client payment report as CSV")
+async def download_client_payments_csv(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Download a CSV payment report for the authenticated client.
+    Includes all payments made, with fee breakdowns.
+    """
+    uid = current_user.id
+    txns = (
+        await Transaction.find({"from_user_id": uid, "status": "completed"})
+        .sort(-Transaction.initiated_at)
+        .to_list()
+    )
+
+    rows = [
+        "Date,Transaction ID,Project,Milestone,Project Amount,Platform Fee (4%),Total Charged,Currency"
+    ]
+    for t in txns:
+        date_str = t.completed_at.strftime("%Y-%m-%d") if t.completed_at else (t.initiated_at.strftime("%Y-%m-%d") if t.initiated_at else "")
+        project = (t.metadata.project_title if t.metadata and t.metadata.project_title else "").replace(",", " ")
+        milestone = (t.metadata.milestone_title if t.metadata and t.metadata.milestone_title else "").replace(",", " ")
+        client_fee = getattr(t, "client_fee", 0.0) or 0.0
+        client_total = round(t.amount + client_fee, 2)
+        rows.append(
+            f'{date_str},{t.transaction_id},{project},{milestone},'
+            f'{t.amount:.2f},{client_fee:.2f},{client_total:.2f},{t.currency}'
+        )
+
+    now_str = datetime.utcnow().strftime("%Y%m%d")
+    filename = f"spectrum_payments_{now_str}.csv"
+    return PlainTextResponse(
+        content="\n".join(rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

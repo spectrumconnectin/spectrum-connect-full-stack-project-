@@ -198,7 +198,7 @@ export default function CreatorDisputesPage() {
     <>
       <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Disputes</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Disputes</h1>
           <p className="text-lg text-gray-600">Track and manage project disputes and resolutions.</p>
         </div>
         <button onClick={() => setShowModal(true)}
@@ -309,7 +309,7 @@ export default function CreatorDisputesPage() {
                       {d.resolved_at && <p><span className="font-semibold">Resolved:</span> {formatDate(d.resolved_at)}</p>}
                       <p className="pt-2 text-gray-400 text-xs">
                         For urgent escalation contact{' '}
-                        <a href="mailto:disputes@spectrumconnect.com" className="text-cobalt underline">disputes@spectrumconnect.com</a>
+                        <a href="mailto:team.spectrumstudios@gmail.com" className="text-cobalt underline">team.spectrumstudios@gmail.com</a>
                       </p>
                     </div>
                   )}

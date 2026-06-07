@@ -19,9 +19,11 @@ PATCH /admin/jobs/{job_id}/status    Change job status
 GET  /admin/disputes                 All disputes
 GET  /admin/transactions             All escrow transactions
 GET  /admin/etf/stats                ETF points summary
+GET  /admin/revenue                  Platform revenue breakdown (fees by month/project)
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -30,6 +32,11 @@ from pydantic import BaseModel
 
 from app.auth.auth import get_admin_user, get_superadmin_user
 from app.models.schema import User
+
+
+def _safe_regex(raw: str) -> str:
+    """Escape user input before embedding in a MongoDB $regex to prevent ReDoS."""
+    return re.escape(raw[:200])
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
 
@@ -93,40 +100,78 @@ def _user_summary(u: User) -> dict:
 @router.get("/stats", summary="Platform-wide metrics")
 async def get_platform_stats(admin: User = Depends(get_admin_user)):
     """Return headline metrics for the admin dashboard."""
-    from app.models.escrow import Escrow
     from app.models.etf_points import EtfPoints
-
-    all_users   = await User.find_all().to_list()
-    total_users = len(all_users)
-    creators    = sum(1 for u in all_users if u.account_type == "crew")
-    clients     = sum(1 for u in all_users if u.account_type == "producer")
-    admins      = sum(1 for u in all_users if u.user_role in {"admin", "moderator"})
-    verified    = sum(1 for u in all_users if u.is_verified)
-    suspended   = sum(1 for u in all_users if not u.is_active)
-
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    new_users_30d   = sum(
-        1 for u in all_users
-        if u.created_at and u.created_at >= thirty_days_ago
-    )
-
-    # Escrow / financial stats
+    import asyncio as _aio
     try:
-        all_escrow       = await Escrow.find_all().to_list()
-        total_volume     = sum(float(e.total_amount or 0) for e in all_escrow)
-        active_escrow    = sum(1 for e in all_escrow if e.status == "active")
-        completed_escrow = sum(1 for e in all_escrow if e.status == "completed")
-        disputed_escrow  = sum(1 for e in all_escrow if e.status == "disputed")
-        total_fees       = sum(float(e.released_amount or 0) for e in all_escrow)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        (
+            total_users, creators, clients, admins, verified, suspended,
+        ) = await _aio.gather(
+            User.find().count(),
+            User.find({"account_type": {"$in": ["crew", "both"]}}).count(),
+            User.find({"account_type": {"$in": ["producer", "both"]}}).count(),
+            User.find({"user_role": {"$in": ["admin", "moderator"]}}).count(),
+            User.find({"is_verified": True}).count(),
+            User.find({"is_active": False}).count(),
+        )
+        from bson import ObjectId as _BsonOID
+        cutoff_id = _BsonOID.from_datetime(thirty_days_ago)
+        new_users_30d = await User.find({"_id": {"$gte": cutoff_id}}).count()
     except Exception:
-        total_volume = active_escrow = completed_escrow = disputed_escrow = total_fees = 0
+        total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
-    # ETF stats
+    # Financial stats — use MongoDB aggregation pipeline to sum amounts server-side.
     try:
-        all_etf = await EtfPoints.find_all().to_list()
-        total_points_awarded = sum(int(e.lifetime_points or 0) for e in all_etf)
-        platinum_users = sum(1 for e in all_etf if e.level == "platinum")
-        gold_users = sum(1 for e in all_etf if e.level == "gold")
+        from app.models.schema import Transaction as TxModel
+        from app.models.escrow import Escrow as EscrowModel
+
+        # Aggregate sums in one round-trip instead of loading all transactions
+        pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": None,
+                "total_volume":    {"$sum": "$amount"},
+                "total_fees":      {"$sum": "$platform_fee"},
+                "client_fee_usd":  {"$sum": "$client_fee"},
+                "creator_fee_usd": {"$sum": "$creator_fee"},
+            }},
+        ]
+        agg_result = await TxModel.aggregate(pipeline).to_list()
+        if agg_result:
+            total_volume    = round(agg_result[0].get("total_volume",    0), 2)
+            total_fees      = round(agg_result[0].get("total_fees",      0), 2)
+            client_fee_usd  = round(agg_result[0].get("client_fee_usd",  0), 2)
+            creator_fee_usd = round(agg_result[0].get("creator_fee_usd", 0), 2)
+        else:
+            total_volume = total_fees = client_fee_usd = creator_fee_usd = 0.0
+
+        # Escrow status counts
+        active_escrow, completed_escrow, disputed_escrow = await _aio.gather(
+            EscrowModel.find({"status": {"$in": ["active", "funded", "in_progress"]}}).count(),
+            EscrowModel.find({"status": "completed"}).count(),
+            EscrowModel.find({"status": "disputed"}).count(),
+        )
+    except Exception:
+        total_volume = active_escrow = completed_escrow = disputed_escrow = 0
+        total_fees = client_fee_usd = creator_fee_usd = 0
+
+    # ETF stats — aggregate in DB
+    try:
+        etf_pipeline = [
+            {"$group": {
+                "_id": None,
+                "total_lifetime": {"$sum": "$lifetime_points"},
+                "platinum_users": {"$sum": {"$cond": [{"$eq": ["$level", "platinum"]}, 1, 0]}},
+                "gold_users":     {"$sum": {"$cond": [{"$eq": ["$level", "gold"]},     1, 0]}},
+            }}
+        ]
+        etf_result = await EtfPoints.aggregate(etf_pipeline).to_list()
+        if etf_result:
+            total_points_awarded = int(etf_result[0].get("total_lifetime", 0))
+            platinum_users       = int(etf_result[0].get("platinum_users", 0))
+            gold_users           = int(etf_result[0].get("gold_users",     0))
+        else:
+            total_points_awarded = platinum_users = gold_users = 0
     except Exception:
         total_points_awarded = platinum_users = gold_users = 0
 
@@ -141,8 +186,10 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
             "new_last_30_days": new_users_30d,
         },
         "escrow": {
-            "total_volume_usd": round(total_volume, 2),
-            "platform_fees_usd": round(total_fees, 2),
+            "total_volume_usd": total_volume,
+            "platform_fees_usd": total_fees,
+            "client_fee_usd": client_fee_usd,
+            "creator_fee_usd": creator_fee_usd,
             "active_count": active_escrow,
             "completed_count": completed_escrow,
             "disputed_count": disputed_escrow,
@@ -425,45 +472,26 @@ async def list_users(
     status: Optional[str] = Query(None, description="suspended | verified | unverified"),
     admin: User = Depends(get_admin_user),
 ):
-    all_users = await User.find_all().to_list()
-
-    # Search by email or username
+    raw_filter: dict = {}
     if search:
-        q = search.lower()
-        all_users = [
-            u for u in all_users
-            if q in (u.email or "").lower()
-            or q in (u.username or "").lower()
-            or q in ((u.profile.display_name or "") if u.profile else "").lower()
+        safe_search = _safe_regex(search)
+        raw_filter["$or"] = [
+            {"email": {"$regex": safe_search, "$options": "i"}},
+            {"username": {"$regex": safe_search, "$options": "i"}},
+            {"profile.display_name": {"$regex": safe_search, "$options": "i"}},
         ]
 
-    # Role filter matches the computed _compute_role() value
-    if role:
-        all_users = [u for u in all_users if _compute_role(u).lower() == role.lower()]
-
-    # Status filter matches the computed _compute_status() value
-    if status:
-        all_users = [u for u in all_users if _compute_status(u) == status.lower()]
-
-    total = len(all_users)
-
-    # Sort newest first using created_at or ObjectId generation_time
-    def _sort_key(u: User):
-        if u.created_at:
-            return u.created_at
-        if u.id:
-            return u.id.generation_time.replace(tzinfo=None)
-        return datetime.min
-
-    all_users.sort(key=_sort_key, reverse=True)
+    query = User.find(raw_filter)
+    total = await query.count()
     start = (page - 1) * page_size
+    page_users = await query.sort([("_id", -1)]).skip(start).limit(page_size).to_list()
 
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
         "has_more": start + page_size < total,
-        "users": [_user_summary(u) for u in all_users[start: start + page_size]],
+        "users": [_user_summary(u) for u in page_users],
     }
 
 
@@ -622,6 +650,91 @@ async def toggle_verify_user(user_id: str, admin: User = Depends(get_admin_user)
     return {"id": user_id, "is_verified": u.is_verified}
 
 
+@router.delete("/users/{user_id}", summary="[Admin] Soft delete user + redact PII (GDPR)")
+async def soft_delete_user(
+    user_id: str,
+    admin: User = Depends(get_superadmin_user),
+):
+    """
+    Soft-delete a user account and redact all PII fields (GDPR right to erasure).
+
+    What happens:
+    - deleted_at is stamped (marks account as deleted)
+    - is_active set to False
+    - email, username, phone, OAuth tokens, profile, login history are redacted
+    - Audit log events are KEPT for fraud history
+    - Account cannot log in or be recovered after this
+
+    Requires: superadmin role only.
+    """
+    from bson import ObjectId
+    from app.services.audit_service import log_event
+
+    try:
+        u = await User.get(ObjectId(user_id))
+    except Exception:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid user ID.")
+    if not u:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
+    if u.deleted_at:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "User is already deleted.")
+    if u.user_role == "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Cannot delete an admin account.")
+
+    # Save identifiers for audit log before redacting
+    original_email    = u.email
+    original_username = u.username
+
+    redacted_id = f"deleted_{user_id}"
+
+    # ── Redact PII ─────────────────────────────────────────────────────────────
+    u.email               = f"{redacted_id}@deleted.invalid"
+    u.username            = redacted_id
+    u.password_hash       = "[redacted]"
+    u.phone_number        = None
+    u.phone_country_code  = None
+    u.oauth               = None
+    u.login_history       = None
+    u.password_reset_token_hash = None
+    u.is_active           = False
+    u.deleted_at          = datetime.utcnow()
+
+    # Redact profile PII but keep skill/category data for platform stats
+    if u.profile:
+        u.profile.first_name      = None
+        u.profile.last_name       = None
+        u.profile.display_name    = "[deleted]"
+        u.profile.bio             = None
+        u.profile.tagline         = None
+        u.profile.profile_picture = None
+        u.profile.cover_image     = None
+        u.profile.website         = None
+        u.profile.social_links    = None
+        u.profile.intro_video     = None
+
+    await u.save()
+
+    await log_event(
+        "admin.user.deleted",
+        actor=admin,
+        target_type="user",
+        target_id=user_id,
+        metadata={
+            "original_email":    original_email,
+            "original_username": original_username,
+            "reason":            "GDPR erasure / admin action",
+        },
+        severity="critical",
+    )
+
+    return {
+        "success":    True,
+        "user_id":    user_id,
+        "deleted_at": u.deleted_at.isoformat(),
+        "message":    "User soft-deleted and PII redacted.",
+    }
+
+
 # ── Job/Project Management ─────────────────────────────────────────────────────
 
 @router.get("/jobs", summary="List all job postings")
@@ -634,25 +747,21 @@ async def list_all_jobs(
 ):
     from app.models.schema import JobPost
     try:
-        all_jobs = await JobPost.find_all().to_list()
+        raw_filter: dict = {}
+        if job_status:
+            raw_filter["status"] = job_status
+        if search:
+            safe_search = _safe_regex(search)
+            raw_filter["$or"] = [
+                {"title": {"$regex": safe_search, "$options": "i"}},
+                {"description": {"$regex": safe_search, "$options": "i"}},
+            ]
+        query = JobPost.find(raw_filter)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_jobs = await query.sort([("_id", -1)]).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "jobs": []}
-
-    if search:
-        q = search.lower()
-        all_jobs = [j for j in all_jobs if q in (j.title or "").lower() or q in (j.description or "").lower()]
-    if job_status:
-        all_jobs = [j for j in all_jobs if j.status == job_status]
-
-    def _job_created(j) -> datetime:
-        if j.id:
-            return j.id.generation_time.replace(tzinfo=None)
-        return datetime.min
-
-    all_jobs.sort(key=_job_created, reverse=True)
-    total = len(all_jobs)
-    start = (page - 1) * page_size
-    page_jobs = all_jobs[start: start + page_size]
 
     return {
         "total": total,
@@ -950,18 +1059,16 @@ async def list_all_disputes(
     dispute_status: Optional[str] = Query(None, alias="status"),
     admin: User = Depends(get_admin_user),
 ):
-    from app.models.escrow import Dispute
+    from app.models.escrow import Dispute as DisputeModel
     try:
-        all_disputes = await Dispute.find_all().to_list()
+        query = DisputeModel.find()
+        if dispute_status:
+            query = query.find(DisputeModel.status == dispute_status)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_disputes = await query.sort(-DisputeModel.created_at).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "disputes": []}
-
-    if dispute_status:
-        all_disputes = [d for d in all_disputes if d.status == dispute_status]
-
-    all_disputes.sort(key=lambda d: d.created_at or datetime.min, reverse=True)
-    total = len(all_disputes)
-    start = (page - 1) * page_size
 
     return {
         "total": total,
@@ -974,11 +1081,11 @@ async def list_all_disputes(
                 "escrow_id": str(d.escrow_id) if d.escrow_id else None,
                 "status": d.status,
                 "reason": d.reason,
-                "raised_by": str(d.raised_by) if d.raised_by else None,
-                "raised_against": str(d.raised_against) if d.raised_against else None,
+                "raised_by": str(d.raised_by) if getattr(d, "raised_by", None) else None,
+                "raised_against": str(d.raised_against) if getattr(d, "raised_against", None) else None,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
             }
-            for d in all_disputes[start: start + page_size]
+            for d in page_disputes
         ],
     }
 
@@ -994,16 +1101,14 @@ async def list_all_transactions(
 ):
     from app.models.escrow import Escrow
     try:
-        all_tx = await Escrow.find_all().to_list()
+        query = Escrow.find()
+        if tx_status:
+            query = query.find(Escrow.status == tx_status)
+        total = await query.count()
+        start = (page - 1) * page_size
+        page_tx = await query.sort(-Escrow.created_at).skip(start).limit(page_size).to_list()
     except Exception:
         return {"total": 0, "page": page, "page_size": page_size, "has_more": False, "transactions": []}
-
-    if tx_status:
-        all_tx = [t for t in all_tx if t.status == tx_status]
-
-    all_tx.sort(key=lambda t: t.created_at or datetime.min, reverse=True)
-    total = len(all_tx)
-    start = (page - 1) * page_size
 
     return {
         "total": total,
@@ -1024,7 +1129,7 @@ async def list_all_transactions(
                 "project_id": str(t.project_id) if t.project_id else None,
                 "created_at": t.created_at.isoformat() if t.created_at else None,
             }
-            for t in all_tx[start: start + page_size]
+            for t in page_tx
         ],
     }
 
@@ -1261,25 +1366,140 @@ async def export_audit_log(
 async def get_etf_stats(admin: User = Depends(get_admin_user)):
     from app.models.etf_points import EtfPoints
     try:
-        all_etf = await EtfPoints.find_all().to_list()
+        pipeline = [
+            {"$group": {
+                "_id": None,
+                "total_accounts":  {"$sum": 1},
+                "total_lifetime":  {"$sum": "$lifetime_points"},
+                "total_redeemed":  {"$sum": "$redeemed_points"},
+                "bronze":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "bronze"]},   1, 0]}},
+                "silver":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "silver"]},   1, 0]}},
+                "gold":     {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "gold"]},     1, 0]}},
+                "platinum": {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "platinum"]}, 1, 0]}},
+                "diamond":  {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "diamond"]},  1, 0]}},
+            }}
+        ]
+        result = await EtfPoints.aggregate(pipeline).to_list()
+        if not result:
+            return {"total_accounts": 0, "total_lifetime_points": 0, "total_redeemed_points": 0, "level_breakdown": {}}
+        r = result[0]
+        return {
+            "total_accounts":        r.get("total_accounts", 0),
+            "total_lifetime_points": int(r.get("total_lifetime", 0)),
+            "total_redeemed_points": int(r.get("total_redeemed", 0)),
+            "level_breakdown": {
+                "bronze":   r.get("bronze",   0),
+                "silver":   r.get("silver",   0),
+                "gold":     r.get("gold",     0),
+                "platinum": r.get("platinum", 0),
+                "diamond":  r.get("diamond",  0),
+            },
+        }
     except Exception:
         return {}
 
-    levels = {"bronze": 0, "silver": 0, "gold": 0, "platinum": 0}
-    total_lifetime = 0
-    total_redeemed = 0
-    for e in all_etf:
-        lvl = (e.level or "bronze").lower()
-        if lvl in levels:
-            levels[lvl] += 1
-        total_lifetime += int(e.lifetime_points or 0)
-        total_redeemed += int(e.redeemed_points or 0)
+
+# ── Revenue Reporting ──────────────────────────────────────────────────────────
+
+@router.get("/revenue", summary="Platform revenue breakdown")
+async def get_revenue_report(admin: User = Depends(get_admin_user)):
+    """
+    Detailed fee revenue report:
+    - Monthly breakdown of client fees vs creator fees for the last 12 months
+    - All-time totals
+    - Top 10 projects by revenue
+    - Current commission version / rate info
+    """
+    from app.models.schema import Transaction as TxModel
+    from app.services.commission_service import DEFAULT_COMMISSION_VERSION
+
+    # ── Monthly aggregation — done in DB with $group, not in Python ──────────
+    try:
+        monthly_pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m", "date": "$initiated_at"}},
+                "client_fees":  {"$sum": "$client_fee"},
+                "creator_fees": {"$sum": "$creator_fee"},
+                "total_fees":   {"$sum": "$platform_fee"},
+                "volume":       {"$sum": "$amount"},
+                "count":        {"$sum": 1},
+            }},
+            {"$sort": {"_id": 1}},
+        ]
+        monthly_raw = await TxModel.aggregate(monthly_pipeline).to_list()
+    except Exception:
+        monthly_raw = []
+
+    # Take last 12 months
+    monthly_list = [
+        {
+            "month": r["_id"],
+            "client_fees":  round(r.get("client_fees",  0), 2),
+            "creator_fees": round(r.get("creator_fees", 0), 2),
+            "total_fees":   round(r.get("total_fees",   0), 2),
+            "volume":       round(r.get("volume",       0), 2),
+            "count":        r.get("count", 0),
+        }
+        for r in monthly_raw[-12:]
+    ]
+
+    # ── All-time totals — one aggregation query ───────────────────────────────
+    try:
+        totals_pipeline = [
+            {"$match": {"status": "completed"}},
+            {"$group": {
+                "_id": None,
+                "client_fees":    {"$sum": "$client_fee"},
+                "creator_fees":   {"$sum": "$creator_fee"},
+                "platform_total": {"$sum": "$platform_fee"},
+                "volume":         {"$sum": "$amount"},
+                "count":          {"$sum": 1},
+            }},
+        ]
+        totals_raw = await TxModel.aggregate(totals_pipeline).to_list()
+        r = totals_raw[0] if totals_raw else {}
+        totals = {
+            "client_fees":       round(r.get("client_fees",    0), 2),
+            "creator_fees":      round(r.get("creator_fees",   0), 2),
+            "platform_total":    round(r.get("platform_total", 0), 2),
+            "volume":            round(r.get("volume",         0), 2),
+            "transaction_count": r.get("count", 0),
+        }
+    except Exception:
+        totals = {"client_fees": 0, "creator_fees": 0, "platform_total": 0, "volume": 0, "transaction_count": 0}
+
+    # ── Top 10 transactions by platform_fee ───────────────────────────────────
+    try:
+        top_tx = await TxModel.find({"status": "completed"}).sort(-TxModel.platform_fee).limit(10).to_list()
+        top_projects = [
+            {
+                "id": str(t.id),
+                "amount": float(t.amount or 0),
+                "platform_fee": float(t.platform_fee or 0),
+                "client_fee": float(t.client_fee or 0),
+                "creator_fee": float(t.creator_fee or 0),
+                "client_id": str(t.from_user_id) if t.from_user_id else None,
+                "creator_id": str(t.to_user_id) if t.to_user_id else None,
+                "created_at": t.initiated_at.isoformat() if t.initiated_at else None,
+                "status": t.status,
+            }
+            for t in top_tx
+        ]
+    except Exception:
+        top_projects = []
 
     return {
-        "total_accounts": len(all_etf),
-        "total_lifetime_points": total_lifetime,
-        "total_redeemed_points": total_redeemed,
-        "level_breakdown": levels,
+        "monthly": monthly_list,
+        "totals": totals,
+        "top_projects": top_projects,
+        "commission_info": {
+            "version": DEFAULT_COMMISSION_VERSION,
+            "client_rate_pct": 4.0,
+            "creator_rate_pct": 8.0,
+            "total_rate_pct": 12.0,
+            "note": "Client pays +4% on top of project amount. Creator receives amount minus 8%.",
+        },
     }
 
 
@@ -1372,3 +1592,181 @@ async def dismiss_report(
         admin_note=body.admin_note,
     )
     return ReportActionResponse(**result)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MODULE 14: SETTINGS — Feature Flags + Broadcast Notifications
+# ══════════════════════════════════════════════════════════════════════════════
+
+from app.models.platform_settings import PlatformSettings, BroadcastNotification
+from pydantic import BaseModel as _PydanticBase
+
+
+class FlagUpdate(_PydanticBase):
+    etf_cashout_enabled:           Optional[bool] = None
+    maintenance_mode:              Optional[bool] = None
+    maintenance_message:           Optional[str]  = None
+    new_user_registration_enabled: Optional[bool] = None
+    job_posting_enabled:           Optional[bool] = None
+    review_queue_enabled:          Optional[bool] = None
+    skill_challenges_enabled:      Optional[bool] = None
+    disputes_enabled:              Optional[bool] = None
+    escrow_enabled:                Optional[bool] = None
+
+
+class BroadcastRequest(_PydanticBase):
+    title:          str
+    message:        str
+    target_segment: str = "all"   # all | creators | clients | verified | unverified | admins
+
+
+async def _get_or_create_settings() -> PlatformSettings:
+    s = await PlatformSettings.find_one(PlatformSettings.settings_id == "global")
+    if not s:
+        s = PlatformSettings()
+        await s.insert()
+    return s
+
+
+@router.get("/settings", summary="[Admin] Get platform feature flags")
+async def get_platform_settings(admin: User = Depends(get_admin_user)):
+    s = await _get_or_create_settings()
+    return {
+        "etf_cashout_enabled":           s.etf_cashout_enabled,
+        "maintenance_mode":              s.maintenance_mode,
+        "maintenance_message":           s.maintenance_message,
+        "new_user_registration_enabled": s.new_user_registration_enabled,
+        "job_posting_enabled":           s.job_posting_enabled,
+        "review_queue_enabled":          s.review_queue_enabled,
+        "skill_challenges_enabled":      s.skill_challenges_enabled,
+        "disputes_enabled":              s.disputes_enabled,
+        "escrow_enabled":                s.escrow_enabled,
+        "updated_at":                    s.updated_at.isoformat() if s.updated_at else None,
+        "updated_by":                    s.updated_by,
+    }
+
+
+@router.patch("/settings", summary="[Admin] Update platform feature flags")
+async def update_platform_settings(
+    body: FlagUpdate,
+    admin: User = Depends(get_superadmin_user),
+):
+    from app.services.audit_service import log_event
+    s = await _get_or_create_settings()
+
+    changes = {}
+    for field, value in body.model_dump(exclude_none=True).items():
+        old = getattr(s, field)
+        if old != value:
+            setattr(s, field, value)
+            changes[field] = {"from": old, "to": value}
+
+    if changes:
+        s.updated_at = datetime.utcnow()
+        s.updated_by = admin.username
+        await s.save()
+        await log_event(
+            "admin.settings.updated",
+            actor=admin,
+            metadata={"changes": changes},
+            severity="critical",
+        )
+
+    return {"success": True, "changes": changes, "message": "Settings updated." if changes else "No changes."}
+
+
+@router.get("/notifications/broadcast", summary="[Admin] List past broadcasts")
+async def list_broadcasts(
+    limit:  int = Query(20, ge=1, le=100),
+    offset: int = Query(0,  ge=0),
+    admin: User = Depends(get_admin_user),
+):
+    total = await BroadcastNotification.find().count()
+    items = (
+        await BroadcastNotification.find()
+        .sort(-BroadcastNotification.created_at)
+        .skip(offset).limit(limit).to_list()
+    )
+    return {
+        "total":  total,
+        "limit":  limit,
+        "offset": offset,
+        "has_more": (offset + limit) < total,
+        "broadcasts": [
+            {
+                "id":               str(b.id),
+                "title":            b.title,
+                "message":          b.message,
+                "target_segment":   b.target_segment,
+                "sent_by_username": b.sent_by_username,
+                "recipient_count":  b.recipient_count,
+                "status":           b.status,
+                "created_at":       b.created_at.isoformat() if b.created_at else None,
+            }
+            for b in items
+        ],
+    }
+
+
+@router.post("/notifications/broadcast", summary="[Admin] Send broadcast notification")
+async def send_broadcast(
+    body: BroadcastRequest,
+    admin: User = Depends(get_admin_user),
+):
+    from app.services.audit_service import log_event
+
+    # Count recipients based on segment
+    segment_filters = {
+        "all":        {},
+        "creators":   {"account_type": {"$in": ["crew", "both"]}},
+        "clients":    {"account_type": {"$in": ["producer", "both"]}},
+        "verified":   {"is_verified": True},
+        "unverified": {"is_verified": False},
+        "admins":     {"user_role": {"$in": ["admin", "moderator"]}},
+    }
+    raw_filter = segment_filters.get(body.target_segment, {})
+    recipient_count = await User.find(raw_filter).count()
+
+    # Save to notification collection for each user (fire-and-forget)
+    try:
+        from app.models.schema import Notification
+        target_users = await User.find(raw_filter).to_list()
+        for u in target_users:
+            notif = Notification(
+                user_id=str(u.id),
+                type="broadcast",
+                title=body.title,
+                message=body.message,
+                is_read=False,
+            )
+            await notif.insert()
+    except Exception:
+        pass
+
+    # Record broadcast history
+    record = BroadcastNotification(
+        title=body.title,
+        message=body.message,
+        target_segment=body.target_segment,
+        sent_by_id=str(admin.id),
+        sent_by_username=admin.username,
+        recipient_count=recipient_count,
+        status="sent",
+    )
+    await record.insert()
+
+    await log_event(
+        "admin.broadcast.sent",
+        actor=admin,
+        metadata={"title": body.title, "segment": body.target_segment, "recipient_count": recipient_count},
+        severity="warning",
+    )
+
+    return {
+        "success":         True,
+        "broadcast_id":    str(record.id),
+        "title":           body.title,
+        "target_segment":  body.target_segment,
+        "recipient_count": recipient_count,
+        "message":         f"Broadcast sent to {recipient_count} users.",
+    }

@@ -74,12 +74,18 @@ class JobService:
             hourly_rate=hourly_rate,
             daily_rate=daily_rate,
             weekly_rate=weekly_rate,
+            location=getattr(job_data, 'location', None),
+            event_date=getattr(job_data, 'event_date', None),
+            is_remote=getattr(job_data, 'is_remote', None),
             duration=job_data.duration,
             estimated_duration=job_data.estimated_duration,
             start_date=job_data.start_date,
             deadline=job_data.deadline,
             skills=job_data.skills,
             experience_level=job_data.experience_level,
+            goals=job_data.goals if hasattr(job_data, 'goals') else None,
+            deliverables=job_data.deliverables if hasattr(job_data, 'deliverables') else None,
+            currency=getattr(job_data, 'currency', 'USD') or 'USD',
             crew_call=crew_calls if crew_calls else None,
             visibility=job_data.visibility,
             invited_crew=invited_crew_ids,
@@ -165,11 +171,11 @@ class JobService:
         # Build query
         query = {}
 
-        # Only show open jobs for public search (unless specific status requested)
+        # Show open + in_review jobs for public search (both accept proposals)
         if filters.status:
             query["status"] = filters.status
         else:
-            query["status"] = "open"  # Default to open jobs
+            query["status"] = {"$in": ["open", "in_review"]}  # default: jobs accepting proposals
 
         # Department filter
         if filters.department:
@@ -199,15 +205,14 @@ class JobService:
         if filters.budget_type:
             query["budget_type"] = filters.budget_type
 
-        # Budget range filter
+        # Budget range filter — match jobs whose budget.max >= creator min AND budget.min <= creator max
         if filters.min_budget or filters.max_budget:
-            budget_query = {}
             if filters.min_budget:
-                budget_query["$gte"] = filters.min_budget
+                # Job budget must reach at least the creator's minimum
+                query["budget.max"] = {"$gte": filters.min_budget}
             if filters.max_budget:
-                budget_query["$lte"] = filters.max_budget
-            if budget_query:
-                query["budget.min"] = budget_query
+                # Job budget must not start above the creator's maximum
+                query["budget.min"] = {"$lte": filters.max_budget}
 
         # Experience level filter
         if filters.experience_level:
@@ -290,11 +295,52 @@ class JobService:
         if 'invited_crew' in update_dict and update_dict['invited_crew']:
             update_dict['invited_crew'] = [PydanticObjectId(id) for id in update_dict['invited_crew']]
 
+        # Strip immutable / ownership fields — prevents a client from transferring
+        # the job to another user or backdating creation timestamps.
+        _IMMUTABLE = {"client_id", "id", "created_at", "proposal_count"}
+        for key in _IMMUTABLE:
+            update_dict.pop(key, None)
+
         # Apply updates
         for key, value in update_dict.items():
             setattr(job, key, value)
 
         await job.save()
+
+        # If location or event_date changed, notify all hired creators so they can
+        # reconfirm availability for the new venue / date.
+        location_changed = ("location" in update_dict or "event_date" in update_dict)
+        if location_changed:
+            try:
+                from app.models.schema import Application
+                from app.services.notification_service import NotificationService
+                hired_apps = await Application.find(
+                    Application.project_id == job.id,
+                    Application.status == "accepted",
+                ).to_list()
+                new_location = getattr(job, "location", None)
+                new_event_date = getattr(job, "event_date", None)
+                date_str = new_event_date.strftime("%B %d, %Y") if new_event_date else None
+                for app in hired_apps:
+                    detail_parts = []
+                    if "location" in update_dict and new_location:
+                        detail_parts.append(f"New venue: {new_location}")
+                    if "event_date" in update_dict and date_str:
+                        detail_parts.append(f"New date: {date_str}")
+                    detail = " · ".join(detail_parts) if detail_parts else "Project details have been updated."
+                    await NotificationService.send(
+                        user_id=str(app.crew_id),
+                        type="system",
+                        category="warning",
+                        title=f"⚠️ Project update: '{job.title}'",
+                        message=f"The client updated the project details. {detail} Please confirm your availability.",
+                        action_url="/creator/projects",
+                        action_text="View project",
+                        actor_id=str(user.id),
+                    )
+            except Exception:
+                pass
+
         return job
 
     @staticmethod
@@ -322,6 +368,25 @@ class JobService:
                 detail="Cannot change status of cancelled job"
             )
 
+        # Gate: cannot mark completed until escrow funds have been released
+        if new_status == 'completed':
+            try:
+                from app.models.escrow import Escrow as _Escrow
+                from beanie import PydanticObjectId as _OID
+                escs = await _Escrow.find(_Escrow.job_post_id == job.id).to_list()
+                for esc in escs:
+                    funded = [m for m in esc.milestones if m.status in ('funded', 'delivered', 'approved')]
+                    if funded:
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail="Payment must be released before this project can be completed. "
+                                   "Release the escrow funds to the creator first."
+                        )
+            except HTTPException:
+                raise
+            except Exception:
+                pass  # If escrow lookup fails, allow status change (non-blocking)
+
         # Update status
         old_status = job.status
         job.status = new_status
@@ -337,7 +402,8 @@ class JobService:
 
     @staticmethod
     async def delete_job(job: JobPost, user: User):
-        """Delete job post (owner only, only if draft or no proposals)"""
+        """Delete job post (owner only, only if draft or no proposals).
+        Cascades to orphaned Applications and Conversations."""
         # Verify ownership
         if job.client_id != user.id:
             raise HTTPException(
@@ -346,21 +412,32 @@ class JobService:
             )
 
         # Can only delete draft jobs or jobs with no proposals
-        if job.status != 'draft' and job.proposal_count > 0:
+        if job.status != 'draft' and (job.proposal_count or 0) > 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete job post with proposals. Cancel it instead."
             )
 
+        # Cascade: remove orphaned applications and conversations
+        try:
+            from app.models.schema import Application
+            await Application.find({"project_id": job.id}).delete()
+        except Exception:
+            pass
+        try:
+            from app.models.message import Conversation
+            await Conversation.find({"job_id": str(job.id)}).delete()
+        except Exception:
+            pass
+
         await job.delete()
 
     @staticmethod
     async def increment_views(job_id: str):
-        """Increment job post view count"""
+        """Increment job post view count atomically (prevents race conditions)."""
         try:
             job = await JobPost.get(PydanticObjectId(job_id))
             if job:
-                job.view_count += 1
-                await job.save()
-        except:
+                await job.update({"$inc": {"view_count": 1}})
+        except Exception:
             pass  # Silently fail for view counting

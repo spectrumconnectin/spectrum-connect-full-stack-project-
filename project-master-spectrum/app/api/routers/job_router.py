@@ -280,6 +280,76 @@ async def delete_job(
 # ============================================================================
 
 @router.get(
+    "/{job_id}/team",
+    response_model=list,
+    summary="Get all hired creators for a job (crew team)",
+    description="Returns every accepted application with creator profile and escrow summary"
+)
+async def get_job_team(
+    job_id: str = Path(..., description="Job Post ID"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns all accepted (hired) creators on a job, along with a brief escrow
+    summary per creator. Used by the payments page to show multi-creator funding UI.
+
+    **Who:** Client (job owner) only.
+    """
+    from app.models.schema import Application
+    from app.models.escrow import Escrow as EscrowDoc
+    import asyncio
+
+    job = await JobService.get_job_by_id(job_id)
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to view this team"
+        )
+
+    hired_apps = await Application.find(
+        Application.project_id == job.id,
+        Application.status == "accepted",
+    ).to_list()
+
+    async def _enrich(app):
+        creator = await User.get(app.crew_id)
+        profile = creator.profile if creator else None
+
+        # Find escrow for this (job, creator) pair
+        escrow = await EscrowDoc.find_one({
+            "job_post_id": job.id,
+            "creator_id": app.crew_id,
+        })
+
+        return {
+            "application_id": str(app.id),
+            "creator_id": str(app.crew_id),
+            "creator_name": (
+                (profile.display_name or f"{profile.first_name or ''} {profile.last_name or ''}".strip())
+                if profile else (creator.username if creator else "Unknown")
+            ),
+            "creator_username": creator.username if creator else None,
+            "creator_avatar": profile.profile_picture if profile else None,
+            "creator_title": profile.headline if profile else None,
+            "role": app.role,
+            "proposed_budget": app.proposed_budget,
+            "escrow": {
+                "escrow_id": str(escrow.id),
+                "status": escrow.status,
+                "total_amount": escrow.total_amount,
+                "funded_amount": escrow.funded_amount,
+                "released_amount": escrow.released_amount,
+                "milestone_count": len(escrow.milestones),
+                "funded_milestones": sum(1 for m in escrow.milestones if m.status == "funded"),
+                "released_milestones": sum(1 for m in escrow.milestones if m.status == "released"),
+            } if escrow else None,
+        }
+
+    results = await asyncio.gather(*[_enrich(app) for app in hired_apps])
+    return list(results)
+
+
+@router.get(
     "/{job_id}/stats",
     response_model=dict,
     summary="Get job post statistics",

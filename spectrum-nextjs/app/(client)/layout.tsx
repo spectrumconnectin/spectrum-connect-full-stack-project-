@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
 import NotificationBell from '@/components/NotificationBell';
 import { profile as profileApi, auth } from '@/lib/api';
+import { usePresence } from '@/hooks/usePresence';
 
 const navLinks = [
   { href: '/client/dashboard',       label: 'Dashboard',     icon: 'fa-gauge-high' },
@@ -98,17 +99,14 @@ function ClientHeader() {
 
             {/* Right actions */}
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <div className="relative">
-                <Link href="/client/messaging"
-                  className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
-                    pathname === '/client/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-                  }`} title="Messages">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                </Link>
-                <span className="absolute top-1 right-1 w-2 h-2 bg-cobalt rounded-full border-2 border-white pointer-events-none" />
-              </div>
+              <Link href="/client/messaging"
+                className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
+                  pathname === '/client/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                }`} title="Messages">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </Link>
 
               <NotificationBell />
 
@@ -289,6 +287,10 @@ function ClientFooter() {
 }
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  // Activate real-time presence tracking: marks user Online, sends heartbeats,
+  // marks Offline on tab-hide / unload.
+  usePresence();
+
   return (
     <div className="bg-off-white min-h-screen" style={{ fontFamily: "'Inter',sans-serif" }}>
       <ClientHeader />

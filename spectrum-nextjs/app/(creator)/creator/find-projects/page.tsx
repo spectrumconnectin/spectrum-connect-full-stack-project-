@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
 const DEPARTMENTS = [
   'All Departments', 'Camera', 'Cinematography', 'Directing', 'Editing',
@@ -16,18 +16,7 @@ const BUDGET_RANGES = ['Any Budget', 'Under $1,000', '$1,000 – $3,000', '$3,00
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, suffix = '') => {
-    if (min && max) return `$${min.toLocaleString()} – $${max.toLocaleString()}${suffix}`;
-    if (min) return `From $${min.toLocaleString()}${suffix}`;
-    return `Rate TBD`;
-  };
-  if (p.budget_type === 'fixed') return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily') return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Rate TBD';
-}
+const formatBudget = formatJobBudget;
 
 function getBudgetMin(p: JobPostItem): number {
   if (p.budget_type === 'fixed') return p.budget?.min ?? 0;
@@ -72,7 +61,8 @@ export default function FindProjectsPage() {
       setLoading(true);
       setError(null);
       try {
-        const params: Record<string, string | number | undefined> = { status: 'open', limit: 40 };
+        // No status filter — backend defaults to open + in_review (both accept proposals)
+        const params: Record<string, string | number | undefined> = { limit: 40 };
         if (search.trim()) params.search = search.trim();
         if (department !== 'All Departments') params.department = department;
         if (budget === 'Under $1,000') { params.max_budget = 1000; }
@@ -108,7 +98,7 @@ export default function FindProjectsPage() {
       {/* ── Hero search ── */}
       <section className="mb-8">
         <div className="max-w-3xl mb-6">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Find Projects</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Find Projects</h1>
           <p className="text-lg text-gray-500">Browse film & creative opportunities that match your skills.</p>
         </div>
 
@@ -305,11 +295,11 @@ function ProjectCard({
 
       {/* Actions */}
       <div className="px-5 pb-4 flex items-center gap-3 border-t border-gray-100 pt-4">
-        <Link href={`/creator/projects/${p.id}/apply`}
+        <Link href={`/creator/find-projects/${p.id}/apply`}
           className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
           <i className="fa-solid fa-paper-plane mr-2"></i>Apply Now
         </Link>
-        <Link href={`/creator/projects/${p.id}`}
+        <Link href={`/creator/find-projects/${p.id}`}
           className="px-5 py-2.5 border border-cobalt text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-50 transition">
           View Details
         </Link>

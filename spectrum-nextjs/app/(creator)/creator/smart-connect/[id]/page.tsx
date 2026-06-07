@@ -3,20 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { jobs, JobPostItem } from '@/lib/api';
+import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
-function formatBudget(p: JobPostItem): string {
-  const fmt = (min?: number, max?: number, suffix = '') => {
-    if (min && max) return `$${min.toLocaleString()} – $${max.toLocaleString()}${suffix}`;
-    if (min) return `From $${min.toLocaleString()}${suffix}`;
-    return 'Rate TBD';
-  };
-  if (p.budget_type === 'fixed') return fmt(p.budget?.min, p.budget?.max);
-  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
-  if (p.budget_type === 'daily') return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
-  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
-  return 'Negotiable';
-}
+const formatBudget = formatJobBudget;
 
 export default function SmartConnectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -88,10 +77,10 @@ export default function SmartConnectDetailPage() {
         <div className="lg:col-span-2 space-y-6">
 
           {/* Project details */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Project Details</h2>
             <p className="text-gray-600 leading-relaxed mb-5">{job.description || 'No description provided.'}</p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 { icon: 'fa-tag', label: 'Department', value: job.department },
                 { icon: 'fa-star', label: 'Experience', value: job.experience_level },
@@ -111,7 +100,7 @@ export default function SmartConnectDetailPage() {
 
           {/* Skills */}
           {(job.skills ?? []).length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Required Skills</h2>
               <div className="flex flex-wrap gap-2">
                 {job.skills!.map(s => (
@@ -123,7 +112,7 @@ export default function SmartConnectDetailPage() {
 
           {/* Tags */}
           {job.tags.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Project Tags</h2>
               <div className="flex flex-wrap gap-2">
                 {job.tags.map(t => (

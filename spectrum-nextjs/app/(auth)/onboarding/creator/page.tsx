@@ -5,25 +5,20 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { profile } from '@/lib/api';
+import PortfolioSection from '@/components/PortfolioSection';
 
 const SKILLS = [
-  // Design
   'Graphic Design', 'UI/UX Design', 'Product Design', 'Motion Graphics', '3D Design', 'Brand Identity Design',
-  // Film & Video
   'Video Editing', 'Videography', 'Animation', 'VFX', 'Film Direction', 'Sound Design',
-  // Writing & Content
   'Copywriting', 'Scriptwriting', 'Content Writing', 'Editing',
-  // Marketing & Strategy
   'Creative Direction', 'Art Direction', 'Brand Strategy', 'Social Media',
-  // Music & Audio
   'Music Production', 'Voice Acting', 'Composing',
-  // Digital & Interactive
   'Game Design', '3D Modeling', 'AR/VR Design',
 ];
 const RATES = ['< $25/hr', '$25–$50/hr', '$50–$100/hr', '$100–$150/hr', '$150+/hr'];
 const AVAILABILITY = ['Full-time (40+ hrs/week)', 'Part-time (20–40 hrs/week)', 'Flexible (10–20 hrs/week)', 'Project-based only'];
 
-const steps = ['Profile', 'Skills', 'Availability', 'Done'];
+const steps = ['Profile', 'Skills', 'Availability', 'Portfolio', 'Done'];
 
 export default function CreatorOnboardingPage() {
   const router = useRouter();
@@ -46,6 +41,8 @@ export default function CreatorOnboardingPage() {
   const [availability, setAvailability] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
 
+  // Step 3 — Portfolio (handled by PortfolioSection component)
+
   const toggleSkill = (s: string) => setSelectedSkills(prev =>
     prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
   );
@@ -58,14 +55,16 @@ export default function CreatorOnboardingPage() {
     }
   };
 
+  // Portfolio step is optional — user can skip
   const canNext = [
     displayName.trim().length >= 2 && bio.trim().length >= 20,
     selectedSkills.length >= 1,
     rate !== '' && availability !== '',
+    true, // portfolio step is optional
   ];
 
   const onNext = () => {
-    if (step < 2) { setStep(s => s + 1); return; }
+    if (step < 3) { setStep(s => s + 1); return; }
     onSubmit();
   };
 
@@ -75,6 +74,14 @@ export default function CreatorOnboardingPage() {
     const m = r.match(/\$(\d+)[–-]\$(\d+)/);
     if (m) return { hourly_rate_min: parseInt(m[1]), hourly_rate_max: parseInt(m[2]) };
     return {};
+  }
+
+  // Map onboarding availability label to profile availability_status
+  function availabilityStatus(a: string): string {
+    if (a.startsWith('Full-time')) return 'available';
+    if (a.startsWith('Part-time')) return 'available';
+    if (a.startsWith('Flexible')) return 'available';
+    return 'busy'; // Project-based only
   }
 
   const onSubmit = async () => {
@@ -90,12 +97,14 @@ export default function CreatorOnboardingPage() {
           location: location.trim() ? { city: location.trim() } : undefined,
           hourly_rate_min,
           hourly_rate_max,
+          availability_status: availabilityStatus(availability),
+          availability_label: availability, // store the human-readable label
         },
       });
       if (selectedSkills.length > 0) {
         await Promise.all(selectedSkills.map(s => profile.addSkill({ name: s })));
       }
-      setStep(3);
+      setStep(4); // Done
       setTimeout(() => router.push('/creator/dashboard'), 2000);
     } catch (e) {
       setErr((e as Error).message ?? 'Something went wrong. Please try again.');
@@ -118,7 +127,7 @@ export default function CreatorOnboardingPage() {
           <p>Tell clients who you are and what you do. A great profile gets you hired faster.</p>
         </div>
         <div className="features">
-          {steps.slice(0, 3).map((s, i) => (
+          {steps.slice(0, 4).map((s, i) => (
             <div className="feature" key={s}>
               <div className="ic" style={{ background: i <= step ? 'rgba(25,90,215,0.9)' : 'rgba(255,255,255,0.12)' }}>
                 {i < step ? (
@@ -141,16 +150,16 @@ export default function CreatorOnboardingPage() {
           {/* Progress bar */}
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
-              <span>Step {Math.min(step + 1, 3)} of 3</span>
+              <span>Step {Math.min(step + 1, 4)} of 4</span>
               <span>{steps[step]}</span>
             </div>
             <div style={{ height: 6, background: '#e5e7eb', borderRadius: 999 }}>
-              <div style={{ height: '100%', width: `${Math.min((step / 2) * 100, 100)}%`, background: 'linear-gradient(90deg,#195ad7,#4178e7)', borderRadius: 999, transition: 'width 0.4s ease' }} />
+              <div style={{ height: '100%', width: `${Math.min((step / 3) * 100, 100)}%`, background: 'linear-gradient(90deg,#195ad7,#4178e7)', borderRadius: 999, transition: 'width 0.4s ease' }} />
             </div>
           </div>
 
           <div className="card">
-            {step === 3 ? (
+            {step === 4 ? (
               <div className="success">
                 <div className="check">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -162,30 +171,26 @@ export default function CreatorOnboardingPage() {
               </div>
             ) : (
               <form noValidate onSubmit={e => { e.preventDefault(); onNext(); }}>
+
                 {/* Step 0 — Profile */}
                 {step === 0 && (
                   <>
                     <h2>Your profile</h2>
                     <p className="lede">This is what clients see first. Make it count.</p>
-
                     {err && <div className="alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span>{err}</span></div>}
-
                     <div className="field">
                       <label htmlFor="displayName">Display name <span style={{ color: '#ef4444' }}>*</span></label>
                       <input id="displayName" className="input" type="text" placeholder="e.g. Alex Rivera" value={displayName} onChange={e => setDisplayName(e.target.value)} />
                     </div>
-
                     <div className="field">
                       <label htmlFor="bio">Bio <span style={{ color: '#ef4444' }}>*</span></label>
                       <textarea id="bio" className="input" rows={4} placeholder="Describe your experience, style, and what you bring to projects…" value={bio} onChange={e => setBio(e.target.value)} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
                       <div className="help" style={{ color: bio.length < 20 ? '#9ca3af' : '#10b981' }}>{bio.length}/200 characters {bio.length < 20 ? '(min 20)' : '✓'}</div>
                     </div>
-
                     <div className="field">
                       <label htmlFor="location">Location</label>
                       <input id="location" className="input" type="text" placeholder="e.g. Los Angeles, CA" value={location} onChange={e => setLocation(e.target.value)} />
                     </div>
-
                     <div className="field">
                       <label htmlFor="website">Portfolio / website</label>
                       <input id="website" className="input" type="url" placeholder="https://yourportfolio.com" value={website} onChange={e => setWebsite(e.target.value)} />
@@ -198,7 +203,6 @@ export default function CreatorOnboardingPage() {
                   <>
                     <h2>Your skills</h2>
                     <p className="lede">Select all that apply. You can update these anytime.</p>
-
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
                       {SKILLS.map(s => (
                         <button key={s} type="button" onClick={() => toggleSkill(s)}
@@ -213,7 +217,6 @@ export default function CreatorOnboardingPage() {
                         </button>
                       ))}
                     </div>
-
                     <div className="field">
                       <label htmlFor="customSkill">Add a custom skill</label>
                       <div style={{ display: 'flex', gap: 8 }}>
@@ -226,7 +229,6 @@ export default function CreatorOnboardingPage() {
                         </button>
                       </div>
                     </div>
-
                     {selectedSkills.length === 0 && (
                       <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 8 }}>Select at least one skill to continue.</p>
                     )}
@@ -238,7 +240,6 @@ export default function CreatorOnboardingPage() {
                   <>
                     <h2>Your availability</h2>
                     <p className="lede">Help clients understand your schedule and pricing.</p>
-
                     <div className="field">
                       <label>Hourly rate <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -250,7 +251,6 @@ export default function CreatorOnboardingPage() {
                         ))}
                       </div>
                     </div>
-
                     <div className="field">
                       <label>Availability <span style={{ color: '#ef4444' }}>*</span></label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -262,7 +262,6 @@ export default function CreatorOnboardingPage() {
                         ))}
                       </div>
                     </div>
-
                     <div className="field">
                       <label className="remember">
                         <input type="checkbox" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} />
@@ -272,7 +271,22 @@ export default function CreatorOnboardingPage() {
                   </>
                 )}
 
-                <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                {/* Step 3 — Portfolio */}
+                {step === 3 && (
+                  <>
+                    <h2>Add your portfolio</h2>
+                    <p className="lede">Show clients your best work. Up to 2 videos and 3 photos. You can add more later.</p>
+                    {err && <div className="alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span>{err}</span></div>}
+                    <div style={{ marginTop: 8 }}>
+                      <PortfolioSection editable={true} compact={true} />
+                    </div>
+                    <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, textAlign: 'center' }}>
+                      This step is optional — you can always add portfolio items from your profile settings.
+                    </p>
+                  </>
+                )}
+
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
                   {step > 0 && (
                     <button type="button" onClick={() => setStep(s => s - 1)}
                       style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', fontWeight: 600, fontSize: 15, color: '#374151', cursor: 'pointer' }}>
@@ -285,7 +299,7 @@ export default function CreatorOnboardingPage() {
                     disabled={!canNext[step] || submitting}
                     style={{ flex: step > 0 ? 2 : 1, opacity: canNext[step] ? 1 : 0.5 }}
                   >
-                    {step === 2 ? (submitting ? 'Setting up…' : 'Complete setup') : 'Continue'}
+                    {step === 3 ? (submitting ? 'Setting up…' : 'Finish setup') : 'Continue'}
                   </button>
                 </div>
 

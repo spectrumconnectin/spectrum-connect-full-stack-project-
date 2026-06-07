@@ -8,18 +8,22 @@ import EtfBadge from '@/components/EtfBadge';
 // Backend actions are dotted strings (e.g. "milestone.released.creator").
 // We map known ones to a short verb + icon for the UI; unknowns fall back
 // to a generic chip so the feed stays readable even as we add actions.
-const ACTION_META: Record<string, { label: string; icon: string }> = {
-  'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn' },
-  'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake' },
-  'milestone.funded':               { label: 'Funded a milestone',         icon: 'fa-lock' },
-  'milestone.released.client':      { label: 'Released milestone',         icon: 'fa-unlock' },
-  'milestone.released.creator':     { label: 'Delivered milestone',        icon: 'fa-flag-checkered' },
-  'project.completed.client':       { label: 'Completed a project',        icon: 'fa-check-double' },
-  'project.completed.creator':      { label: 'Completed a project',        icon: 'fa-trophy' },
-  'review.submitted':               { label: 'Left a review',              icon: 'fa-star' },
-  'repeat_client.bonus':            { label: 'Repeat client bonus',        icon: 'fa-rotate-right' },
-  'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved' },
-  'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket' },
+const ACTION_META: Record<string, { label: string; icon: string; color?: string }> = {
+  'project.posted':                 { label: 'Posted a project',           icon: 'fa-bullhorn',             color: 'text-cobalt' },
+  'project.hired':                  { label: 'Hired a creator',            icon: 'fa-handshake',            color: 'text-cobalt' },
+  'milestone.funded':               { label: 'Funded a milestone',         icon: 'fa-lock',                 color: 'text-cobalt' },
+  'milestone.released.client':      { label: 'Released milestone payment', icon: 'fa-unlock',               color: 'text-emerald-600' },
+  'milestone.released.creator':     { label: 'Milestone payment received', icon: 'fa-flag-checkered',       color: 'text-emerald-600' },
+  'project.completed.client':       { label: 'Project completed',          icon: 'fa-check-double',         color: 'text-emerald-600' },
+  'project.completed.creator':      { label: 'Project completed',          icon: 'fa-trophy',               color: 'text-amber-500' },
+  'on_time_delivery':               { label: 'On-time delivery bonus',     icon: 'fa-clock',                color: 'text-amber-500' },
+  'positive_review':                { label: 'Positive review bonus',      icon: 'fa-star',                 color: 'text-amber-400' },
+  'review.submitted':               { label: 'Left a review',              icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'review.given':                   { label: 'Left a review',              icon: 'fa-pen-to-square',        color: 'text-blue-500' },
+  'repeat_client.bonus':            { label: 'Repeat client bonus',        icon: 'fa-rotate-right',         color: 'text-purple-500' },
+  'platform.activity':              { label: 'Platform engagement',        icon: 'fa-bolt',                 color: 'text-sky-500' },
+  'profile.verified':               { label: 'Profile verified',           icon: 'fa-shield-halved',        color: 'text-green-600' },
+  'cashout.requested':              { label: 'Cash-out requested',         icon: 'fa-arrow-right-from-bracket', color: 'text-gray-500' },
 };
 
 function actionMeta(action: string) {
@@ -79,7 +83,7 @@ export default function CreatorEtfPage() {
       {/* Header */}
       <section className="mb-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-          <h1 className="text-4xl font-bold text-gray-900">ETF — Earn Trust</h1>
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900">ETF — Earn Trust</h1>
           {level && <EtfBadge level={level} size="md" />}
         </div>
         <p className="text-gray-600">
@@ -163,6 +167,46 @@ export default function CreatorEtfPage() {
         </div>
       </section>
 
+      {/* Level Benefits */}
+      <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">What you unlock at each level</h2>
+        <p className="text-sm text-gray-600 mb-6">Higher ETF levels earn you better visibility, stronger rankings, and more trust signals on the platform.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            {
+              level: 'Bronze', icon: 'fa-medal', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200',
+              perks: ['Platform access', 'Smart Connect listing', 'Standard visibility', 'Apply to projects'],
+            },
+            {
+              level: 'Silver', icon: 'fa-medal', color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200',
+              perks: ['Higher Smart Connect ranking', 'Silver trust badge on profile', 'Priority in search results', 'Repeat client bonus active'],
+            },
+            {
+              level: 'Gold', icon: 'fa-crown', color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200',
+              perks: ['Top-tier Smart Connect ranking', 'Gold trust badge', 'Featured in client recommendations', 'Stronger trust indicators'],
+            },
+            {
+              level: 'Platinum', icon: 'fa-gem', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200',
+              perks: ['Highest Smart Connect priority', 'Platinum badge + cash-out eligible', 'Maximum recommendation boost', 'Early access to platform features'],
+            },
+          ].map(({ level, icon, color, bg, border, perks }) => (
+            <div key={level} className={`rounded-2xl border ${border} ${bg} p-5`}>
+              <div className="flex items-center gap-2 mb-3">
+                <i className={`fa-solid ${icon} text-xl ${color}`}></i>
+                <span className={`font-bold text-base ${color}`}>{level}</span>
+              </div>
+              <ul className="space-y-2">
+                {perks.map(p => (
+                  <li key={p} className="flex items-start gap-2 text-xs text-gray-700">
+                    <i className="fa-solid fa-check text-emerald-500 mt-0.5 flex-shrink-0"></i>{p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* How you earn */}
       <section className="bg-white rounded-3xl border border-gray-200 p-8 mb-8">
         <h2 className="text-xl font-bold text-gray-900 mb-2">How you earn ETF Points</h2>
@@ -170,20 +214,25 @@ export default function CreatorEtfPage() {
           Genuine, on-platform activity is rewarded. Self-jobs, fake projects, and duplicate
           accounts never earn points.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { icon: 'fa-flag-checkered', label: 'Deliver a milestone' },
-            { icon: 'fa-trophy',         label: 'Complete a project' },
-            { icon: 'fa-handshake',      label: 'Get hired' },
-            { icon: 'fa-shield-halved',  label: 'Get verified' },
-            { icon: 'fa-star',           label: 'Leave a review' },
-            { icon: 'fa-rotate-right',   label: 'Repeat client' },
+            { icon: 'fa-flag-checkered', label: 'Deliver a milestone',   pts: '+50' },
+            { icon: 'fa-trophy',         label: 'Complete a project',    pts: '+100' },
+            { icon: 'fa-clock',          label: 'On-time delivery',      pts: '+30 bonus' },
+            { icon: 'fa-handshake',      label: 'Get hired',             pts: '+20' },
+            { icon: 'fa-shield-halved',  label: 'Get verified',          pts: '+100' },
+            { icon: 'fa-star',           label: 'Leave a review',        pts: '+15' },
+            { icon: 'fa-rotate-right',   label: 'Repeat client',         pts: '+25' },
+            { icon: 'fa-lock',           label: 'Fund a milestone',      pts: '+10' },
           ].map(it => (
-            <div key={it.label} className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center">
-                <i className={`fa-solid ${it.icon}`}></i>
+            <div key={it.label} className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 text-cobalt flex items-center justify-center flex-shrink-0">
+                  <i className={`fa-solid ${it.icon}`}></i>
+                </div>
+                <span className="text-sm font-medium text-gray-800">{it.label}</span>
               </div>
-              <span className="text-sm font-medium text-gray-800">{it.label}</span>
+              <span className="text-xs font-bold text-emerald-600 flex-shrink-0 ml-2">{it.pts}</span>
             </div>
           ))}
         </div>
@@ -208,14 +257,17 @@ export default function CreatorEtfPage() {
             {events.map(ev => {
               const meta = actionMeta(ev.action);
               const positive = ev.points >= 0;
+              const iconColor = meta.color ?? (positive ? 'text-emerald-600' : 'text-rose-600');
               return (
                 <li key={ev.id} className="flex items-center gap-4 px-8 py-4 hover:bg-gray-50 transition">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${positive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                    <i className={`fa-solid ${meta.icon}`}></i>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-gray-100`}>
+                    <i className={`fa-solid ${meta.icon} ${iconColor}`}></i>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{meta.label}</p>
-                    <p className="text-xs text-gray-400 truncate">{ev.description}</p>
+                    {ev.description && (
+                      <p className="text-xs text-gray-400 truncate">{ev.description}</p>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className={`text-sm font-bold tabular-nums ${positive ? 'text-emerald-600' : 'text-rose-600'}`}>

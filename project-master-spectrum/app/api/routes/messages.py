@@ -9,10 +9,12 @@ Endpoints for messaging system:
 - User presence
 """
 
+import asyncio
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query, UploadFile, File
 from fastapi.responses import JSONResponse
 from beanie import PydanticObjectId
+from app.core.rate_limit import rate_limiter
 
 from app.models.schema import User
 from app.models.message import Conversation, Message, UserPresence, MessageAttachment
@@ -47,27 +49,28 @@ async def _conversation_to_response(
     current_user_id: str
 ) -> ConversationResponse:
     """Convert Conversation model to response schema"""
-    # Get participant details
-    participants = []
-    for participant_id in conversation.participants:
-        try:
-            user = await User.get(PydanticObjectId(participant_id))
-        except Exception:
-            user = None
-        if user:
-            # Get presence
-            presence = await MessageService.get_user_presence(participant_id)
-            is_online = presence.is_online if presence else False
-            last_seen = presence.last_seen if presence else None
+    # Batch-load all participants and their presence in parallel — avoids N+1.
+    participant_ids = conversation.participants or []
 
-            participants.append(ConversationParticipant(
-                user_id=str(user.id),
-                username=user.username,
-                display_name=user.profile.display_name if user.profile else None,
-                avatar_url=user.profile.avatar if user.profile else None,
-                is_online=is_online,
-                last_seen=last_seen
-            ))
+    async def _fetch_participant(pid: str):
+        try:
+            user = await User.get(PydanticObjectId(pid))
+        except Exception:
+            return None
+        if not user:
+            return None
+        presence = await MessageService.get_user_presence(pid)
+        return ConversationParticipant(
+            user_id=str(user.id),
+            username=user.username,
+            display_name=user.profile.display_name if user.profile else None,
+            avatar_url=user.profile.avatar if user.profile else None,
+            is_online=presence.is_online if presence else False,
+            last_seen=presence.last_seen if presence else None,
+        )
+
+    results = await asyncio.gather(*[_fetch_participant(pid) for pid in participant_ids])
+    participants = [p for p in results if p is not None]
 
     # Get unread count for current user
     unread_count = conversation.unread_counts.get(current_user_id, 0)
@@ -140,6 +143,19 @@ async def create_conversation(
         initial_message=data.initial_message
     )
 
+    # ETF: platform activity for initiating contact
+    try:
+        from app.services.etf_points_service import EtfPointsService
+        await EtfPointsService.award_points(
+            user_id=current_user.id,
+            action="platform.activity",
+            source_type="conversation",
+            source_id=str(conversation.id),
+            description="Started a project conversation",
+        )
+    except Exception:
+        pass
+
     return await _conversation_to_response(conversation, str(current_user.id))
 
 
@@ -164,15 +180,12 @@ async def list_conversations(
         include_archived=include_archived
     )
 
-    # Convert to response format
-    active_projects_responses = [
-        await _conversation_to_response(c, str(current_user.id))
-        for c in active_projects
-    ]
-    recent_responses = [
-        await _conversation_to_response(c, str(current_user.id))
-        for c in recent
-    ]
+    # Convert to response format — parallel to avoid N+1
+    uid = str(current_user.id)
+    active_projects_responses, recent_responses = await asyncio.gather(
+        asyncio.gather(*[_conversation_to_response(c, uid) for c in active_projects]),
+        asyncio.gather(*[_conversation_to_response(c, uid) for c in recent]),
+    )
 
     return ConversationListResponse(
         conversations=active_projects_responses + recent_responses,
@@ -208,10 +221,12 @@ async def get_conversation(
         limit=20
     )
 
-    recent_messages = [await _message_to_response(m) for m in messages]
+    recent_messages, base_response = await asyncio.gather(
+        asyncio.gather(*[_message_to_response(m) for m in messages]),
+        _conversation_to_response(conversation, str(current_user.id)),
+    )
 
-    # Get base response
-    base_response = await _conversation_to_response(conversation, str(current_user.id))
+    # base_response is a single object; recent_messages is a tuple from gather
 
     # Build detailed response
     return ConversationDetailResponse(
@@ -236,7 +251,8 @@ async def archive_conversation(
 @router.post("", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def create_message(
     data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limiter("send_message", limit=60, window_seconds=60)),
 ):
     """
     Send a message in a conversation (alias for /send)
@@ -256,7 +272,8 @@ async def create_message(
 @router.post("/send", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(
     data: MessageCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limiter("send_message", limit=60, window_seconds=60)),
 ):
     """Send a message in a conversation"""
     message = await MessageService.send_message(
@@ -288,7 +305,7 @@ async def get_conversation_messages(
         before_message_id=before_message_id
     )
 
-    message_responses = [await _message_to_response(m) for m in messages]
+    message_responses = list(await asyncio.gather(*[_message_to_response(m) for m in messages]))
 
     return MessageListResponse(
         messages=message_responses,
@@ -405,7 +422,7 @@ async def search_messages(
         limit=data.limit
     )
 
-    message_responses = [await _message_to_response(m) for m in messages]
+    message_responses = list(await asyncio.gather(*[_message_to_response(m) for m in messages]))
 
     return MessageSearchResponse(
         results=message_responses,
@@ -413,7 +430,20 @@ async def search_messages(
     )
 
 
-# ==================== File Upload (Placeholder) ====================
+# ==================== File Upload ====================
+
+# Supported attachment types for in-chat file sharing
+_ALLOWED_ATTACHMENT_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+    "application/zip",
+}
+_MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 20 MB per attachment
 
 @router.post("/attachments/upload", response_model=AttachmentResponse)
 async def upload_attachment(
@@ -421,18 +451,91 @@ async def upload_attachment(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Upload a file attachment
+    Upload a file attachment for use in a project conversation.
+    Files are stored on S3 and the permanent URL is returned.
 
-    TODO: Implement actual file storage (S3, local, etc.)
-    For now, returns a placeholder
+    Supported types: images, PDF, Word/Excel, plain text, zip.
+    Max size: 20 MB per file.
     """
-    # Placeholder implementation
-    # In production, upload to S3 or local storage
+    import os as _os
+    import uuid as _uuid
+    import boto3 as _boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File name is required.")
+
+    content = await file.read()
+    file_size = len(content)
+
+    if file_size == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if file_size > _MAX_ATTACHMENT_BYTES:
+        raise HTTPException(status_code=400, detail=f"File exceeds the 20 MB limit.")
+
+    declared_type = file.content_type or "application/octet-stream"
+    if declared_type not in _ALLOWED_ATTACHMENT_TYPES:
+        # Allow images regardless of exact sub-type for convenience
+        if not declared_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{declared_type}'. Allowed: images, PDF, Word, Excel, text, zip.",
+            )
+
+    # Magic byte validation for images: reject files whose bytes don't match the declared type.
+    # This prevents an attacker from declaring image/jpeg but uploading an HTML/JS payload.
+    _IMAGE_MAGIC: dict[str, list[bytes]] = {
+        "image/jpeg": [b"\xff\xd8\xff"],
+        "image/png":  [b"\x89PNG\r\n\x1a\n"],
+        "image/gif":  [b"GIF87a", b"GIF89a"],
+        "image/webp": [b"RIFF"],  # bytes 8-11 must also be WEBP
+    }
+    if declared_type in _IMAGE_MAGIC:
+        magic_ok = False
+        for sig in _IMAGE_MAGIC[declared_type]:
+            if content[:len(sig)] == sig:
+                if declared_type == "image/webp":
+                    magic_ok = len(content) >= 12 and content[8:12] == b"WEBP"
+                else:
+                    magic_ok = True
+                break
+        if not magic_ok:
+            raise HTTPException(
+                status_code=400,
+                detail="File content does not match its declared image type.",
+            )
+
+    # Sanitize filename and derive extension
+    safe_name = _os.path.basename(file.filename).replace("..", "").replace("/", "_").replace("\\", "_")
+    ext = _os.path.splitext(safe_name)[1].lower() or ".bin"
+
+    # Upload to S3
+    S3_BUCKET = _os.getenv("S3_MEDIA_BUCKET", "spectrum-connect-media-217989999840")
+    S3_REGION = _os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
+    S3_BASE_URL = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com"
+    key = f"attachments/{str(current_user.id)}/{_uuid.uuid4().hex}{ext}"
+
+    try:
+        s3 = _boto3.client("s3", region_name=S3_REGION)
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=key,
+            Body=content,
+            ContentType=declared_type,
+            # Force download for non-image files (security: prevent inline JS execution)
+            ContentDisposition=f'attachment; filename="{safe_name}"' if not declared_type.startswith("image/") else "inline",
+            # Encrypt at rest — uses the bucket's default KMS/SSE key.
+            ServerSideEncryption="AES256",
+        )
+        file_url = f"{S3_BASE_URL}/{key}"
+    except (BotoCoreError, ClientError) as exc:
+        raise HTTPException(status_code=500, detail=f"File upload failed: {exc}")
+
     attachment = MessageAttachment(
-        filename=file.filename,
-        file_size=0,  # Get from file
-        file_type=file.content_type,
-        file_url=f"/uploads/{file.filename}",  # Placeholder
+        filename=safe_name,
+        file_size=file_size,
+        file_type=declared_type,
+        file_url=file_url,
         uploaded_by=str(current_user.id)
     )
     await attachment.insert()

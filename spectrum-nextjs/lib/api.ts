@@ -8,7 +8,8 @@ function setCookie(token: string, rememberMe: boolean = false) {
   // 30 days if "Remember me" is checked, otherwise 7 days
   const daysToExpire = rememberMe ? 30 : 7;
   const expires = new Date(Date.now() + daysToExpire * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Lax`;
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
 }
 
 function getCookie(): string | null {
@@ -121,6 +122,8 @@ export interface MeResponse {
   account_type: string;
   user_role: string;
   is_verified: boolean;
+  is_online?: boolean;
+  last_seen?: string;
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -139,6 +142,8 @@ export interface MeResponse {
     certifications?: object[];
     hourly_rate_min?: number;
     hourly_rate_max?: number;
+    rating?: number;
+    review_count?: number;
   };
   settings?: {
     email_notifications?: boolean;
@@ -149,8 +154,16 @@ export interface MeResponse {
     show_location?: boolean;
     show_earnings?: boolean;
     two_factor_auth?: boolean;
+    availability_status?: string;
   };
-  stats?: object;
+  stats?: {
+    projects_completed?: number;
+    completed_credits?: number;
+    active_projects?: number;
+    total_earnings?: number;
+    response_time?: number;
+    client_satisfaction?: number;
+  };
 }
 
 // ── Authentication ───────────────────────────────────────────────────────────
@@ -172,10 +185,12 @@ export const auth = {
     email: string;
     username: string;
     password: string;
-    phone_number: string;
+    phone_number?: string;
     phone_country_code?: string;
     account_type: string;
     name?: string;
+    first_name?: string;
+    last_name?: string;
   }): Promise<RegisterResponse> =>
     request<RegisterResponse>('/auth/register', {
       method: 'POST',
@@ -228,6 +243,8 @@ export interface ProfileUpdate {
   social_links?: { linkedin?: string; imdb?: string; vimeo?: string; portfolio?: string };
   hourly_rate_min?: number;
   hourly_rate_max?: number;
+  availability_status?: string;
+  availability_label?: string;
 }
 
 export interface ExperienceCreate {
@@ -299,6 +316,17 @@ export const notifications = {
 
   markOneRead: (id: string): Promise<{ success: boolean }> =>
     request(`/header/notifications/${id}/read`, { method: 'POST' }),
+
+  send: (data: {
+    user_id: string;
+    type: string;
+    category: string;
+    title: string;
+    message: string;
+    action_url?: string;
+    action_text?: string;
+  }): Promise<{ success: boolean }> =>
+    request('/header/notifications/send', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Profile ──────────────────────────────────────────────────────────────────
@@ -329,8 +357,10 @@ export const profile = {
     return request<{ url: string }>('/upload/cover', { method: 'POST', body: form });
   },
 
-  addSkill: (data: { name: string; level?: string; years_of_experience?: number }) =>
-    request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) }),
+  addSkill: (nameOrData: string | { name: string; level?: string; years_of_experience?: number }, level?: string) => {
+    const data = typeof nameOrData === 'string' ? { name: nameOrData, level } : nameOrData;
+    return request('/profiles/me/skills', { method: 'POST', body: JSON.stringify(data) });
+  },
 
   deleteSkill: (index: number) =>
     request(`/profiles/me/skills/${index}`, { method: 'DELETE' }),
@@ -363,6 +393,9 @@ export const profile = {
     request(`/profiles/me/certifications/${index}`, { method: 'DELETE' }),
 
   getPublic: (userId: string): Promise<PublicProfile> => request<PublicProfile>(`/profiles/${userId}`),
+
+  getPublicReviews: (userId: string): Promise<{ reviews: PublicReview[]; total: number }> =>
+    request<{ reviews: PublicReview[]; total: number }>(`/profiles/${userId}/reviews`),
 };
 
 // ── Account Settings ─────────────────────────────────────────────────────────
@@ -509,6 +542,43 @@ export interface JobPostItem {
   published_at?: string;
   created_at?: string;
   workspace?: { progress: number; roles_required: number; roles_filled: number };
+  location?: string;           // physical location for in-person jobs
+  event_date?: string;         // ISO date for event-based projects
+  is_remote?: boolean;         // true = remote only, false = on-site, undefined = flexible
+  goals?: string[];
+  deliverables?: string[];
+  currency?: string;  // ISO 4217 code stored on the job post (e.g. "USD", "LKR")
+}
+
+// ── Shared currency utilities ─────────────────────────────────────────────────
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', LKR: 'Rs ', EUR: '€', GBP: '£',
+  AUD: 'A$', INR: '₹', SGD: 'S$', CAD: 'C$', AED: 'AED ',
+};
+
+/** Returns the display symbol for a given ISO 4217 currency code. */
+export function currencySymbol(code?: string | null): string {
+  if (!code) return '$';
+  return CURRENCY_SYMBOLS[code] ?? `${code} `;
+}
+
+/** Currency-aware budget formatter — reads currency from the JobPostItem. */
+export function formatJobBudget(p: JobPostItem): string {
+  const sym = currencySymbol(p.budget?.currency ?? p.currency);
+  const fmt = (min?: number, max?: number, sfx = '') => {
+    if (!min && !max) return 'TBD';
+    if (min && max) return min === max
+      ? `${sym}${min.toLocaleString()}${sfx}`
+      : `${sym}${min.toLocaleString()}–${sym}${max.toLocaleString()}${sfx}`;
+    if (min) return `${sym}${min.toLocaleString()}+${sfx}`;
+    return `${sym}${max?.toLocaleString()}${sfx}`;
+  };
+  if (p.budget_type === 'fixed')  return fmt(p.budget?.min, p.budget?.max);
+  if (p.budget_type === 'hourly') return fmt(p.hourly_rate?.min, p.hourly_rate?.max, '/hr');
+  if (p.budget_type === 'daily')  return fmt(p.daily_rate?.min, p.daily_rate?.max, '/day');
+  if (p.budget_type === 'weekly') return fmt(p.weekly_rate?.min, p.weekly_rate?.max, '/wk');
+  return 'Negotiable';
 }
 
 export interface JobSearchResponse {
@@ -523,18 +593,24 @@ export interface JobCreatePayload {
   description: string;
   department: string;
   role?: string;
-  tags: string[];
-  crew_size: string;
-  complexity: string;
-  budget_type: string;
-  budget?: { min?: number; max?: number };
+  tags?: string[];
+  crew_size?: string;
+  complexity?: string;
+  budget_type?: string;
+  budget?: { min?: number; max?: number; currency?: string };
   hourly_rate?: { min?: number; max?: number };
   daily_rate?: { min?: number; max?: number };
   weekly_rate?: { min?: number; max?: number };
+  currency?: string;
   duration?: string;
   estimated_duration?: number;
-  skills: string[];
-  experience_level: string;
+  skills?: string[];
+  experience_level?: string;
+  goals?: string[];
+  deliverables?: string[];
+  location?: string;
+  event_date?: string;
+  is_remote?: boolean;
   status?: string;
 }
 
@@ -568,6 +644,29 @@ export const jobs = {
 
   delete: (id: string): Promise<void> =>
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
+
+  /** Returns all hired (accepted) creators for a job, each with their escrow summary. */
+  getTeam: (id: string): Promise<{
+    application_id: string;
+    creator_id: string;
+    creator_name: string;
+    creator_username?: string;
+    creator_avatar?: string;
+    creator_title?: string;
+    role?: string;
+    proposed_budget?: number;
+    escrow?: {
+      escrow_id: string;
+      status: string;
+      total_amount: number;
+      funded_amount: number;
+      released_amount: number;
+      milestone_count: number;
+      funded_milestones: number;
+      released_milestones: number;
+    } | null;
+  }[]> =>
+    request(`/jobs/${id}/team`),
 };
 
 // ── Service Listings ──────────────────────────────────────────────────────────
@@ -645,6 +744,15 @@ export interface TalentItem {
   hourly_rate_max?: number;
   rating?: number;
   review_count?: number;
+  etf_level?: string;
+  /** Profile-set preference: 'available' | 'busy' | 'not_available' | null */
+  availability_status?: string | null;
+  /** True only if creator sent a presence heartbeat within the last 2 minutes */
+  is_online?: boolean;
+  /** ISO timestamp of last heartbeat — shown as "Last active X ago" */
+  last_seen?: string | null;
+  portfolio_has_video?: boolean;
+  portfolio_item_count?: number;
 }
 
 export const talent = {
@@ -664,6 +772,10 @@ export interface PublicProfile {
   username: string;
   account_type: string;
   is_verified: boolean;
+  availability_status?: string;
+  availability_label?: string;
+  rating?: number;
+  review_count?: number;
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -690,7 +802,20 @@ export interface PublicProfile {
     profile_views?: number;
     total_connections?: number;
     completed_credits?: number;
+    client_satisfaction?: number;
+    total_earnings?: number;
   };
+  completed_projects?: number;
+}
+
+export interface PublicReview {
+  proposal_id: string;
+  overall: number;
+  ratings: Record<string, number>;
+  review: string;
+  tags: string[];
+  reviewed_at?: string;
+  job_title?: string;
 }
 
 // ── Creator Projects ──────────────────────────────────────────────────────────
@@ -724,6 +849,7 @@ export interface ProjectItem {
   budget_min?: number;
   budget_max?: number;
   location?: string;
+  job_post_id?: string;
 }
 
 export interface ProjectListResponse {
@@ -746,6 +872,22 @@ export interface ActivityLogItem {
   created_at: string;
 }
 
+export interface DeadlineItem {
+  id: string;
+  project_id: string;
+  project_title: string;
+  title: string;
+  description?: string;
+  due_date: string;
+  priority: string;
+  status: string;
+  days_remaining: number;
+  assigned_to: string[];
+  created_by: string;
+  created_at: string;
+  completed_at?: string;
+}
+
 export const creatorProjects = {
   list: (params?: { status?: string; search?: string; page?: number }): Promise<ProjectListResponse> =>
     request<ProjectListResponse>(`/projects${buildQS(params as Record<string, string | number | undefined> || {})}`),
@@ -761,6 +903,36 @@ export const creatorProjects = {
       method: 'PATCH',
       body: JSON.stringify({ progress_percentage }),
     }),
+
+  create: (data: {
+    title: string;
+    description: string;
+    category: string;
+    tags?: string[];
+    budget_min?: number;
+    budget_max?: number;
+    start_date?: string;
+    end_date?: string;
+  }): Promise<ProjectItem> =>
+    request<ProjectItem>('/projects', { method: 'POST', body: JSON.stringify({ ...data, icon_type: 'film', is_public: false, total_roles: 1 }) }),
+
+  getDeadlines: (projectId: string): Promise<{ deadlines: DeadlineItem[]; total: number }> =>
+    request(`/projects/${projectId}/deadlines`),
+
+  createDeadline: (data: {
+    project_id: string;
+    title: string;
+    description?: string;
+    due_date: string;
+    priority?: string;
+  }): Promise<DeadlineItem> =>
+    request<DeadlineItem>('/projects/deadlines', { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteDeadline: (deadlineId: string): Promise<void> =>
+    request<void>(`/projects/deadlines/${deadlineId}`, { method: 'DELETE' }),
+
+  completeDeadline: (deadlineId: string): Promise<DeadlineItem> =>
+    request<DeadlineItem>(`/projects/deadlines/${deadlineId}/complete`, { method: 'POST' }),
 };
 
 // ── Earnings ──────────────────────────────────────────────────────────────────
@@ -800,6 +972,50 @@ export const earnings = {
 
   getStats: (): Promise<EarningsStats> =>
     request<EarningsStats>('/earnings/stats'),
+
+  /** Download a CSV earnings report (creator). Triggers file download. */
+  downloadCreatorCSV: (): void => {
+    const token = tokenStore.get();
+    const url = `${BASE_URL}/earnings/invoice/csv`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', 'spectrum_earnings.csv');
+    // For auth'd download, open in new tab (the endpoint returns a binary response)
+    if (token) {
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.blob())
+        .then(b => {
+          const burl = URL.createObjectURL(b);
+          a.href = burl;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(burl);
+        })
+        .catch(() => { /* ignore */ });
+    }
+  },
+
+  /** Download a CSV payment report (client). Triggers file download. */
+  downloadClientCSV: (): void => {
+    const token = tokenStore.get();
+    const url = `${BASE_URL}/earnings/invoice/client-csv`;
+    if (token) {
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.blob())
+        .then(b => {
+          const burl = URL.createObjectURL(b);
+          const a = document.createElement('a');
+          a.href = burl;
+          a.setAttribute('download', 'spectrum_payments.csv');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(burl);
+        })
+        .catch(() => { /* ignore */ });
+    }
+  },
 };
 
 // ── Proposals ─────────────────────────────────────────────────────────────────
@@ -810,8 +1026,10 @@ export interface ProposalItem {
   job_title: string;
   job_department: string;
   job_status: string;
+  client_id?: string;
   cover_letter: string;
   proposed_budget?: number;
+  portfolio_url?: string;
   role?: string;
   status: string; // submitted | shortlisted | interviewing | accepted | rejected | withdrawn
   submitted_at?: string;
@@ -827,10 +1045,46 @@ export interface JobProposalItem {
   creator_skills: string[];
   cover_letter: string;
   proposed_budget?: number;
+  portfolio_url?: string;
   role?: string;
   status: string;
   client_viewed: boolean;
   submitted_at?: string;
+  accepted_at?: string;
+  deadline_at?: string;
+  proposed_duration?: number;
+}
+
+export interface ProposalDetail {
+  id: string;
+  job_id: string;
+  job_title: string;
+  job_description?: string;
+  job_department: string;
+  job_status: string;
+  job_budget_min?: number;
+  job_budget_max?: number;
+  job_location?: string;
+  job_skills?: string[];
+  job_deadline?: string;
+  client_id?: string;
+  client?: { id: string; username: string; display_name?: string; avatar?: string };
+  cover_letter: string;
+  proposed_budget?: number;
+  proposed_duration?: number;
+  role?: string;
+  status: string;
+  submitted_at?: string;
+  accepted_at?: string;
+  deadline_at?: string;
+  escrow?: {
+    escrow_id: string;
+    status: string;
+    total_amount: number;
+    funded_amount: number;
+    released_amount: number;
+    milestones: EscrowMilestone[];
+  };
 }
 
 export interface ProposalSubmitPayload {
@@ -838,6 +1092,7 @@ export interface ProposalSubmitPayload {
   proposed_budget?: number;
   role?: string;
   proposed_duration?: number;
+  portfolio_url?: string;
 }
 
 export const proposals = {
@@ -847,8 +1102,13 @@ export const proposals = {
   getMe: (): Promise<ProposalItem[]> =>
     request<ProposalItem[]>('/proposals/me'),
 
-  getForJob: (jobId: string): Promise<JobProposalItem[]> =>
-    request<JobProposalItem[]>(`/proposals/job/${jobId}`),
+  getDetail: (proposalId: string): Promise<ProposalDetail> =>
+    request<ProposalDetail>(`/proposals/${proposalId}/detail`),
+
+  getForJob: (jobId: string, params?: { limit?: number; skip?: number; sort_by?: string }): Promise<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }> =>
+    request<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }>(
+      `/proposals/job/${jobId}${buildQS(params as Record<string, string | number | undefined> || {})}`
+    ),
 
   updateStatus: (proposalId: string, status: string): Promise<{ id: string; status: string }> =>
     request(`/proposals/${proposalId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -863,6 +1123,28 @@ export const proposals = {
     private_note?: string;
   }): Promise<{ success: boolean; message: string }> =>
     request(`/proposals/${proposalId}/rate`, { method: 'POST', body: JSON.stringify(data) }),
+
+  reviewClient: (proposalId: string, data: {
+    ratings: Record<string, number>;
+    review: string;
+    tags?: string[];
+  }): Promise<{ success: boolean; message: string; overall: number }> =>
+    request(`/proposals/${proposalId}/review-client`, { method: 'POST', body: JSON.stringify(data) }),
+
+  getReviews: (proposalId: string): Promise<{
+    client_rating: { ratings: Record<string, number>; overall: number; review: string; tags: string[]; reviewed_at: string } | null;
+    creator_rating: { ratings: Record<string, number>; overall: number; review: string; tags: string[]; reviewed_at: string } | null;
+    proposal_id: string;
+    job_title: string | null;
+  }> =>
+    request(`/proposals/${proposalId}/reviews`),
+
+  directHire: (data: {
+    job_id: string;
+    creator_id: string;
+    note?: string;
+  }): Promise<{ id: string; status: string; job_id: string; already_hired?: boolean }> =>
+    request('/proposals/direct-hire', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Escrow & Payments ─────────────────────────────────────────────────────────
@@ -871,12 +1153,16 @@ export interface EscrowMilestone {
   milestone_id: string;
   title: string;
   amount: number;
-  status: string; // pending | funded | released | disputed | refunded
+  status: string; // pending | funded | delivered | revision_requested | approved | released | disputed | refunded
   funded_at?: string;
+  delivered_at?: string;
   released_at?: string;
   refunded_at?: string;
   release_transaction_id?: string;
   deadline_id?: string;
+  /** Delivery fields set by creator when submitting work */
+  google_drive_link?: string;
+  delivery_notes?: string;
   /** Per-milestone fee breakdown (v1 8/4 commission). */
   fees?: CommissionBreakdown;
 }
@@ -925,6 +1211,7 @@ export interface EscrowListItem {
   released_amount: number;
   currency: string;
   project_id?: string;
+  job_post_id?: string;
   client_id: string;
   creator_id: string;
   milestone_count: number;
@@ -948,10 +1235,85 @@ export const escrow = {
   getById: (id: string): Promise<EscrowDetail> =>
     request<EscrowDetail>(`/escrow/${id}`),
 
+  create: (data: {
+    creator_id: string;
+    milestones: Array<{ title: string; amount: number; currency?: string }>;
+    job_post_id?: string;
+    project_id?: string;
+    description?: string;
+    currency?: string;
+  }): Promise<{ escrow_id: string; status: string; total_amount: number; milestones: Array<{ milestone_id: string; title: string; amount: number; status: string }> }> =>
+    request('/escrow', { method: 'POST', body: JSON.stringify(data) }),
+
+  fundMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; funded_amount: number; transaction_id?: string; mock_transaction_id?: string }> =>
+    request(`/escrow/${escrowId}/fund-milestone`, {
+      method: 'POST',
+      body: JSON.stringify({ milestone_id: milestoneId }),
+    }),
+
+  refund: (escrowId: string, reason: string): Promise<{ success: boolean; refund_amount: number; transaction_id?: string }> =>
+    request(`/escrow/${escrowId}/refund`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
   releaseMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; escrow_id: string; message: string; creator_payout?: number; fees?: CommissionBreakdown }> =>
     request(`/escrow/${escrowId}/release-milestone`, {
       method: 'POST',
       body: JSON.stringify({ milestone_id: milestoneId }),
+    }),
+
+  deliverMilestone: (escrowId: string, milestoneId: string, data: { google_drive_link: string; delivery_notes?: string }): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/deliver`, { method: 'POST', body: JSON.stringify(data) }),
+
+  approveMilestone: (escrowId: string, milestoneId: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/approve`, { method: 'POST' }),
+
+  getDeliveryStatus: (escrowId: string, milestoneId: string): Promise<{
+    milestone_id: string;
+    title: string;
+    amount: number;
+    status: string;
+    google_drive_link?: string;
+    delivery_notes?: string;
+    delivered_at?: string;
+    auto_release_at?: string;
+    hours_remaining?: number;
+    auto_released: boolean;
+    revision_count?: number;
+    revision_notes?: string;
+    delivery_history?: Array<{
+      version: number;
+      google_drive_link: string;
+      delivery_notes?: string;
+      submitted_at?: string;
+    }>;
+    /** Timestamp when client first opened the Drive link (null = not opened yet) */
+    drive_link_opened_at?: string | null;
+    /** Timestamp when client confirmed they reviewed the work (null = not confirmed yet) */
+    client_reviewed_at?: string | null;
+    escrow_id: string;
+    client_id: string;
+    creator_id: string;
+  }> =>
+    request(`/escrow/${escrowId}/delivery-status?milestone_id=${milestoneId}`),
+
+  /** Step 1: Records that the client opened the Drive delivery link. */
+  markDriveLinkOpened: (escrowId: string, milestoneId: string): Promise<{
+    success: boolean; milestone_id: string; drive_link_opened_at: string;
+  }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/mark-opened`, { method: 'POST' }),
+
+  /** Step 2: Client confirms they have reviewed the delivered work. */
+  confirmReview: (escrowId: string, milestoneId: string): Promise<{
+    success: boolean; milestone_id: string; client_reviewed_at: string;
+  }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/confirm-review`, { method: 'POST' }),
+
+  requestRevision: (escrowId: string, milestoneId: string, feedback?: string): Promise<{ success: boolean; milestone_id: string; status: string }> =>
+    request(`/escrow/${escrowId}/milestone/${milestoneId}/request-revision`, {
+      method: 'POST',
+      body: JSON.stringify({ feedback: feedback ?? '' }),
     }),
 };
 
@@ -1291,6 +1653,25 @@ export const messaging = {
   getMessages: (conversationId: string, params?: { limit?: number; before_message_id?: string }): Promise<MessageListResponse> =>
     request<MessageListResponse>(`/messages/conversations/${conversationId}/messages${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
+  uploadAttachment: async (file: File): Promise<{ id: string; filename: string; file_url: string; file_size: number; file_type: string }> => {
+    const token = tokenStore.get();
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE_URL}/messages/attachments/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error('File upload failed');
+    return res.json();
+  },
+
+  sendWithAttachments: (conversationId: string, content: string, attachmentIds: string[]): Promise<MessageItem> =>
+    request<MessageItem>('/messages', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: conversationId, content, attachment_ids: attachmentIds }),
+    }),
+
   send: (conversationId: string, content: string): Promise<MessageItem> =>
     request<MessageItem>('/messages', {
       method: 'POST',
@@ -1352,6 +1733,8 @@ export interface SmartCreativeProfile {
   /** ETF Points level — bronze/silver/gold/platinum. Inline so cards
    *  don't need an N+1 fetch to render the badge. */
   etf_level?: EtfLevelName;
+  portfolio_item_count?: number;
+  portfolio_has_video?: boolean;
 }
 
 export interface SmartMatchResultItem {
@@ -1413,6 +1796,9 @@ export const smartConnect = {
       body: JSON.stringify(data),
     }),
 
+  matchForProject: (jobId: string, limit = 12): Promise<SmartMatchApiResponse> =>
+    request<SmartMatchApiResponse>(`/smart-connect/match-for-project/${jobId}?limit=${limit}`),
+
   getFeatured: (limit = 6): Promise<SavedProfilesApiResponse> =>
     request<SavedProfilesApiResponse>(`/smart-connect/featured?limit=${limit}`, {}, false),
 
@@ -1430,13 +1816,39 @@ export const smartConnect = {
       method: 'PATCH',
       body: JSON.stringify({ capacity }),
     }),
+
+  recordHistory: (data: {
+    match_title: string;
+    match_subtitle?: string;
+    match_avatar?: string;
+    match_score?: number;
+    match_user_id?: string;
+    match_job_id?: string;
+    action: 'applied' | 'invited' | 'saved' | 'messaged';
+  }): Promise<{ success: boolean }> =>
+    request('/smart-connect/history/record', { method: 'POST', body: JSON.stringify(data) }),
+
+  getHistory: (): Promise<{ history: MatchHistoryItem[] }> =>
+    request('/smart-connect/history'),
 };
+
+export interface MatchHistoryItem {
+  id: string;
+  match_title: string;
+  match_subtitle?: string;
+  match_avatar?: string;
+  match_score?: number;
+  match_user_id?: string;
+  match_job_id?: string;
+  action: string;
+  created_at: string;
+}
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 
 export interface AdminStats {
   users: { total: number; creators: number; clients: number; admins: number; verified: number; suspended: number; new_last_30_days: number };
-  escrow: { total_volume_usd: number; platform_fees_usd: number; active_count: number; completed_count: number; disputed_count: number };
+  escrow: { total_volume_usd: number; platform_fees_usd: number; client_fee_usd: number; creator_fee_usd: number; active_count: number; completed_count: number; disputed_count: number };
   etf: { total_points_awarded: number; platinum_users: number; gold_users: number };
 }
 
@@ -1449,16 +1861,24 @@ export interface AdminUser {
 
 export interface AdminUsersResponse { total: number; page: number; page_size: number; has_more: boolean; users: AdminUser[] }
 
-export interface AdminJob { id: string; title: string; status: string; client_id: string; department: string; proposal_count: number; created_at: string }
+export interface AdminJob { id: string; title: string; status: string; client_id: string; department: string; proposal_count: number; created_at: string; published_at?: string }
 export interface AdminJobsResponse { total: number; page: number; page_size: number; has_more: boolean; jobs: AdminJob[] }
 
 export interface AdminDispute { id: string; escrow_id?: string; status: string; reason?: string; opened_by?: string; created_at: string }
 export interface AdminDisputesResponse { total: number; page: number; page_size: number; has_more: boolean; disputes: AdminDispute[] }
 
-export interface AdminTransaction { id: string; status: string; amount: number; currency: string; platform_fee: number; client_id?: string; creator_id?: string; created_at: string }
+export interface AdminTransaction { id: string; status: string; type?: string; amount: number; currency: string; platform_fee: number; client_fee: number; creator_fee: number; commission_version?: string; client_id?: string; creator_id?: string; created_at: string }
 export interface AdminTransactionsResponse { total: number; page: number; page_size: number; has_more: boolean; transactions: AdminTransaction[] }
 
 export interface AdminEtfStats { total_accounts: number; total_lifetime_points: number; total_redeemed_points: number; level_breakdown: Record<string, number> }
+
+export interface AdminRevenueMonth { month: string; client_fees: number; creator_fees: number; total_fees: number; volume: number; count: number }
+export interface AdminRevenueStats {
+  monthly: AdminRevenueMonth[];
+  totals: { client_fees: number; creator_fees: number; platform_total: number; volume: number; transaction_count: number };
+  top_projects: { id: string; amount: number; platform_fee: number; client_fee: number; creator_fee: number; client_id?: string; creator_id?: string; created_at?: string; status: string }[];
+  commission_info: { version: string; client_rate_pct: number; creator_rate_pct: number; total_rate_pct: number; note: string };
+}
 
 export const adminApi = {
   getStats: (): Promise<AdminStats> => request<AdminStats>('/admin/stats'),
@@ -1482,7 +1902,26 @@ export const adminApi = {
   getTransactions: (params?: { page?: number; page_size?: number; status?: string }): Promise<AdminTransactionsResponse> =>
     request<AdminTransactionsResponse>(`/admin/transactions${buildQS(params as Record<string, string | number | undefined> || {})}`),
   getEtfStats: (): Promise<AdminEtfStats> => request<AdminEtfStats>('/admin/etf/stats'),
+  getRevenue: (): Promise<AdminRevenueStats> => request<AdminRevenueStats>('/admin/revenue'),
 };
 
-const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi };
+// ── User Presence ────────────────────────────────────────────────────────────
+export const presence = {
+  setOnline: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/online`, { method: 'POST' }),
+  setOffline: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/offline`, { method: 'POST' }),
+  updateActivity: (): Promise<{ status: string; user_id: string }> =>
+    request(`/presence/activity`, { method: 'POST' }),
+  getPresence: (userId: string): Promise<{ user_id: string; is_online: boolean; last_seen: string | null }> =>
+    request(`/presence/${userId}`),
+};
+
+const api = { auth, profile, account, dashboard, jobs, services, talent, creatorProjects, earnings, proposals, escrow, disputes, etfPoints, commission, skillChallenges, messaging, smartConnect, notifications, tokenStore, portfolio, adminApi, presence };
 export default api;
+
+// ── AI Assistant ─────────────────────────────────────────────────────────────
+export const aiChat = {
+  send: (messages: Array<{ role: string; content: string }>): Promise<{ response: string }> =>
+    request('/ai/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
+};

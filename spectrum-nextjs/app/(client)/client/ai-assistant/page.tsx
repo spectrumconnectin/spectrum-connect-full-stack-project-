@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { aiChat } from '@/lib/api';
 
 type Message = {
   id: number;
@@ -74,14 +75,22 @@ export default function ClientAiAssistantPage() {
     setInput('');
     setIsTyping(true);
 
-    // TODO: POST /ai/chat { message: content, conversation_history: messages, role: 'client' }
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 800));
+    let replyText: string;
+    try {
+      const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.text }));
+      const res = await aiChat.send(history);
+      replyText = res.response;
+    } catch {
+      // Fallback to local response if AI API is unavailable
+      await new Promise(r => setTimeout(r, 600));
+      replyText = getMiyaResponse(content);
+    }
 
     const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const aiMsg: Message = {
       id: Date.now() + 1,
       role: 'assistant',
-      text: getMiyaResponse(content),
+      text: replyText,
       time: replyTime,
     };
 
@@ -128,7 +137,7 @@ export default function ClientAiAssistantPage() {
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Hi, I&apos;m Miya!</h2>
                 <p className="text-gray-500 text-sm max-w-sm">I&apos;m here to help you run better projects — from writing briefs to evaluating proposals and managing your creative team.</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
                 {suggestedPrompts.map(prompt => (
                   <button
                     key={prompt}

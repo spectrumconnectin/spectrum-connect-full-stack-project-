@@ -8,9 +8,8 @@ import { profile } from '@/lib/api';
 
 const CATEGORIES = ['Video Production', 'Photography', 'Graphic Design', 'Motion & Animation', 'Copywriting & Content', 'Music & Audio', 'Social Media', 'Branding', 'Web & App Design', 'Other'];
 const BUDGETS = ['< $500', '$500–$2,000', '$2,000–$10,000', '$10,000–$50,000', '$50,000+'];
-const TEAM_SIZES = ['Just me', '2–10 people', '11–50 people', '51–200 people', '200+ people'];
 
-const steps = ['Company', 'Needs', 'Budget', 'Done'];
+const steps = ['About You', 'What You Need', 'Budget', 'Done'];
 
 export default function ClientOnboardingPage() {
   const router = useRouter();
@@ -18,10 +17,9 @@ export default function ClientOnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState('');
 
-  // Step 0 — Company
+  // Step 0 — About You
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
-  const [teamSize, setTeamSize] = useState('');
   const [website, setWebsite] = useState('');
 
   // Step 1 — Needs
@@ -78,8 +76,8 @@ export default function ClientOnboardingPage() {
           <div className="name">Spectrum Connect</div>
         </div>
         <div className="brand-hero">
-          <h1>Set up your client profile</h1>
-          <p>Tell us about your company so we can match you with the right creative talent.</p>
+          <h1>Set up your profile</h1>
+          <p>A few quick steps and you&apos;ll be ready to post your first project and find the right creator.</p>
         </div>
         <div className="features">
           {steps.slice(0, 3).map((s, i) => (
@@ -126,39 +124,27 @@ export default function ClientOnboardingPage() {
               </div>
             ) : (
               <form noValidate onSubmit={e => { e.preventDefault(); onNext(); }}>
-                {/* Step 0 — Company */}
+                {/* Step 0 — About You */}
                 {step === 0 && (
                   <>
-                    <h2>Your company</h2>
-                    <p className="lede">This helps creators understand who they&apos;re working with.</p>
+                    <h2>About you</h2>
+                    <p className="lede">Tell creators who you are — whether you&apos;re an individual, a startup, or a large company.</p>
 
                     {err && <div className="alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span>{err}</span></div>}
 
                     <div className="field">
-                      <label htmlFor="companyName">Company / brand name <span style={{ color: '#ef4444' }}>*</span></label>
-                      <input id="companyName" className="input" type="text" placeholder="e.g. Sunrise Media" value={companyName} onChange={e => setCompanyName(e.target.value)} />
+                      <label htmlFor="companyName">Your name or company name <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input id="companyName" className="input" type="text" placeholder="e.g. Alex Johnson or Sunrise Media" value={companyName} onChange={e => setCompanyName(e.target.value)} />
                     </div>
 
                     <div className="field">
-                      <label htmlFor="industry">Industry</label>
-                      <input id="industry" className="input" type="text" placeholder="e.g. Entertainment, Tech, Fashion" value={industry} onChange={e => setIndustry(e.target.value)} />
+                      <label htmlFor="industry">Industry <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                      <input id="industry" className="input" type="text" placeholder="e.g. Film, Tech, Fashion, Healthcare" value={industry} onChange={e => setIndustry(e.target.value)} />
                     </div>
 
                     <div className="field">
-                      <label>Team size</label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        {TEAM_SIZES.map(s => (
-                          <button key={s} type="button" onClick={() => setTeamSize(s)}
-                            style={{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${teamSize === s ? '#195ad7' : '#e5e7eb'}`, background: teamSize === s ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: teamSize === s ? '#195ad7' : '#374151', cursor: 'pointer' }}>
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="website">Company website</label>
-                      <input id="website" className="input" type="url" placeholder="https://yourcompany.com" value={website} onChange={e => setWebsite(e.target.value)} />
+                      <label htmlFor="website">Website <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+                      <input id="website" className="input" type="url" placeholder="https://yourwebsite.com" value={website} onChange={e => setWebsite(e.target.value)} />
                     </div>
                   </>
                 )}

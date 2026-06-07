@@ -61,7 +61,7 @@ export default function DmcaPage() {
         Spectrum Connect, Inc.<br />
         340 Pine Street, Suite 800<br />
         San Francisco, CA 94104, USA<br />
-        Email: <a href="mailto:dmca@spectrumconnect.co">dmca@spectrumconnect.co</a>
+        Email: <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a>
       </div>
       <p>
         Email is the fastest channel. The address is monitored on business days. Please put
@@ -127,7 +127,7 @@ export default function DmcaPage() {
       <p>
         This policy covers copyright. For trademark complaints, name-and-likeness issues
         (impersonation, deepfakes), or right-of-publicity claims, email{' '}
-        <a href="mailto:legal@spectrumconnect.co">legal@spectrumconnect.co</a> with a similar
+        <a href="mailto:team.spectrumstudios@gmail.com">team.spectrumstudios@gmail.com</a> with a similar
         level of detail and we&apos;ll route the request to the right team.
       </p>
 

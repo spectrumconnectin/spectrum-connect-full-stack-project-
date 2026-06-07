@@ -31,6 +31,8 @@ from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
 from app.models.report import Report
 from app.models.audit_log import AuditLog
+from app.models.platform_settings import PlatformSettings, BroadcastNotification
+from app.models.smart_connect_history import SmartConnectHistory
 from app.auth.router import router as auth_router
 from app.api.routers.job_router import router as job_router
 from app.api.routers.client_dashboard import router as client_dashboard_router
@@ -64,6 +66,7 @@ from app.api.routers.earnings_router import router as earnings_router
 from app.api.routers.portfolio_router import router as portfolio_router
 from app.api.routers.admin_router import router as admin_router
 from app.api.routers.report_router import router as report_router
+from app.api.routers.presence_router import router as presence_router
 
 load_dotenv()
 
@@ -123,6 +126,12 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    # Content-Security-Policy — deny frames and restrict scripts/objects.
+    # APIs don't serve HTML so a strict policy is safe without breaking clients.
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'none'; frame-ancestors 'none'",
+    )
     if settings.is_production():
         # Tell browsers to upgrade and pin HTTPS once a TLS cert is in front of
         # the LB. Harmless on HTTP origins (browsers ignore HSTS over HTTP).
@@ -164,6 +173,7 @@ app.include_router(skill_challenge_router, tags=["Skill Verification Challenges"
 app.include_router(upload_router, prefix="/upload", tags=["File Upload"])
 app.include_router(proposals_router, tags=["Proposals"])
 app.include_router(earnings_router, tags=["Earnings"])
+app.include_router(presence_router, tags=["User Presence"])
 app.include_router(portfolio_router, tags=["Portfolio"])
 app.include_router(admin_router, tags=["Admin Panel"])
 app.include_router(report_router, tags=["Reports"])
@@ -208,9 +218,20 @@ async def startup_db_client():
                 SkillChallenge, ChallengeSubmission, SkillBadge,
                 Report,
                 AuditLog,
+                PlatformSettings,
+                BroadcastNotification,
+                SmartConnectHistory,
             ],
         )
         logger.info("Beanie initialized successfully — all models registered")
+
+        # Start auto-release background scheduler (runs every 30 min)
+        import asyncio
+        from app.services.auto_release_service import _scheduler_loop
+        asyncio.create_task(_scheduler_loop())
+        logger.info("Auto-release scheduler started")
+
+
     except Exception as e:
         err = str(e)
         if "SSL handshake" in err or "ReplicaSetNoPrimary" in err or "ServerSelectionTimeout" in err:

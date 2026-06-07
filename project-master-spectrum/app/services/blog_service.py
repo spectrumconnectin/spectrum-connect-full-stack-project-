@@ -11,6 +11,8 @@ import re
 
 from app.models.blog import BlogPost, BlogComment, BlogCategory, BlogAuthor, BlogStats
 from app.models.schema import User
+import logging
+logger = logging.getLogger(__name__)
 
 
 class BlogService:
@@ -106,7 +108,7 @@ class BlogService:
             }
 
         except Exception as e:
-            print(f"Error in BlogService.get_all_posts: {e}")
+            logger.error("Error in BlogService.get_all_posts: %s", e)
             return {"posts": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
 
     @staticmethod
@@ -171,7 +173,7 @@ class BlogService:
             }
 
         except Exception as e:
-            print(f"Error in BlogService.get_post_by_slug: {e}")
+            logger.error("Error in BlogService.get_post_by_slug: %s", e)
             return None
 
     @staticmethod
@@ -240,7 +242,7 @@ class BlogService:
             }
 
         except Exception as e:
-            print(f"Error in BlogService.create_post: {e}")
+            logger.error("Error in BlogService.create_post: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -298,7 +300,7 @@ class BlogService:
             return {"success": True, "message": "Post updated successfully"}
 
         except Exception as e:
-            print(f"Error in BlogService.update_post: {e}")
+            logger.error("Error in BlogService.update_post: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -331,7 +333,7 @@ class BlogService:
             return True
 
         except Exception as e:
-            print(f"Error in BlogService.delete_post: {e}")
+            logger.error("Error in BlogService.delete_post: %s", e)
             return False
 
     @staticmethod
@@ -361,7 +363,7 @@ class BlogService:
             }
 
         except Exception as e:
-            print(f"Error in BlogService.toggle_like: {e}")
+            logger.error("Error in BlogService.toggle_like: %s", e)
             return {"error": str(e)}
 
     # ===== COMMENT METHODS =====
@@ -419,7 +421,7 @@ class BlogService:
             return comments_data
 
         except Exception as e:
-            print(f"Error in BlogService.get_comments: {e}")
+            logger.error("Error in BlogService.get_comments: %s", e)
             return []
 
     @staticmethod
@@ -479,7 +481,7 @@ class BlogService:
             }
 
         except Exception as e:
-            print(f"Error in BlogService.create_comment: {e}")
+            logger.error("Error in BlogService.create_comment: %s", e)
             return {"error": str(e)}
 
     @staticmethod
@@ -520,7 +522,7 @@ class BlogService:
             return True
 
         except Exception as e:
-            print(f"Error in BlogService.moderate_comment: {e}")
+            logger.error("Error in BlogService.moderate_comment: %s", e)
             return False
 
     # ===== CATEGORY METHODS =====
@@ -552,7 +554,7 @@ class BlogService:
             ]
 
         except Exception as e:
-            print(f"Error in BlogService.get_all_categories: {e}")
+            logger.error("Error in BlogService.get_all_categories: %s", e)
             return []
 
     # ===== UTILITY METHODS =====
@@ -646,5 +648,5 @@ class BlogService:
             ]
 
         except Exception as e:
-            print(f"Error in BlogService.search_posts: {e}")
+            logger.error("Error in BlogService.search_posts: %s", e)
             return []

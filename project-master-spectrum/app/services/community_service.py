@@ -20,6 +20,9 @@ from app.models.community import (
     ProjectMember
 )
 from app.models.schema import User
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CommunityService:
@@ -89,7 +92,7 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.get_community_projects: {e}")
+            logger.error("Error in CommunityService.get_community_projects: %s", e)
             return {"projects": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
 
     @staticmethod
@@ -166,7 +169,7 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.get_project_by_id: {e}")
+            logger.error("Error in CommunityService.get_project_by_id: %s", e)
             return None
 
     @staticmethod
@@ -209,7 +212,7 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.create_project: {e}")
+            logger.error("Error in CommunityService.create_project: %s", e)
             return {"error": str(e)}
 
     # ===== COMMUNITY EVENT METHODS =====
@@ -259,7 +262,7 @@ class CommunityService:
             ]
 
         except Exception as e:
-            print(f"Error in CommunityService.get_events: {e}")
+            logger.error("Error in CommunityService.get_events: %s", e)
             return []
 
     # ===== FORUM METHODS =====
@@ -322,7 +325,7 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.get_forum_threads: {e}")
+            logger.error("Error in CommunityService.get_forum_threads: %s", e)
             return {"threads": [], "total": 0, "limit": limit, "offset": offset, "has_more": False}
 
     # ===== COLLAB CALL METHODS =====
@@ -377,7 +380,7 @@ class CommunityService:
             ]
 
         except Exception as e:
-            print(f"Error in CommunityService.get_collab_calls: {e}")
+            logger.error("Error in CommunityService.get_collab_calls: %s", e)
             return []
 
     # ===== GUIDELINES & FEATURED CREATORS =====
@@ -402,7 +405,7 @@ class CommunityService:
             ]
 
         except Exception as e:
-            print(f"Error in CommunityService.get_guidelines: {e}")
+            logger.error("Error in CommunityService.get_guidelines: %s", e)
             return []
 
     @staticmethod
@@ -430,7 +433,7 @@ class CommunityService:
             ]
 
         except Exception as e:
-            print(f"Error in CommunityService.get_featured_creators: {e}")
+            logger.error("Error in CommunityService.get_featured_creators: %s", e)
             return []
 
     # ===== STATS =====
@@ -461,7 +464,7 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.get_community_stats: {e}")
+            logger.error("Error in CommunityService.get_community_stats: %s", e)
             return {
                 "members": "0",
                 "active_threads": "0",
@@ -543,5 +546,5 @@ class CommunityService:
             }
 
         except Exception as e:
-            print(f"Error in CommunityService.search_community: {e}")
+            logger.error("Error in CommunityService.search_community: %s", e)
             return {"projects": [], "events": [], "threads": [], "query": query}

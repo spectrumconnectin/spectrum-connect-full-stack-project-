@@ -2,6 +2,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Brevo SMTP relay settings
 BREVO_SMTP_HOST = "smtp-relay.brevo.com"
@@ -16,7 +19,7 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
     from_email = str(settings.FROM_EMAIL)
 
     if not smtp_user or not smtp_pass or not from_email:
-        print(f"[email] BREVO credentials not set — skipping send to {to_email}")
+        logger.info("[email] BREVO credentials not set — skipping send to {to_email}")
         return False
     try:
         msg = MIMEMultipart("alternative")
@@ -31,10 +34,10 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
 
-        print(f"[email] Sent '{subject}' to {to_email}")
+        logger.info("[email] Sent '{subject}' to {to_email}")
         return True
     except Exception as e:
-        print(f"[email] SMTP error sending to {to_email}: {e}")
+        logger.error("[email] SMTP error sending to {to_email}: %s", e)
         return False
 
 

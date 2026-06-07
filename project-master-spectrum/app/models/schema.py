@@ -266,7 +266,7 @@ class User(Document):
     email: str  # Required - users must provide both email and phone
     username: str
     password_hash: str
-    phone_number: str  # Required - E.164 format (e.g., +1234567890)
+    phone_number: Optional[str] = None  # E.164 format (e.g., +1234567890) — optional for OAuth signups
     phone_country_code: Optional[str] = None  # E.g., "US", "IN", "GB"
     phone_verified: bool = False  # Phone verification status (WhatsApp OTP)
     oauth: Optional[OAuth] = None
@@ -281,9 +281,17 @@ class User(Document):
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None
-    deleted_at: Optional[datetime] = None   # Soft delete (GDPR erasure)
-    is_active: bool = True                  # False = suspended
-    suspended_at: Optional[datetime] = None # Set when admin suspends account
+    deleted_at: Optional[datetime] = None
+    is_active: bool = True
+    suspended_at: Optional[datetime] = None
+    password_reset_token_hash: Optional[str] = None
+
+    @classmethod
+    async def get_active(cls, user_id) -> "Optional[User]":
+        user = await cls.get(user_id)
+        if user and user.deleted_at:
+            return None
+        return user
     spectrum_id: Optional[SpectrumID] = Field(default_factory=SpectrumID)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -297,8 +305,16 @@ class User(Document):
             "oauth.facebook.id",
             "oauth.linkedin.id",
             "account_type",
-            "spectrum_id.tier",   
+            "spectrum_id.tier",
             "spectrum_id.trust_score",
+            # Search / filter indexes — critical for talent search at scale
+            "is_verified",
+            "last_active",
+            "deleted_at",             # fast filter for soft-deleted users
+            "profile.skills.name",    # skill search (regex on this field)
+            "profile.location.city",  # location filter
+            "profile.rating",         # sort by rating
+            [("account_type", 1), ("is_verified", 1), ("last_active", -1)],  # compound: crew + verified + active
         ]
 
 # ============================================================================
@@ -543,13 +559,19 @@ class JobPost(Document):
     hourly_rate: Optional[Rate] = None
     daily_rate: Optional[Rate] = None
     weekly_rate: Optional[Rate] = None
+    currency: str = "USD"              # ISO 4217 currency code for all rate fields
 
+    location: Optional[str] = None         # physical location for in-person/on-site jobs
+    event_date: Optional[datetime] = None  # specific event date (e.g. sports meet, wedding)
+    is_remote: Optional[bool] = None       # True = remote, False = in-person, None = either
     duration: Optional[str] = None
     estimated_duration: Optional[int] = None # in days
     start_date: Optional[datetime] = None
     deadline: Optional[datetime] = None
     skills: Optional[List[str]] = None
     experience_level: Optional[str] = None # student, entry, intermediate, expert
+    goals: Optional[List[str]] = None        # project goals
+    deliverables: Optional[List[str]] = None # what will be delivered
     crew_call: Optional[List[CrewCall]] = None
     attachments: Optional[List[Attachment]] = None
     visibility: str = "public" # public, private, invited_only
@@ -597,6 +619,7 @@ class Application(Document):
     cover_letter: str
     proposed_budget: Optional[float] = None
     proposed_duration: Optional[int] = None # in days
+    portfolio_url: Optional[str] = None      # Google Drive / portfolio link
     hourly_rate: Optional[float] = None
     estimated_hours: Optional[int] = None
     team_members: Optional[List[dict]] = None
@@ -608,7 +631,11 @@ class Application(Document):
     client_viewed: bool = False
     client_viewed_at: Optional[datetime] = None
     client_notes: Optional[str] = None
-    client_rating: Optional[dict] = None  # Review submitted by client after project completion
+    client_rating: Optional[dict] = None             # Review submitted by client (client → creator)
+    creator_rating_of_client: Optional[dict] = None  # Review submitted by creator (creator → client), via /rate
+    creator_rating: Optional[dict] = None            # Review submitted by creator via /review-client
+    accepted_at: Optional[datetime] = None   # When client accepted this proposal
+    deadline_at: Optional[datetime] = None   # accepted_at + proposed_duration weeks
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
     responded_at: Optional[datetime] = None
