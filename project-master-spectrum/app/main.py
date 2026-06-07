@@ -90,9 +90,13 @@ _raw_origins = os.getenv("ALLOWED_ORIGINS", "")
 _extra_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 _frontend_url = os.getenv("FRONTEND_URL", "").strip()
 
+_hardcoded_origins = [
+    "https://admin-spectrum-connect-frontend-production.up.railway.app",
+]
+
 if settings.is_production():
     # Production: ONLY origins explicitly allowed via env vars. No localhost.
-    _origins = list({o for o in ([_frontend_url] + _extra_origins) if o})
+    _origins = list({o for o in (_hardcoded_origins + [_frontend_url] + _extra_origins) if o})
     if not _origins:
         logger.warning(
             "CORS: no FRONTEND_URL or ALLOWED_ORIGINS configured in production. "
@@ -102,6 +106,7 @@ else:
     # Development: localhost defaults plus anything in env.
     _origins = list({o for o in (
         ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"]
+        + _hardcoded_origins
         + ([_frontend_url] if _frontend_url else [])
         + _extra_origins
     ) if o})
