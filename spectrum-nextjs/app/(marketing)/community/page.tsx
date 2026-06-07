@@ -5,8 +5,22 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Community — Spectrum Connect',
-  description: 'Join the Spectrum Connect community of creators and clients building great work together.',
+  title: 'Creative Community — 18,000+ Creators & Clients',
+  description: 'Join 18,000+ creative professionals and clients on Spectrum Connect. Collaborate, get feedback, share work, and grow your freelance career alongside a global creative community.',
+  openGraph: {
+    title: 'Spectrum Connect Community — 18,000+ Creative Professionals',
+    description: 'Join the fastest-growing creative marketplace community. 18,000+ verified creators and clients sharing work, tips, and opportunities.',
+    url: 'https://spectrumconect.com/community',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Spectrum Connect Community — 18,000+ Members',
+    description: 'Join 18,000+ creators and clients building great work together.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/community',
+  },
 };
 
 const Ic = {

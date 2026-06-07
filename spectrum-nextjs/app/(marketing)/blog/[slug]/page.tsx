@@ -82,12 +82,34 @@ If a creator can start working from your brief without emailing you a single que
   },
 };
 
+const BASE = 'https://spectrumconect.com';
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = posts[params.slug];
   if (!post) return { title: 'Post Not Found — Spectrum Connect' };
+  const url = `${BASE}/blog/${params.slug}`;
   return {
-    title: `${post.title} — Spectrum Connect Blog`,
+    title: post.title,
     description: post.excerpt,
+    authors: [{ name: post.author, url: `${BASE}/about` }],
+    openGraph: {
+      title: post.title,
+      description: post.excerpt,
+      url,
+      type: 'article',
+      publishedTime: post.date,
+      authors: [post.author],
+      section: post.category,
+      siteName: 'Spectrum Connect',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt,
+    },
+    alternates: {
+      canonical: url,
+    },
   };
 }
 
@@ -128,8 +150,62 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
     );
   }
 
+  const postUrl = `${BASE}/blog/${params.slug}`;
+
+  // Article JSON-LD — tells Google this is an expert-authored article
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt,
+    url: postUrl,
+    datePublished: post.date,
+    dateModified: post.date,
+    author: {
+      '@type': 'Person',
+      name: post.author,
+      jobTitle: post.authorRole,
+      url: `${BASE}/about`,
+      worksFor: {
+        '@type': 'Organization',
+        name: 'Spectrum Connect',
+        url: BASE,
+      },
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Spectrum Connect',
+      url: BASE,
+      logo: { '@type': 'ImageObject', url: `${BASE}/assets/spectrum-logo.svg` },
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+    articleSection: post.category,
+    inLanguage: 'en-US',
+  };
+
+  // BreadcrumbList JSON-LD — shows navigation path in search results
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${BASE}/blog` },
+      { '@type': 'ListItem', position: 3, name: post.title, item: postUrl },
+    ],
+  };
+
   return (
     <div>
+      {/* Article structured data — tells Google & AI engines this is expert-authored content */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
+      {/* Breadcrumb structured data — shows navigation path in search results */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <Nav />
 
       {/* Hero */}

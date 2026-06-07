@@ -2,9 +2,25 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 
-export const metadata = {
-  title: 'Pricing — Spectrum Connect',
-  description: 'Simple, transparent pricing. No hidden fees.',
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Pricing — Just 12% Total, Half What Competitors Charge',
+  description: 'Spectrum Connect charges just 12% total — 8% from creators, 4% from clients. No hidden fees, no subscriptions. Compare us to Fiverr (20%) and Freelancer.com (up to 30%).',
+  openGraph: {
+    title: 'Spectrum Connect Pricing — Just 12% Total Fee',
+    description: 'The most transparent pricing in the creative marketplace. 8% from creators + 4% from clients = 12% total. Half of what Fiverr charges. No hidden fees, ever.',
+    url: 'https://spectrumconect.com/pricing',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Spectrum Connect Pricing — Just 12% Total',
+    description: '8% creator + 4% client = 12% total. Half of Fiverr. No surprises.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/pricing',
+  },
 };
 
 const Ic = {

@@ -1,9 +1,24 @@
+import type { Metadata } from 'next';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
-export const metadata = {
-  title: 'Help & FAQ — Spectrum Connect',
-  description: 'Find answers to common questions about Spectrum Connect.',
+export const metadata: Metadata = {
+  title: 'Help & FAQ — Common Questions About Spectrum Connect',
+  description: 'Get answers to your questions about Spectrum Connect — how escrow payments work, platform fees, how Smart Connect AI matches you with creators, refund policies, and more.',
+  openGraph: {
+    title: 'Help & FAQ — Spectrum Connect',
+    description: 'Everything you need to know about using Spectrum Connect — payments, escrow, creator matching, fees, and dispute resolution.',
+    url: 'https://spectrumconect.com/help',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Help & FAQ — Spectrum Connect',
+    description: 'Answers to the most common questions about Spectrum Connect — fees, escrow, Smart Connect AI, and more.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/help',
+  },
 };
 
 const sections = [
@@ -64,9 +79,32 @@ const sections = [
   },
 ];
 
+// Build FAQ JSON-LD from sections data (all questions + answers)
+function buildFaqJsonLd() {
+  const allFaqs = sections.flatMap(s => s.faqs);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: allFaqs.map(faq => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.a,
+      },
+    })),
+  };
+}
+
 export default function HelpPage() {
+  const faqJsonLd = buildFaqJsonLd();
   return (
     <div style={{ background: '#fff', color: '#1f2937', fontFamily: "'Inter',system-ui,sans-serif" }}>
+      {/* FAQPage structured data — unlocks Google featured snippets */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <Nav />
 
       {/* Hero */}

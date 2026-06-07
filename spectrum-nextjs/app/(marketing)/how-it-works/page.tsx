@@ -1,7 +1,27 @@
+import type { Metadata } from 'next';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import Avatar from '@/components/Avatar';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'How Spectrum Connect Works — Post, Match, Hire, Pay',
+  description: 'Learn how Spectrum Connect works for creators and clients. Post a project, get AI-matched with verified professionals, manage milestones, and release payments through secure escrow — in 4 simple steps.',
+  openGraph: {
+    title: 'How Spectrum Connect Works — 4 Steps to Great Creative Work',
+    description: 'Post your project, get matched instantly with verified creators using Smart Connect AI, collaborate in a shared workspace, and pay safely through milestone escrow.',
+    url: 'https://spectrumconect.com/how-it-works',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'How Spectrum Connect Works',
+    description: 'Post → Match → Create → Pay. The simplest way to hire verified creative professionals.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/how-it-works',
+  },
+};
 
 // ---- Icons ----
 const Ic = {
@@ -179,10 +199,7 @@ function PricingStrip() {
   );
 }
 
-export const metadata = {
-  title: 'How It Works — Spectrum Connect',
-  description: 'From first match to final payment — a clear, transparent journey.',
-};
+// (duplicate metadata removed — see top of file for canonical metadata export)
 
 export default function HowItWorksPage() {
   return (

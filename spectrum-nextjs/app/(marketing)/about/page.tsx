@@ -5,8 +5,22 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'About — Spectrum Connect',
-  description: 'The story behind Spectrum Connect — why we built a better creative marketplace.',
+  title: 'About Us — The Team Behind Spectrum Connect',
+  description: 'Meet the founders behind Spectrum Connect — Jamie Rivera (CEO), Priya Nair (CPO), and Tom Osei (Head of Engineering). We built the creative marketplace we always wished existed.',
+  openGraph: {
+    title: 'About Spectrum Connect — Our Story & Team',
+    description: 'Three founders, one mission: fix creative collaboration. Meet the team behind Spectrum Connect and discover why we built a better marketplace for creators and clients.',
+    url: 'https://spectrumconect.com/about',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'About Spectrum Connect — Our Story & Team',
+    description: 'Meet the founders behind Spectrum Connect — and why we built the creative marketplace we always wished existed.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/about',
+  },
 };
 
 const Ic = {
@@ -20,9 +34,62 @@ const Ic = {
   Rocket: () => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>,
 };
 
+// Person JSON-LD for each founder — boosts E-E-A-T signals for AI engines
+const foundersJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  name: 'Spectrum Connect Founding Team',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      item: {
+        '@type': 'Person',
+        name: 'Jamie Rivera',
+        jobTitle: 'Co-founder & CEO',
+        worksFor: { '@type': 'Organization', name: 'Spectrum Connect', url: 'https://spectrumconect.com' },
+        description: 'Co-founder and CEO of Spectrum Connect with 8+ years of experience in creative production and marketplace design.',
+        url: 'https://spectrumconect.com/about',
+        sameAs: [],
+      },
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      item: {
+        '@type': 'Person',
+        name: 'Priya Nair',
+        jobTitle: 'Co-founder & CPO',
+        worksFor: { '@type': 'Organization', name: 'Spectrum Connect', url: 'https://spectrumconect.com' },
+        description: 'Co-founder and Chief Product Officer at Spectrum Connect, leading product design and creator experience.',
+        url: 'https://spectrumconect.com/about',
+        sameAs: [],
+      },
+    },
+    {
+      '@type': 'ListItem',
+      position: 3,
+      item: {
+        '@type': 'Person',
+        name: 'Tom Osei',
+        jobTitle: 'Head of Engineering',
+        worksFor: { '@type': 'Organization', name: 'Spectrum Connect', url: 'https://spectrumconect.com' },
+        description: 'Head of Engineering at Spectrum Connect, building the Smart Connect AI matching engine and escrow infrastructure.',
+        url: 'https://spectrumconect.com/about',
+        sameAs: [],
+      },
+    },
+  ],
+};
+
 export default function AboutPage() {
   return (
     <div className="about">
+      {/* Founder Person structured data — E-E-A-T signal for Google and AI engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(foundersJsonLd) }}
+      />
       <Nav />
 
       {/* Hero */}

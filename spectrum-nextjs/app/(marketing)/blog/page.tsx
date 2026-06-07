@@ -4,8 +4,22 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Blog — Spectrum Connect',
-  description: 'Insights, guides, and stories for creative professionals.',
+  title: 'Blog — Insights for Creative Professionals & Clients',
+  description: 'Practical guides on freelance pricing, creative contracts, escrow payments, portfolio tips, and AI-powered matching — written by the Spectrum Connect founding team.',
+  openGraph: {
+    title: 'Spectrum Connect Blog — Freelance & Creative Marketplace Insights',
+    description: 'Expert advice from Priya Nair, Jamie Rivera, and Tom Osei on freelance pricing, creative briefs, escrow, portfolio tips, and building a sustainable creative career.',
+    url: 'https://spectrumconect.com/blog',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Spectrum Connect Blog — Creative Career Insights',
+    description: 'Practical guides on pricing, contracts, escrow, and portfolios — written by founders who built the platform.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com/blog',
+  },
 };
 
 const posts = [

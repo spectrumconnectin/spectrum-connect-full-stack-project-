@@ -6,8 +6,23 @@ import MarketingEffects from '@/components/MarketingEffects';
 import PageTransition from '@/components/PageTransition';
 
 export const metadata: Metadata = {
-  title: 'Spectrum Connect — Creative Marketplace',
-  description: 'Find trusted creators, build amazing teams, and work better together with AI-powered matching.',
+  title: 'Spectrum Connect — Hire Verified Creative Professionals',
+  description: 'Hire verified designers, videographers, illustrators, and more. AI-powered Smart Connect matches you with the right creator in seconds. Milestone escrow, just 12% total fee — half of Fiverr.',
+  openGraph: {
+    title: 'Spectrum Connect — Hire Verified Creative Professionals',
+    description: 'The creative marketplace with the lowest fees in the industry. AI-powered matching, milestone escrow, and 18,000+ verified creators ready to work.',
+    url: 'https://spectrumconect.com',
+    type: 'website',
+    siteName: 'Spectrum Connect',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Spectrum Connect — Hire Verified Creative Professionals',
+    description: 'AI-matched creators. Milestone escrow. Just 12% total — half of Fiverr. Join 18,000+ members.',
+  },
+  alternates: {
+    canonical: 'https://spectrumconect.com',
+  },
 };
 
 /* ─────────────────────────────────────────────────────────────
