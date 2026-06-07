@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import CookieBanner from "@/components/CookieBanner";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const BASE_URL = "https://spectrumconect.com";
 
@@ -153,6 +154,8 @@ export default function RootLayout({
         <CookieBanner />
         {/* Vercel Speed Insights */}
         <SpeedInsights />
+        {/* Google Analytics 4 — tracks visitor behavior and traffic sources */}
+        <GoogleAnalytics gaId="G-FP5C0829J6" />
       </body>
     </html>
   );
