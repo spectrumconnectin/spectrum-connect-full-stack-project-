@@ -35,7 +35,7 @@ export default function CreatorDashboardPage() {
 
   const stats = data?.stats;
   const opportunities = data?.opportunities ?? [];
-  const activeTeams = data?.active_teams ?? [];
+  const activeTeams = (data?.active_teams ?? []).filter(t => t.status !== 'completed');
   const messages = data?.messages ?? [];
   const tasks = data?.tasks ?? [];
 
