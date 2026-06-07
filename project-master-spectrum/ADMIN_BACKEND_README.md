@@ -10,7 +10,7 @@
 
 1. [Authentication](#1-authentication)
 2. [Admin Setup](#2-admin-setup)
-3. [Module: Stats & Overview](#3-module-stats--overview)
+3. [Module: Stats and Overview](#3-module-stats--overview)
 4. [Module: User Management](#4-module-user-management)
 5. [Module: Job Management](#5-module-job-management)
 6. [Module: Project Management](#6-module-project-management)
@@ -21,11 +21,12 @@
 11. [Module: ETF Points](#11-module-etf-points)
 12. [Module: Audit Log](#12-module-audit-log)
 13. [Module: Reports Inbox](#13-module-reports-inbox)
-14. [Module: Broadcast Notifications *(to build)*](#14-module-broadcast-notifications-to-build)
-15. [AuditLog Data Model *(to build)*](#15-auditlog-data-model-to-build)
-16. [Security Rules](#16-security-rules)
-17. [Build Order](#17-build-order)
-18. [Pagination Convention](#18-pagination-convention)
+14. [Module: Settings](#14-module-settings)
+15. [Module: Broadcast Notifications](#15-module-broadcast-notifications-to-build)
+16. [AuditLog Data Model](#16-auditlog-data-model-to-build)
+17. [Security Rules](#17-security-rules)
+18. [Build Order](#18-build-order)
+19. [Pagination Convention](#19-pagination-convention)
 
 ---
 
@@ -2159,7 +2160,172 @@ Content-Type: application/json
 
 ---
 
-## 14. Module: Broadcast Notifications *(to build)*
+## 14. Module: Settings
+
+> Model: `app/models/platform_settings.py` — `PlatformSettings`, `BroadcastNotification`  
+> Endpoints: `app/api/routers/admin_router.py` — prefix `/admin/settings` + `/admin/notifications`  
+> All endpoints require: `Authorization: Bearer <admin_token>`
+
+---
+
+### 14.1 Get Feature Flags ✅ Ready
+
+```
+GET /admin/settings
+```
+
+**Success `200`**
+
+```json
+{
+  "etf_cashout_enabled": false,
+  "maintenance_mode": false,
+  "maintenance_message": "We are performing scheduled maintenance. Back shortly.",
+  "new_user_registration_enabled": true,
+  "job_posting_enabled": true,
+  "review_queue_enabled": true,
+  "skill_challenges_enabled": true,
+  "disputes_enabled": true,
+  "escrow_enabled": true,
+  "updated_at": "2026-06-07T10:00:00",
+  "updated_by": "superadmin"
+}
+```
+
+---
+
+### 14.2 Update Feature Flags ✅ Ready
+
+```
+PATCH /admin/settings
+Authorization: Bearer <superadmin_token>
+Content-Type: application/json
+```
+
+> Requires **superadmin** (role: `admin`). Moderators cannot change settings.
+
+**Request body** — all fields optional, only send what you want to change:
+
+```json
+{
+  "maintenance_mode": true,
+  "maintenance_message": "Scheduled maintenance until 3 PM UTC.",
+  "etf_cashout_enabled": false,
+  "job_posting_enabled": false
+}
+```
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `maintenance_mode` | `false` | Show maintenance page to all users |
+| `maintenance_message` | string | Message shown during maintenance |
+| `etf_cashout_enabled` | `false` | Allow ETF points cash-out |
+| `new_user_registration_enabled` | `true` | Allow new signups |
+| `job_posting_enabled` | `true` | Allow new job posts |
+| `review_queue_enabled` | `true` | Accept profile review submissions |
+| `skill_challenges_enabled` | `true` | Allow challenge submissions |
+| `disputes_enabled` | `true` | Allow dispute creation |
+| `escrow_enabled` | `true` | Allow escrow creation |
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "changes": {
+    "maintenance_mode": { "from": false, "to": true },
+    "maintenance_message": { "from": "...", "to": "Scheduled maintenance until 3 PM UTC." }
+  },
+  "message": "Settings updated."
+}
+```
+
+> Every settings change is automatically written to the Audit Log with `severity=critical`.
+
+---
+
+### 14.3 List Past Broadcasts ✅ Ready
+
+```
+GET /admin/notifications/broadcast
+```
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `limit` | int | Default `20`, max `100` |
+| `offset` | int | Default `0` |
+
+**Success `200`**
+
+```json
+{
+  "total": 5,
+  "limit": 20,
+  "offset": 0,
+  "has_more": false,
+  "broadcasts": [
+    {
+      "id": "507f1f77bcf86cd799439088",
+      "title": "Platform Maintenance Tonight",
+      "message": "We will be down for maintenance from 2–4 AM UTC.",
+      "target_segment": "all",
+      "sent_by_username": "superadmin",
+      "recipient_count": 4200,
+      "status": "sent",
+      "created_at": "2026-06-07T09:00:00"
+    }
+  ]
+}
+```
+
+---
+
+### 14.4 Send Broadcast Notification ✅ Ready
+
+```
+POST /admin/notifications/broadcast
+Content-Type: application/json
+```
+
+**Request body**
+
+```json
+{
+  "title": "Platform Maintenance Tonight",
+  "message": "We will be down for maintenance from 2–4 AM UTC. Please save your work.",
+  "target_segment": "all"
+}
+```
+
+| `target_segment` | Recipients |
+|------------------|-----------|
+| `all` | Every user on the platform |
+| `creators` | Users with `account_type: crew` or `both` |
+| `clients` | Users with `account_type: producer` or `both` |
+| `verified` | Verified users only |
+| `unverified` | Unverified users only |
+| `admins` | Admin and moderator accounts only |
+
+**Success `200`**
+
+```json
+{
+  "success": true,
+  "broadcast_id": "507f1f77bcf86cd799439088",
+  "title": "Platform Maintenance Tonight",
+  "target_segment": "all",
+  "recipient_count": 4200,
+  "message": "Broadcast sent to 4200 users."
+}
+```
+
+> Delivery creates a `Notification` record for every recipient. Also auto-logged to Audit Log.
+
+---
+
+## 15. Module: Broadcast Notifications *(to build)*
 
 > New section in: `app/api/routers/admin_router.py`
 
@@ -2201,7 +2367,7 @@ Content-Type: application/json
 
 ---
 
-## 15. AuditLog Data Model *(to build)*
+## 16. AuditLog Data Model *(to build)*
 
 Add to `app/models/schema.py` and register in `app/main.py`.
 
@@ -2245,7 +2411,7 @@ class AuditLog(Document):
 
 ---
 
-## 16. Security Rules
+## 17. Security Rules
 
 | Rule | Status |
 |------|--------|
@@ -2263,7 +2429,7 @@ class AuditLog(Document):
 
 ---
 
-## 17. Build Order
+## 18. Build Order
 
 ### ✅ Done — Stats & Overview
 - `GET /admin/stats` — platform deep stats
@@ -2306,7 +2472,7 @@ class AuditLog(Document):
 
 ---
 
-## 18. Pagination Convention
+## 19. Pagination Convention
 
 All list endpoints return the same envelope:
 
