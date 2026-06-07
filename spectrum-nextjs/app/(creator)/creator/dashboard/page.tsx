@@ -168,56 +168,108 @@ export default function CreatorDashboardPage() {
         {/* Opportunities */}
         <section className="lg:col-span-2">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-bold text-gray-900">Matched Opportunities</h2>
-            <Link href="/creator/smart-connect" className="text-sm text-cobalt font-semibold hover:underline">
-              View all
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Matched Opportunities</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Ranked by how well they fit your skills</p>
+            </div>
+            <Link href="/creator/find-projects" className="text-sm text-cobalt font-semibold hover:underline flex items-center gap-1">
+              Browse all <i className="fa-solid fa-arrow-right text-xs" />
             </Link>
           </div>
 
           {opportunities.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center text-gray-400 shadow-sm">
-              <i className="fa-solid fa-wand-magic-sparkles text-3xl mb-3 block text-gray-300" />
-              No opportunities yet. Add skills to your profile to get matched.
+            <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center shadow-sm">
+              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i className="fa-solid fa-wand-magic-sparkles text-2xl text-cobalt" />
+              </div>
+              <p className="font-semibold text-gray-700 mb-1">No matches yet</p>
+              <p className="text-sm text-gray-400 mb-5">Add skills and a role to your profile so we can match you.</p>
+              <Link href="/creator/profile" className="inline-flex items-center gap-2 bg-cobalt text-white text-sm px-5 py-2.5 rounded-xl font-semibold hover:bg-blue-700 transition">
+                <i className="fa-solid fa-user-pen" /> Complete Profile
+              </Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {opportunities.map(op => (
-                <div key={op.id} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:border-cobalt transition">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{op.title}</h3>
-                      {op.department && <p className="text-sm text-gray-400">{op.department}</p>}
+            <div className="space-y-3">
+              {opportunities.map((op, idx) => {
+                const isStrong = op.match_percent >= 80;
+                const isGood   = op.match_percent >= 50 && op.match_percent < 80;
+                const daysLeft = op.deadline
+                  ? Math.ceil((new Date(op.deadline).getTime() - Date.now()) / 86400000)
+                  : null;
+                const urgent = daysLeft !== null && daysLeft <= 3;
+
+                return (
+                  <div key={op.id}
+                    className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all group
+                      ${isStrong ? 'border-cobalt/30 ring-1 ring-cobalt/10' : 'border-gray-200 hover:border-cobalt/40'}`}>
+
+                    {/* Top bar: match strength indicator */}
+                    <div className={`h-1 w-full rounded-t-2xl ${
+                      isStrong ? 'bg-gradient-to-r from-cobalt to-blue-400' :
+                      isGood   ? 'bg-gradient-to-r from-blue-300 to-sky-300' :
+                                 'bg-gray-100'
+                    }`} />
+
+                    <div className="p-5">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            {idx === 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 uppercase tracking-wide">Best match</span>}
+                            {urgent && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-200 uppercase tracking-wide"><i className="fa-solid fa-fire mr-1" />Closing soon</span>}
+                          </div>
+                          <h3 className="font-bold text-gray-900 text-base leading-tight">{op.title}</h3>
+                          {op.department && <p className="text-xs text-gray-400 mt-0.5">{op.department}</p>}
+                        </div>
+
+                        {/* Match score ring */}
+                        {op.match_percent > 0 && (
+                          <div className="flex-shrink-0 text-center">
+                            <div className={`text-xl font-extrabold leading-none ${
+                              isStrong ? 'text-cobalt' : isGood ? 'text-sky-500' : 'text-gray-400'
+                            }`}>{op.match_percent}%</div>
+                            <div className="text-[10px] text-gray-400 font-medium">match</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {op.description && (
+                        <p className="text-sm text-gray-500 line-clamp-2 mb-3">{op.description}</p>
+                      )}
+
+                      {/* Skills — highlighted if they match */}
+                      {op.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {op.skills.slice(0, 6).map(sk => (
+                            <span key={sk} className="text-xs px-2.5 py-0.5 bg-blue-50 text-cobalt rounded-full font-medium border border-blue-100">
+                              {sk}
+                            </span>
+                          ))}
+                          {op.skills.length > 6 && (
+                            <span className="text-xs px-2 py-0.5 text-gray-400">+{op.skills.length - 6} more</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Footer row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-xs text-gray-400">
+                          {daysLeft !== null && (
+                            <span className={urgent ? 'text-red-500 font-semibold' : ''}>
+                              <i className="fa-regular fa-clock mr-1" />
+                              {daysLeft <= 0 ? 'Closing today' : `${daysLeft}d left`}
+                            </span>
+                          )}
+                        </div>
+                        <Link
+                          href={`/creator/find-projects`}
+                          className="inline-flex items-center gap-1.5 bg-cobalt text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm group-hover:shadow-md">
+                          View & Apply <i className="fa-solid fa-arrow-right text-[10px]" />
+                        </Link>
+                      </div>
                     </div>
-                    {op.match_percent > 0 && (
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-cobalt">
-                        {op.match_percent}% match
-                      </span>
-                    )}
                   </div>
-                  {op.description && (
-                    <p className="text-sm text-gray-500 mb-3 line-clamp-2">{op.description}</p>
-                  )}
-                  {op.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {op.skills.slice(0, 5).map(sk => (
-                        <span key={sk} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{sk}</span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    {op.deadline && (
-                      <span className="text-xs text-gray-400">
-                        <i className="fa-regular fa-calendar mr-1" />
-                        {new Date(op.deadline).toLocaleDateString()}
-                      </span>
-                    )}
-                    <Link href={`/creator/projects/${op.id}/apply`}
-                      className="ml-auto text-xs font-semibold text-cobalt hover:underline">
-                      View & Apply →
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -226,29 +278,76 @@ export default function CreatorDashboardPage() {
         <section className="space-y-6">
           {/* Active Teams */}
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Active Teams</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Active Projects</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{activeTeams.length} in progress</p>
+              </div>
+              <Link href="/creator/projects" className="text-sm text-cobalt font-semibold hover:underline">View all</Link>
+            </div>
+
             {activeTeams.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center text-gray-400 shadow-sm text-sm">
-                No active projects yet.
+              <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center shadow-sm">
+                <i className="fa-solid fa-folder-open text-2xl text-gray-300 mb-2 block" />
+                <p className="text-sm text-gray-400">No active projects yet.</p>
+                <Link href="/creator/find-projects" className="mt-3 inline-block text-xs font-semibold text-cobalt hover:underline">
+                  Browse open jobs →
+                </Link>
               </div>
             ) : (
               <div className="space-y-3">
-                {activeTeams.map(team => (
-                  <div key={team.project_id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:border-cobalt transition">
-                    <h3 className="font-semibold text-gray-900 text-sm mb-1">{team.title}</h3>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{team.role ?? 'Member'}</span>
-                      {team.time_remaining_days != null && (
-                        <span className="text-amber-600 font-semibold">{team.time_remaining_days}d left</span>
-                      )}
+                {activeTeams.map(team => {
+                  const daysLeft = team.time_remaining_days;
+                  const urgent   = daysLeft !== null && daysLeft != null && daysLeft <= 2;
+                  const statusColors: Record<string, string> = {
+                    accepted:    'bg-blue-50 text-cobalt border-blue-100',
+                    in_progress: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                    delivered:   'bg-amber-50 text-amber-700 border-amber-100',
+                    completed:   'bg-gray-50 text-gray-500 border-gray-200',
+                  };
+                  const statusLabels: Record<string, string> = {
+                    accepted:    'Hired',
+                    in_progress: 'In Progress',
+                    delivered:   'Delivered',
+                    completed:   'Completed',
+                  };
+                  const statusAction: Record<string, string> = {
+                    accepted:    'Go to workspace →',
+                    in_progress: 'Submit delivery →',
+                    delivered:   'Awaiting approval',
+                    completed:   'View project →',
+                  };
+                  const statusStyle = statusColors[team.status ?? ''] ?? 'bg-gray-50 text-gray-500 border-gray-200';
+                  const statusLabel = statusLabels[team.status ?? ''] ?? (team.status ?? 'Active');
+                  const actionText  = statusAction[team.status ?? ''] ?? 'Open →';
+
+                  return (
+                    <div key={team.project_id}
+                      className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:border-cobalt hover:shadow-md transition-all group">
+                      {/* Status bar */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
+                          {statusLabel}
+                        </span>
+                        {daysLeft !== null && daysLeft != null && (
+                          <span className={`text-xs font-bold flex items-center gap-1 ${urgent ? 'text-red-500' : 'text-amber-500'}`}>
+                            <i className={`fa-solid ${urgent ? 'fa-fire' : 'fa-hourglass-half'} text-[10px]`} />
+                            {daysLeft}d left
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight mb-1 line-clamp-1">{team.title}</h3>
+                      <p className="text-xs text-gray-400 mb-3">{team.role ?? 'Member'}</p>
+
+                      <Link
+                        href={`/creator/projects`}
+                        className="text-xs font-semibold text-cobalt hover:underline group-hover:text-blue-700 transition">
+                        {actionText}
+                      </Link>
                     </div>
-                    {team.status && (
-                      <span className="mt-2 inline-block text-xs px-2 py-0.5 rounded-full bg-blue-50 text-cobalt">
-                        {team.status}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -256,30 +355,36 @@ export default function CreatorDashboardPage() {
           {/* Recent Messages */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Messages</h2>
-              <Link href="/creator/messaging" className="text-sm text-cobalt font-semibold hover:underline">View all</Link>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Messages</h2>
+                {messages.length > 0 && <p className="text-xs text-gray-400 mt-0.5">{messages.length} recent</p>}
+              </div>
+              <Link href="/creator/messages" className="text-sm text-cobalt font-semibold hover:underline">View all</Link>
             </div>
             {messages.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center text-gray-400 shadow-sm text-sm">
-                No messages yet.
+              <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-6 text-center shadow-sm">
+                <i className="fa-regular fa-comment text-2xl text-gray-300 mb-2 block" />
+                <p className="text-sm text-gray-400">No messages yet.</p>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3">
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-50">
                 {messages.map(msg => (
-                  <div key={msg.id} className="flex items-start gap-3">
+                  <Link key={msg.id} href="/creator/messages"
+                    className="flex items-center gap-3 p-4 hover:bg-gray-50 transition first:rounded-t-2xl last:rounded-b-2xl">
                     {msg.avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={msg.avatar} alt={msg.name} className="w-9 h-9 rounded-full object-cover" />
+                      <img src={msg.avatar} alt={msg.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
                     ) : (
-                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-cobalt font-bold text-sm">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cobalt to-blue-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                         {msg.name[0]?.toUpperCase()}
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-900">{msg.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{msg.text}</p>
+                      <p className="text-xs text-gray-400 truncate">{msg.text}</p>
                     </div>
-                  </div>
+                    <i className="fa-solid fa-chevron-right text-[10px] text-gray-300 flex-shrink-0" />
+                  </Link>
                 ))}
               </div>
             )}

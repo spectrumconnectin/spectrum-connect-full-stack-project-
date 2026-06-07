@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spectrum Connect — Pitch Deck Icon Library</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 48px 40px 32px;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .brand img {
+    height: 36px;
+    filter: brightness(0) invert(1);
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #f8fafc;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: #64748b;
+    margin-top: 4px;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 24px 40px;
+    border-bottom: 1px solid #1e293b;
+    flex-wrap: wrap;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+    max-width: 360px;
+    padding: 10px 16px;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background: #1e293b;
+    color: #f1f5f9;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus {
+    border-color: #3b82f6;
+  }
+  input::placeholder { color: #475569; }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  .swatch-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  .swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.1s, border-color 0.1s;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active { border-color: #fff; }
+
+  .size-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  .size-btn {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #94a3b8;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .size-btn.active, .size-btn:hover {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+  }
+
+  .count {
+    margin-left: auto;
+    font-size: 13px;
+    color: #64748b;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 4px;
+    padding: 24px 40px;
+  }
+
+  .icon-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 12px 14px;
+    border-radius: 12px;
+    background: #1e293b;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    position: relative;
+    border: 1px solid transparent;
+  }
+  .icon-card:hover {
+    background: #263348;
+    transform: translateY(-2px);
+    border-color: #334155;
+  }
+  .icon-card.brand-card {
+    border-color: #1d4ed8;
+    background: #1e3a5f;
+  }
+
+  .icon-card .badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 9px;
+    background: #1d4ed8;
+    color: #bfdbfe;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .icon-wrap {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-wrap img {
+    display: block;
+    transition: filter 0.15s;
+  }
+
+  .icon-name {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    word-break: break-word;
+    line-height: 1.3;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+  }
+
+  .icon-card:hover .icon-name { color: #94a3b8; }
+
+  .copy-toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: #22c55e;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 100;
+    pointer-events: none;
+  }
+  .copy-toast.show { transform: translateX(-50%) translateY(0); }
+
+  .section-label {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #3b82f6;
+    padding: 12px 0 4px;
+    border-bottom: 1px solid #1e293b;
+    margin-bottom: 4px;
+  }
+
+  .empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 0;
+    color: #475569;
+    font-size: 15px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="spectrum-logo.svg" alt="Spectrum Connect" onerror="this.style.display='none'" />
+  </div>
+  <h1>Pitch Deck Icon Library</h1>
+  <p class="subtitle">All icons extracted from the Spectrum Connect app — 87 SVG icons ready to use in presentations</p>
+</header>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Search icons… (e.g. check, star, lock)" autocomplete="off" />
+
+  <div class="color-row">
+    <span>Color:</span>
+    <div class="swatch-group" id="swatches">
+      <div class="swatch active" data-color="#ffffff" style="background:#ffffff;" title="White"></div>
+      <div class="swatch" data-color="#195AD7" style="background:#195AD7;" title="Cobalt Blue"></div>
+      <div class="swatch" data-color="#10B981" style="background:#10B981;" title="Emerald"></div>
+      <div class="swatch" data-color="#F59E0B" style="background:#F59E0B;" title="Amber"></div>
+      <div class="swatch" data-color="#EF4444" style="background:#EF4444;" title="Red"></div>
+      <div class="swatch" data-color="#111827" style="background:#6b7280;border:1px solid #374151;" title="Dark/Gray"></div>
+    </div>
+  </div>
+
+  <div class="size-row">
+    <span>Size:</span>
+    <button class="size-btn" data-size="32">32</button>
+    <button class="size-btn active" data-size="48">48</button>
+    <button class="size-btn" data-size="64">64</button>
+    <button class="size-btn" data-size="96">96</button>
+  </div>
+
+  <span class="count" id="count"></span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="copy-toast" id="toast">✓ Filename copied!</div>
+
+<script>
+const ICONS = [
+  // Brand
+  { file: "spectrum-logo.svg",   label: "spectrum-logo",   brand: true,  fill: true },
+  { file: "team-icon.svg",       label: "team-icon",       brand: true,  fill: true },
+  { file: "team-icon-white.svg", label: "team-icon-white", brand: true,  fill: true },
+  // UI Icons
+  { file: "checkmark.svg",          label: "checkmark" },
+  { file: "checkmark-1.svg",        label: "checkmark-1" },
+  { file: "checkmark-2.svg",        label: "checkmark-2" },
+  { file: "checkmark-3.svg",        label: "checkmark-3" },
+  { file: "checkmark-4.svg",        label: "checkmark-4" },
+  { file: "check-alt.svg",          label: "check-alt" },
+  { file: "check-small.svg",        label: "check-small" },
+  { file: "check-small-1.svg",      label: "check-small-1" },
+  { file: "check-small-2.svg",      label: "check-small-2" },
+  { file: "check-small-3.svg",      label: "check-small-3" },
+  { file: "check-small-4.svg",      label: "check-small-4" },
+  { file: "check-circle-inner.svg", label: "check-circle-inner" },
+  { file: "check-pencil.svg",       label: "check-pencil" },
+  { file: "check-pencil-1.svg",     label: "check-pencil-1" },
+  { file: "star.svg",               label: "star" },
+  { file: "star-alt.svg",           label: "star-alt" },
+  { file: "star-alt-1.svg",         label: "star-alt-1" },
+  { file: "star-alt-2.svg",         label: "star-alt-2" },
+  { file: "star-filled.svg",        label: "star-filled" },
+  { file: "star-spin.svg",          label: "star-spin" },
+  { file: "award-badge.svg",        label: "award-badge" },
+  { file: "shield.svg",             label: "shield" },
+  { file: "shield-1.svg",           label: "shield-1" },
+  { file: "shield-2.svg",           label: "shield-2" },
+  { file: "shield-3.svg",           label: "shield-3" },
+  { file: "lock.svg",               label: "lock" },
+  { file: "lock-1.svg",             label: "lock-1" },
+  { file: "lock-alt.svg",           label: "lock-alt" },
+  { file: "lock-padlock.svg",       label: "lock-padlock" },
+  { file: "lock-padlock-1.svg",     label: "lock-padlock-1" },
+  { file: "bolt.svg",               label: "bolt" },
+  { file: "bolt-1.svg",             label: "bolt-1" },
+  { file: "bolt-2.svg",             label: "bolt-2" },
+  { file: "globe.svg",              label: "globe" },
+  { file: "globe-2.svg",            label: "globe-2" },
+  { file: "users.svg",              label: "users" },
+  { file: "user-circle.svg",        label: "user-circle" },
+  { file: "user-silhouette.svg",    label: "user-silhouette" },
+  { file: "chat.svg",               label: "chat" },
+  { file: "chat-bubble.svg",        label: "chat-bubble" },
+  { file: "chat-bubble-1.svg",      label: "chat-bubble-1" },
+  { file: "chat-bubble-2.svg",      label: "chat-bubble-2" },
+  { file: "message-bubble.svg",     label: "message-bubble" },
+  { file: "email-envelope.svg",     label: "email-envelope" },
+  { file: "email-envelope-1.svg",   label: "email-envelope-1" },
+  { file: "send.svg",               label: "send" },
+  { file: "heart.svg",              label: "heart" },
+  { file: "paintbrush.svg",         label: "paintbrush" },
+  { file: "paintbrush-alt.svg",     label: "paintbrush-alt" },
+  { file: "location-pin.svg",       label: "location-pin" },
+  { file: "location-pin-1.svg",     label: "location-pin-1" },
+  { file: "book.svg",               label: "book" },
+  { file: "receipt.svg",            label: "receipt" },
+  { file: "file-doc.svg",           label: "file-doc" },
+  { file: "clipboard.svg",          label: "clipboard" },
+  { file: "clipboard-1.svg",        label: "clipboard-1" },
+  { file: "mountain.svg",           label: "mountain" },
+  { file: "headphones.svg",         label: "headphones" },
+  { file: "search.svg",             label: "search" },
+  { file: "arrow-right.svg",        label: "arrow-right" },
+  { file: "arrow-diagonal.svg",     label: "arrow-diagonal" },
+  { file: "close-x.svg",            label: "close-x" },
+  { file: "hamburger-close.svg",    label: "hamburger-close" },
+  { file: "slash-line.svg",         label: "slash-line" },
+  { file: "stop-square.svg",        label: "stop-square" },
+  { file: "clock.svg",              label: "clock" },
+  { file: "loader-spinner.svg",     label: "loader-spinner" },
+  { file: "eye-open.svg",           label: "eye-open" },
+  { file: "eye-open-alt.svg",       label: "eye-open-alt" },
+  { file: "eye-slash.svg",          label: "eye-slash" },
+  { file: "currency-line.svg",      label: "currency-line" },
+  { file: "currency-line-1.svg",    label: "currency-line-1" },
+  { file: "currency-line-2.svg",    label: "currency-line-2" },
+  { file: "alert-circle.svg",       label: "alert-circle" },
+  { file: "alert-circle-1.svg",     label: "alert-circle-1" },
+  { file: "alert-circle-2.svg",     label: "alert-circle-2" },
+  { file: "alert-circle-3.svg",     label: "alert-circle-3" },
+  { file: "info-alt.svg",           label: "info-alt" },
+  { file: "warning-triangle.svg",   label: "warning-triangle" },
+  { file: "google-logo.svg",        label: "google-logo",   fill: true },
+  { file: "wechat-logo.svg",        label: "wechat-logo",   fill: true },
+  { file: "wechat-logo-1.svg",      label: "wechat-logo-1", fill: true },
+  { file: "icon-unknown.svg",       label: "icon-unknown" },
+  { file: "icon-unknown-1.svg",     label: "icon-unknown-1" },
+  { file: "icon-m12-2v20.svg",      label: "icon-m12-2v20" },
+];
+
+let currentColor = '#ffffff';
+let currentSize = 48;
+
+const grid = document.getElementById('grid');
+const searchInput = document.getElementById('search');
+const countEl = document.getElementById('count');
+const toast = document.getElementById('toast');
+
+function filterIcons(query) {
+  return ICONS.filter(ic => ic.label.toLowerCase().includes(query.toLowerCase()));
+}
+
+function render(query = '') {
+  const filtered = filterIcons(query);
+  grid.innerHTML = '';
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div class="empty">No icons match your search.</div>';
+    countEl.textContent = '0 icons';
+    return;
+  }
+
+  // Group: brand first
+  const brandIcons = filtered.filter(i => i.brand);
+  const uiIcons    = filtered.filter(i => !i.brand);
+
+  if (brandIcons.length && query === '') {
+    const label = document.createElement('div');
+    label.className = 'section-label';
+    label.textContent = `Brand Assets (${brandIcons.length})`;
+    grid.appendChild(label);
+    brandIcons.forEach(ic => grid.appendChild(makeCard(ic)));
+
+    const label2 = document.createElement('div');
+    label2.className = 'section-label';
+    label2.textContent = `UI Icons (${uiIcons.length})`;
+    grid.appendChild(label2);
+    uiIcons.forEach(ic => grid.appendChild(makeCard(ic)));
+  } else {
+    filtered.forEach(ic => grid.appendChild(makeCard(ic)));
+  }
+
+  countEl.textContent = `${filtered.length} icon${filtered.length !== 1 ? 's' : ''}`;
+}
+
+function makeCard(ic) {
+  const card = document.createElement('div');
+  card.className = 'icon-card' + (ic.brand ? ' brand-card' : '');
+
+  if (ic.brand) {
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = 'Brand';
+    card.appendChild(badge);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'icon-wrap';
+
+  const img = document.createElement('img');
+  img.src = ic.file;
+  img.width = currentSize;
+  img.height = currentSize;
+  img.alt = ic.label;
+  img.style.width = currentSize + 'px';
+  img.style.height = currentSize + 'px';
+
+  // For non-fill SVGs, use CSS filter to colorize
+  if (!ic.fill) {
+    img.style.filter = colorToFilter(currentColor);
+  }
+
+  wrap.appendChild(img);
+  card.appendChild(wrap);
+
+  const name = document.createElement('div');
+  name.className = 'icon-name';
+  name.textContent = ic.label;
+  card.appendChild(name);
+
+  // Click to copy filename
+  card.addEventListener('click', () => {
+    navigator.clipboard.writeText(ic.file).catch(() => {});
+    showToast(`✓ Copied: ${ic.file}`);
+  });
+
+  return card;
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// Color → CSS filter approximation
+function colorToFilter(hex) {
+  if (hex === '#ffffff') return 'brightness(0) invert(1)';
+  if (hex === '#195AD7') return 'brightness(0) saturate(100%) invert(27%) sepia(93%) saturate(1356%) hue-rotate(207deg) brightness(97%) contrast(93%)';
+  if (hex === '#10B981') return 'brightness(0) saturate(100%) invert(59%) sepia(85%) saturate(412%) hue-rotate(118deg) brightness(93%) contrast(89%)';
+  if (hex === '#F59E0B') return 'brightness(0) saturate(100%) invert(71%) sepia(74%) saturate(500%) hue-rotate(1deg) brightness(101%) contrast(97%)';
+  if (hex === '#EF4444') return 'brightness(0) saturate(100%) invert(34%) sepia(93%) saturate(1172%) hue-rotate(332deg) brightness(99%) contrast(94%)';
+  if (hex === '#111827') return 'brightness(0) saturate(100%) invert(36%) sepia(0%) hue-rotate(0deg) brightness(80%) contrast(80%)';
+  return 'brightness(0) invert(1)';
+}
+
+// Swatch click
+document.getElementById('swatches').querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    currentColor = sw.dataset.color;
+    // Re-apply color filter to all non-fill icons
+    document.querySelectorAll('.icon-card:not(.brand-card) img').forEach(img => {
+      img.style.filter = colorToFilter(currentColor);
+    });
+  });
+});
+
+// Size buttons
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSize = parseInt(btn.dataset.size);
+    document.querySelectorAll('.icon-wrap img').forEach(img => {
+      img.width = currentSize;
+      img.height = currentSize;
+      img.style.width = currentSize + 'px';
+      img.style.height = currentSize + 'px';
+    });
+  });
+});
+
+// Search
+searchInput.addEventListener('input', () => render(searchInput.value));
+
+// Initial render
+render();
+</script>
+</body>
+</html>
