@@ -155,7 +155,7 @@ export default function RootLayout({
         {/* Vercel Speed Insights */}
         <SpeedInsights />
         {/* Google Analytics 4 — tracks visitor behavior and traffic sources */}
-        <GoogleAnalytics gaId="G-FP5C0829J6" />
+        <GoogleAnalytics gaId="G-J07TT69B25" />
       </body>
     </html>
   );
