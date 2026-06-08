@@ -95,6 +95,66 @@ def _user_summary(u: User) -> dict:
     }
 
 
+def _raw_user_summary(doc: dict) -> dict:
+    """Serialize a raw MongoDB user document without going through the Beanie model.
+
+    Beanie's ORM silently drops documents that fail model validation, which can
+    cause newer user records (with schema differences) to be excluded from admin
+    queries.  This function works directly on the raw dict so all users are
+    returned regardless of schema drift.
+    """
+    from bson import ObjectId as _OID
+    oid = doc.get("_id")
+    joined = oid.generation_time.replace(tzinfo=None).isoformat() if isinstance(oid, _OID) else None
+
+    profile    = doc.get("profile") or {}
+    location   = profile.get("location") or {}
+    sid        = doc.get("spectrum_id") or {}
+
+    is_active   = doc.get("is_active", True)
+    suspended_at = doc.get("suspended_at")
+    is_verified  = doc.get("is_verified", False)
+    account_type = doc.get("account_type", "crew")
+    user_role    = doc.get("user_role", "user")
+
+    if not is_active or suspended_at is not None:
+        computed_status = "suspended"
+    elif is_verified:
+        computed_status = "verified"
+    else:
+        computed_status = "unverified"
+
+    if user_role == "admin":
+        computed_role = "Admin"
+    elif user_role == "moderator":
+        computed_role = "Moderator"
+    else:
+        computed_role = {"crew": "Creator", "producer": "Client", "both": "Both"}.get(
+            account_type, account_type.capitalize()
+        )
+
+    last_login = doc.get("last_login")
+
+    return {
+        "id":              str(oid),
+        "email":           doc.get("email", ""),
+        "username":        doc.get("username", ""),
+        "display_name":    profile.get("display_name", ""),
+        "profile_picture": profile.get("profile_picture", ""),
+        "account_type":    account_type,
+        "user_role":       user_role,
+        "role":            computed_role,
+        "status":          computed_status,
+        "country":         location.get("country"),
+        "is_verified":     is_verified,
+        "is_active":       is_active,
+        "joined":          joined,
+        "last_login":      last_login.isoformat() if hasattr(last_login, "isoformat") else None,
+        "trust_score":     sid.get("trust_score", 0),
+        "trust_tier":      sid.get("tier", "bronze"),
+    }
+
+
 # ── Platform Stats ─────────────────────────────────────────────────────────────
 
 @router.get("/stats", summary="Platform-wide metrics")
@@ -104,19 +164,21 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
     import asyncio as _aio
     try:
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        (
-            total_users, creators, clients, admins, verified, suspended,
-        ) = await _aio.gather(
-            User.find().count(),
-            User.find({"account_type": {"$in": ["crew", "both"]}}).count(),
-            User.find({"account_type": {"$in": ["producer", "both"]}}).count(),
-            User.find({"user_role": {"$in": ["admin", "moderator"]}}).count(),
-            User.find({"is_verified": True}).count(),
-            User.find({"is_active": False}).count(),
-        )
         from bson import ObjectId as _BsonOID
         cutoff_id = _BsonOID.from_datetime(thirty_days_ago)
-        new_users_30d = await User.find({"_id": {"$gte": cutoff_id}}).count()
+        # Use motor directly so all users are counted regardless of Beanie validation
+        _ucol2 = User.get_motor_collection()
+        (
+            total_users, creators, clients, admins, verified, suspended, new_users_30d,
+        ) = await _aio.gather(
+            _ucol2.count_documents({}),
+            _ucol2.count_documents({"account_type": {"$in": ["crew", "both"]}}),
+            _ucol2.count_documents({"account_type": {"$in": ["producer", "both"]}}),
+            _ucol2.count_documents({"user_role": {"$in": ["admin", "moderator"]}}),
+            _ucol2.count_documents({"is_verified": True}),
+            _ucol2.count_documents({"is_active": False}),
+            _ucol2.count_documents({"_id": {"$gte": cutoff_id}}),
+        )
     except Exception:
         total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
@@ -228,14 +290,15 @@ async def get_stats_overview(admin: User = Depends(get_admin_user)):
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     # ── Users ──────────────────────────────────────────────────────────────────
-    all_users      = await User.find_all().to_list()
-    total_users    = len(all_users)
-    users_today    = sum(
-        1 for u in all_users
-        if u.id and u.id.generation_time.replace(tzinfo=None) >= today_start
-    )
-    verified_users = sum(1 for u in all_users if u.is_verified)
-    deleted_users  = sum(1 for u in all_users if u.deleted_at is not None)
+    # Use motor directly to count all users — Beanie's ORM can silently drop
+    # documents that fail model validation, producing an incorrect total.
+    from bson import ObjectId as _BsonOID2
+    _ucol          = User.get_motor_collection()
+    total_users    = await _ucol.count_documents({})
+    today_cutoff   = _BsonOID2.from_datetime(today_start)
+    users_today    = await _ucol.count_documents({"_id": {"$gte": today_cutoff}})
+    verified_users = await _ucol.count_documents({"is_verified": True})
+    deleted_users  = await _ucol.count_documents({"deleted_at": {"$ne": None}})
 
     # ── Jobs ───────────────────────────────────────────────────────────────────
     try:
@@ -472,26 +535,59 @@ async def list_users(
     status: Optional[str] = Query(None, description="suspended | verified | unverified"),
     admin: User = Depends(get_admin_user),
 ):
+    from pymongo import DESCENDING
+
     raw_filter: dict = {}
+
     if search:
         safe_search = _safe_regex(search)
         raw_filter["$or"] = [
-            {"email": {"$regex": safe_search, "$options": "i"}},
-            {"username": {"$regex": safe_search, "$options": "i"}},
+            {"email":                {"$regex": safe_search, "$options": "i"}},
+            {"username":             {"$regex": safe_search, "$options": "i"}},
             {"profile.display_name": {"$regex": safe_search, "$options": "i"}},
         ]
 
-    query = User.find(raw_filter)
-    total = await query.count()
+    if role:
+        role_lower = role.lower()
+        if role_lower == "creator":
+            raw_filter["account_type"] = {"$in": ["crew", "both"]}
+            raw_filter["user_role"] = "user"
+        elif role_lower == "client":
+            raw_filter["account_type"] = {"$in": ["producer", "both"]}
+            raw_filter["user_role"] = "user"
+        elif role_lower == "moderator":
+            raw_filter["user_role"] = "moderator"
+        elif role_lower == "admin":
+            raw_filter["user_role"] = "admin"
+
+    if status:
+        status_lower = status.lower()
+        if status_lower == "suspended":
+            raw_filter["$or"] = raw_filter.get("$or", []) + [
+                {"is_active": False},
+                {"suspended_at": {"$ne": None}},
+            ]
+        elif status_lower == "verified":
+            raw_filter["is_verified"] = True
+            raw_filter["is_active"]   = {"$ne": False}
+        elif status_lower == "unverified":
+            raw_filter["is_verified"] = False
+            raw_filter["is_active"]   = {"$ne": False}
+
+    # Query the motor collection directly so that documents which fail Beanie's
+    # model validation are not silently dropped — this ensures all registered
+    # users appear in the admin list regardless of schema drift over time.
+    col   = User.get_motor_collection()
+    total = await col.count_documents(raw_filter)
     start = (page - 1) * page_size
-    page_users = await query.sort([("_id", -1)]).skip(start).limit(page_size).to_list()
+    raw_docs = await col.find(raw_filter).sort("_id", DESCENDING).skip(start).limit(page_size).to_list(length=page_size)
 
     return {
-        "total": total,
-        "page": page,
+        "total":     total,
+        "page":      page,
         "page_size": page_size,
-        "has_more": start + page_size < total,
-        "users": [_user_summary(u) for u in page_users],
+        "has_more":  start + page_size < total,
+        "users":     [_raw_user_summary(doc) for doc in raw_docs],
     }
 
 
