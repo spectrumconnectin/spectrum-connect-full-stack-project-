@@ -1621,43 +1621,53 @@ async def send_admin_notification(
 ):
     """
     Create a Notification document for every matching user.
+
+    Uses Motor directly (bypassing Beanie ORM validation) so that users
+    whose documents have schema drift are never silently excluded.
+
     recipient values:
-      - "all"      → every active user
-      - "clients"  → account_type == "client"
-      - "creators" → account_type == "creator"
-      - "custom"   → only the user_ids listed in the body
+      - "all"      → every user in the database
+      - "clients"  → account_type in ["producer", "both"]
+      - "creators" → account_type in ["crew", "both"]
+      - "custom"   → only the user_ids supplied in the body
     """
-    from beanie.operators import In
+    from bson import ObjectId as BsonObjectId
+    from beanie import PydanticObjectId
     from app.models.schema import Notification
 
-    # ── resolve target users ──────────────────────────────────────────────────
+    ucol = User.get_motor_collection()
+
+    # ── resolve target user ObjectIds via raw Motor query ─────────────────────
     if body.recipient == "custom":
         if not body.user_ids:
             raise HTTPException(status_code=400, detail="user_ids required for custom recipient")
-        from bson import ObjectId as BsonObjectId
-        from beanie import PydanticObjectId
         oids = []
         for uid in body.user_ids:
             try:
-                oids.append(PydanticObjectId(uid))
+                oids.append(BsonObjectId(uid))
             except Exception:
                 pass
-        targets = await User.find(In(User.id, oids)).to_list()
+        if not oids:
+            raise HTTPException(status_code=400, detail="No valid user IDs provided")
+        cursor = ucol.find({"_id": {"$in": oids}}, {"_id": 1})
     elif body.recipient == "clients":
-        targets = await User.find(User.account_type == "client", User.is_active == True).to_list()
+        # account_type "producer" = client role; "both" = creator+client
+        cursor = ucol.find({"account_type": {"$in": ["producer", "both"]}}, {"_id": 1})
     elif body.recipient == "creators":
-        targets = await User.find(User.account_type == "creator", User.is_active == True).to_list()
+        # account_type "crew" = creator role; "both" = creator+client
+        cursor = ucol.find({"account_type": {"$in": ["crew", "both"]}}, {"_id": 1})
     else:  # "all"
-        targets = await User.find(User.is_active == True).to_list()
+        cursor = ucol.find({}, {"_id": 1})
 
-    if not targets:
+    raw_docs = await cursor.to_list(length=None)
+    if not raw_docs:
         raise HTTPException(status_code=404, detail="No matching users found")
 
-    # ── create notification documents in bulk ─────────────────────────────────
+    # ── bulk-insert one Notification per user ─────────────────────────────────
     now = datetime.utcnow()
     docs = [
         Notification(
-            user_id=u.id,
+            user_id=PydanticObjectId(doc["_id"]),
             type=body.type,
             category=body.category,
             title=body.title,
@@ -1667,7 +1677,7 @@ async def send_admin_notification(
             actor_name=admin.username,
             is_read=False,
         )
-        for u in targets
+        for doc in raw_docs
     ]
     await Notification.insert_many(docs)
 
