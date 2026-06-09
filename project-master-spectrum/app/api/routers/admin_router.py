@@ -18,6 +18,8 @@ GET  /admin/disputes                 All disputes
 GET  /admin/transactions             All escrow transactions
 GET  /admin/etf/stats                ETF points summary
 GET  /admin/revenue                  Platform revenue breakdown (fees by month/project)
+POST /admin/notifications/send       Broadcast notification to users (all/clients/creators/custom)
+GET  /admin/notifications/history    List last 100 admin-sent notifications
 """
 from __future__ import annotations
 
@@ -109,7 +111,7 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
                 "creator_fee_usd": {"$sum": "$creator_fee"},
             }},
         ]
-        agg_result = await TxModel.aggregate(pipeline).to_list()
+        agg_result = await TxModel.get_pymongo_collection().aggregate(pipeline).to_list(None)
         if agg_result:
             total_volume    = round(agg_result[0].get("total_volume",    0), 2)
             total_fees      = round(agg_result[0].get("total_fees",      0), 2)
@@ -138,7 +140,7 @@ async def get_platform_stats(admin: User = Depends(get_admin_user)):
                 "gold_users":     {"$sum": {"$cond": [{"$eq": ["$level", "gold"]},     1, 0]}},
             }}
         ]
-        etf_result = await EtfPoints.aggregate(etf_pipeline).to_list()
+        etf_result = await EtfPoints.get_pymongo_collection().aggregate(etf_pipeline).to_list(None)
         if etf_result:
             total_points_awarded = int(etf_result[0].get("total_lifetime", 0))
             platinum_users       = int(etf_result[0].get("platinum_users", 0))
@@ -479,7 +481,7 @@ async def get_etf_stats(admin: User = Depends(get_admin_user)):
                 "diamond":  {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "diamond"]},  1, 0]}},
             }}
         ]
-        result = await EtfPoints.aggregate(pipeline).to_list()
+        result = await EtfPoints.get_pymongo_collection().aggregate(pipeline).to_list(None)
         if not result:
             return {"total_accounts": 0, "total_lifetime_points": 0, "total_redeemed_points": 0, "level_breakdown": {}}
         r = result[0]
@@ -527,7 +529,7 @@ async def get_revenue_report(admin: User = Depends(get_admin_user)):
             }},
             {"$sort": {"_id": 1}},
         ]
-        monthly_raw = await TxModel.aggregate(monthly_pipeline).to_list()
+        monthly_raw = await TxModel.get_pymongo_collection().aggregate(monthly_pipeline).to_list(None)
     except Exception:
         monthly_raw = []
 
@@ -557,7 +559,7 @@ async def get_revenue_report(admin: User = Depends(get_admin_user)):
                 "count":          {"$sum": 1},
             }},
         ]
-        totals_raw = await TxModel.aggregate(totals_pipeline).to_list()
+        totals_raw = await TxModel.get_pymongo_collection().aggregate(totals_pipeline).to_list(None)
         r = totals_raw[0] if totals_raw else {}
         totals = {
             "client_fees":       round(r.get("client_fees",    0), 2),
@@ -601,3 +603,121 @@ async def get_revenue_report(admin: User = Depends(get_admin_user)):
             "note": "Client pays +4% on top of project amount. Creator receives amount minus 8%.",
         },
     }
+
+
+# ── Notifications ──────────────────────────────────────────────────────────────
+
+class NotificationSendBody(BaseModel):
+    recipient: str          # "all" | "clients" | "creators" | "custom"
+    user_ids: list[str] = []  # only used when recipient == "custom"
+    title: str
+    message: str
+    type: str = "system"    # message | system | payment | review | connection
+    category: str = "info"  # info | success | warning | alert
+    action_url: Optional[str] = None
+    action_text: Optional[str] = None
+
+
+@router.post("/notifications/send", summary="Broadcast notification to users")
+async def send_admin_notification(
+    body: NotificationSendBody,
+    admin: User = Depends(get_admin_user),
+):
+    """
+    Create a Notification document for every matching user.
+    recipient values:
+      - "all"      → every active user
+      - "clients"  → account_type == "client"
+      - "creators" → account_type == "creator"
+      - "custom"   → only the user_ids listed in the body
+    """
+    from beanie.operators import In
+    from app.models.schema import Notification
+
+    # ── resolve target users ──────────────────────────────────────────────────
+    if body.recipient == "custom":
+        if not body.user_ids:
+            raise HTTPException(status_code=400, detail="user_ids required for custom recipient")
+        from bson import ObjectId as BsonObjectId
+        from beanie import PydanticObjectId
+        oids = []
+        for uid in body.user_ids:
+            try:
+                oids.append(PydanticObjectId(uid))
+            except Exception:
+                pass
+        targets = await User.find(In(User.id, oids)).to_list()
+    elif body.recipient == "clients":
+        targets = await User.find(User.account_type == "client", User.is_active == True).to_list()
+    elif body.recipient == "creators":
+        targets = await User.find(User.account_type == "creator", User.is_active == True).to_list()
+    else:  # "all"
+        targets = await User.find(User.is_active == True).to_list()
+
+    if not targets:
+        raise HTTPException(status_code=404, detail="No matching users found")
+
+    # ── create notification documents in bulk ─────────────────────────────────
+    now = datetime.utcnow()
+    docs = [
+        Notification(
+            user_id=u.id,
+            type=body.type,
+            category=body.category,
+            title=body.title,
+            message=body.message,
+            action_url=body.action_url,
+            action_text=body.action_text,
+            actor_name=admin.username,
+            is_read=False,
+        )
+        for u in targets
+    ]
+    await Notification.insert_many(docs)
+
+    return {
+        "success": True,
+        "sent_to": len(docs),
+        "recipient": body.recipient,
+        "title": body.title,
+        "sent_at": now.isoformat(),
+    }
+
+
+@router.get("/notifications/history", summary="List last 100 admin-sent notifications")
+async def get_notification_history(
+    limit: int = Query(default=100, le=200),
+    admin: User = Depends(get_admin_user),
+):
+    """
+    Returns the most-recent admin-originated (type='system') notifications
+    sorted newest-first, deduplicated by title+sent_at minute so bulk sends
+    appear as one row.
+    """
+    from app.models.schema import Notification
+
+    try:
+        recent = (
+            await Notification.find(Notification.type == "system")
+            .sort(-Notification.id)
+            .limit(limit)
+            .to_list()
+        )
+        seen: set[str] = set()
+        rows = []
+        for n in recent:
+            key = f"{n.title}|{n.id.generation_time.strftime('%Y-%m-%dT%H:%M') if hasattr(n.id, 'generation_time') else str(n.id)}"
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({
+                "id": str(n.id),
+                "title": n.title,
+                "message": n.message,
+                "category": n.category,
+                "actor_name": n.actor_name,
+                "sent_at": n.id.generation_time.isoformat() if hasattr(n.id, "generation_time") else None,
+            })
+        return {"history": rows, "total": len(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load history: {str(e)}")
