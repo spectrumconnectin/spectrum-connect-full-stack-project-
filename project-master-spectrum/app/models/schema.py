@@ -281,20 +281,19 @@ class User(Document):
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None
-    deleted_at: Optional[datetime] = None # Soft delete — use get_active_user() helper, never User.get() directly
-    # One-time password reset token hash (SHA-256 of the raw JWT).
-    # Set when a reset link is issued; cleared immediately on first successful use
-    # to prevent token replay within the 1-hour expiry window.
+    deleted_at: Optional[datetime] = None
+    is_active: bool = True
+    suspended_at: Optional[datetime] = None
     password_reset_token_hash: Optional[str] = None
 
     @classmethod
     async def get_active(cls, user_id) -> "Optional[User]":
-        """Fetch user by ID, returning None if the user has been soft-deleted."""
         user = await cls.get(user_id)
         if user and user.deleted_at:
             return None
         return user
     spectrum_id: Optional[SpectrumID] = Field(default_factory=SpectrumID)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "users"

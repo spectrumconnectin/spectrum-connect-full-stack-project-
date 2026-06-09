@@ -56,6 +56,11 @@ class UserRead(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    id: Optional[str] = None             # User MongoDB ObjectId as string
+    user_role: Optional[str] = None       # "user" | "admin" | "moderator"
+    is_admin: Optional[bool] = None       # True when user_role is admin or moderator
+    account_type: Optional[str] = None    # "crew" | "producer" | "both"
+    username: Optional[str] = None
 
 class TokenData(BaseModel):
     username: Optional[str] = None

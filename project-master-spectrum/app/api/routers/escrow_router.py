@@ -169,8 +169,8 @@ async def fund_milestone(
 
         esc = await EscrowDoc.get(_OID(escrow_id))
         if esc:
-            milestone = next((m for m in esc.milestones if m.milestone_id == request.milestone_id), None)
-            m_title  = milestone.title  if milestone else "Milestone"
+            milestone = next((m for m in (esc.milestones or []) if m.milestone_id == request.milestone_id), None)
+            m_title = milestone.title if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
             await NotificationService.milestone_funded(
                 creator_id=str(esc.creator_id),
@@ -220,11 +220,10 @@ async def release_milestone(
         from app.models.escrow import Escrow as EscrowDoc
         from app.models.schema import JobPost
         from beanie import PydanticObjectId as OID
-        from datetime import datetime, timezone
 
         esc = await EscrowDoc.get(OID(escrow_id))
         if esc:
-            milestone = next((m for m in esc.milestones if m.milestone_id == request.milestone_id), None)
+            milestone = next((m for m in (esc.milestones or []) if m.milestone_id == request.milestone_id), None)
             m_title = milestone.title if milestone else "Milestone"
             m_amount = float(milestone.amount) if milestone else 0.0
 

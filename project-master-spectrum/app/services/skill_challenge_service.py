@@ -112,7 +112,10 @@ class SkillChallengeService:
     @staticmethod
     async def get_challenge_by_id(challenge_id: str) -> Dict[str, Any]:
         """Full challenge detail including instructions and evaluation criteria."""
-        c = await SkillChallenge.get(PydanticObjectId(challenge_id))
+        try:
+            c = await SkillChallenge.get(PydanticObjectId(challenge_id))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid challenge ID.")
         if not c or not c.is_active:
             raise HTTPException(status_code=404, detail="Challenge not found.")
 
@@ -421,6 +424,77 @@ class SkillChallengeService:
             "limit": limit,
             "offset": offset,
             "has_more": (offset + limit) < total,
+        }
+
+    @staticmethod
+    async def get_all_submissions(
+        limit: int = 20,
+        offset: int = 0,
+        status_filter: Optional[str] = None,
+        skill_category: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Admin view of ALL submissions with optional status filter."""
+        query = ChallengeSubmission.find()
+        if status_filter:
+            query = ChallengeSubmission.find(
+                ChallengeSubmission.evaluation_status == status_filter
+            )
+
+        total = await query.count()
+        subs_raw = (
+            await query.sort(-ChallengeSubmission.submitted_at)
+            .skip(offset)
+            .limit(limit)
+            .to_list()
+        )
+
+        # Counts across ALL statuses (ignoring current filter)
+        all_subs = await ChallengeSubmission.find().to_list()
+        pending_count = sum(1 for s in all_subs if s.evaluation_status in ("pending", "evaluating"))
+        passed_count  = sum(1 for s in all_subs if s.evaluation_status == "passed")
+        failed_count  = sum(1 for s in all_subs if s.evaluation_status == "failed")
+
+        submissions = []
+        for s in subs_raw:
+            user      = await User.get(s.user_id)
+            challenge = await SkillChallenge.get(s.challenge_id)
+
+            if skill_category and challenge and challenge.skill_category != skill_category:
+                continue
+
+            passed = None
+            if s.evaluation_status in ("passed", "failed"):
+                passed = s.evaluation_status == "passed"
+
+            submissions.append({
+                "submission_id":    str(s.id),
+                "challenge_id":     str(s.challenge_id),
+                "challenge_title":  challenge.title if challenge else "Unknown",
+                "skill_category":   challenge.skill_category if challenge else None,
+                "difficulty":       challenge.difficulty if challenge else None,
+                "user_id":          str(s.user_id),
+                "username":         user.username if user else "unknown",
+                "content_type":     s.submitted_content.content_type,
+                "submission_url":   s.submitted_content.value,
+                "submission_notes": s.submitted_content.notes,
+                "attempt_number":   s.attempt_number,
+                "evaluation_status": s.evaluation_status,
+                "overall_score":    s.overall_score,
+                "pass_threshold":   challenge.pass_threshold if challenge else None,
+                "passed":           passed,
+                "submitted_at":     s.submitted_at,
+                "evaluated_at":     s.evaluated_at,
+            })
+
+        return {
+            "submissions":   submissions,
+            "total":         total,
+            "pending_count": pending_count,
+            "passed_count":  passed_count,
+            "failed_count":  failed_count,
+            "limit":         limit,
+            "offset":        offset,
+            "has_more":      (offset + limit) < total,
         }
 
     @staticmethod

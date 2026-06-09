@@ -434,7 +434,10 @@ class DisputeService:
         is_admin: bool = False,
     ) -> Dict[str, Any]:
         """Full dispute detail. Parties + admins can view."""
-        dispute = await Dispute.get(PydanticObjectId(dispute_id))
+        try:
+            dispute = await Dispute.get(PydanticObjectId(dispute_id))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid dispute ID.")
         if not dispute:
             raise HTTPException(status_code=404, detail="Dispute not found.")
 
