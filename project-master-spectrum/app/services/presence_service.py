@@ -100,6 +100,31 @@ class PresenceService:
             pass
 
     @staticmethod
+    async def get_presence_bulk(user_ids: list) -> dict:
+        """Read-only presence for many users in one query.
+
+        Returns {user_id_str: {is_online, last_activity}}. Computes is_online
+        from heartbeat age like get_presence, but skips the stored-flag
+        writeback — list endpoints (talent search) shouldn't issue N writes.
+        """
+        out: dict = {}
+        try:
+            ids = [str(u) for u in user_ids]
+            docs = await UserPresence.find({"user_id": {"$in": ids}}).to_list()
+            now = datetime.utcnow()
+            window = timedelta(minutes=PresenceService.OFFLINE_TIMEOUT)
+            for p in docs:
+                is_online = bool(p.last_activity and (now - p.last_activity) <= window)
+                out[str(p.user_id)] = {
+                    "user_id": str(p.user_id),
+                    "is_online": is_online,
+                    "last_activity": p.last_activity.isoformat() if p.last_activity else None,
+                }
+        except Exception:
+            pass
+        return out
+
+    @staticmethod
     async def get_presence(user_id: str) -> dict:
         """Get full presence info for a user.
 

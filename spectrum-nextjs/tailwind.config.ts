@@ -16,7 +16,7 @@ const config: Config = {
         "light-gray": "#636363",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "system-ui", "-apple-system", "sans-serif"],
       },
     },
   },

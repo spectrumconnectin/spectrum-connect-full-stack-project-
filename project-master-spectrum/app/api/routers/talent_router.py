@@ -17,6 +17,21 @@ async def _get_etf_level(user_id) -> str:
         return "bronze"
 
 
+async def _get_etf_levels_bulk(user_ids) -> dict:
+    """ETF level for many users in a single $in query: {user_id_str: level}."""
+    try:
+        from app.models.etf_points import EtfPoints
+        from bson import ObjectId
+        oids = [ObjectId(str(u)) for u in user_ids]
+        col = EtfPoints.get_motor_collection()
+        docs = await col.find(
+            {"user_id": {"$in": oids}}, {"user_id": 1, "level": 1}
+        ).to_list(length=None)
+        return {str(d["user_id"]): (d.get("level") or "bronze").lower() for d in docs}
+    except Exception:
+        return {}
+
+
 def _pget(obj, attr, default=None):
     """Safely get an attribute from either a Pydantic model or a dict."""
     if obj is None:
@@ -35,12 +50,15 @@ async def search_talent(
 ):
     results = await TalentService.search(q=q, location=location, skill=skill, limit=limit)
 
-    # Fetch ETF levels + real-time presence for all users in parallel (no N+1)
+    # ETF levels + presence for the whole result set in 2 queries total
+    # (was 2 queries per user — 60 round-trips for a 30-result page).
     import asyncio
-    etf_levels, presence_data = await asyncio.gather(
-        asyncio.gather(*[_get_etf_level(u.id) for u in results], return_exceptions=True),
-        asyncio.gather(*[PresenceService.get_presence(str(u.id)) for u in results], return_exceptions=True),
+    etf_map, presence_map = await asyncio.gather(
+        _get_etf_levels_bulk([u.id for u in results]),
+        PresenceService.get_presence_bulk([u.id for u in results]),
     )
+    etf_levels = [etf_map.get(str(u.id), "bronze") for u in results]
+    presence_data = [presence_map.get(str(u.id), {"is_online": False, "last_activity": None}) for u in results]
 
     def serialize(user, etf_level: str, presence: dict):
         profile = user.profile

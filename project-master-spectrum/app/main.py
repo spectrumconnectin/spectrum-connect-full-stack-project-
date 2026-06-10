@@ -121,6 +121,12 @@ app.add_middleware(
     max_age=600,
 )
 
+# Compress JSON responses ≥1KB — list endpoints (talent search, dashboards,
+# jobs) shrink 5-10x on the wire, which dominates perceived latency for
+# mobile users on the Next.js rewrite path.
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
 
 # ─── Security headers middleware ─────────────────────────────────────────────
 @app.middleware("http")
