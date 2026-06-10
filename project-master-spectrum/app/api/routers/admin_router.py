@@ -1462,14 +1462,34 @@ async def export_audit_log(
 
 @router.get("/etf/stats", summary="ETF points platform summary")
 async def get_etf_stats(admin: User = Depends(get_admin_user)):
+    """
+    All ETF data comes from the etf_points collection — that is the source of truth
+    for balances, lifetime points, redeemed points, and trust level.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
     from app.models.etf_points import EtfPoints
+
+    empty = {
+        "total_accounts": 0,
+        "total_lifetime_points": 0,
+        "total_redeemed_points": 0,
+        "level_breakdown": {"bronze": 0, "silver": 0, "gold": 0, "platinum": 0, "diamond": 0},
+    }
+
+    try:
+        col = EtfPoints.get_motor_collection()
+    except Exception as exc:
+        logger.error("ETF: cannot get motor collection: %s", exc, exc_info=True)
+        return empty
+
     try:
         pipeline = [
             {"$group": {
                 "_id": None,
-                "total_accounts":  {"$sum": 1},
-                "total_lifetime":  {"$sum": "$lifetime_points"},
-                "total_redeemed":  {"$sum": "$redeemed_points"},
+                "total_accounts": {"$sum": 1},
+                "total_lifetime": {"$sum": "$lifetime_points"},
+                "total_redeemed": {"$sum": "$redeemed_points"},
                 "bronze":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "bronze"]},   1, 0]}},
                 "silver":   {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "silver"]},   1, 0]}},
                 "gold":     {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "gold"]},     1, 0]}},
@@ -1477,24 +1497,25 @@ async def get_etf_stats(admin: User = Depends(get_admin_user)):
                 "diamond":  {"$sum": {"$cond": [{"$eq": [{"$toLower": "$level"}, "diamond"]},  1, 0]}},
             }}
         ]
-        result = await EtfPoints.get_pymongo_collection().aggregate(pipeline).to_list(None)
+        result = await col.aggregate(pipeline).to_list(None)
         if not result:
-            return {"total_accounts": 0, "total_lifetime_points": 0, "total_redeemed_points": 0, "level_breakdown": {}}
+            return empty
         r = result[0]
         return {
-            "total_accounts":        r.get("total_accounts", 0),
+            "total_accounts":        int(r.get("total_accounts", 0)),
             "total_lifetime_points": int(r.get("total_lifetime", 0)),
             "total_redeemed_points": int(r.get("total_redeemed", 0)),
             "level_breakdown": {
-                "bronze":   r.get("bronze",   0),
-                "silver":   r.get("silver",   0),
-                "gold":     r.get("gold",     0),
-                "platinum": r.get("platinum", 0),
-                "diamond":  r.get("diamond",  0),
+                "bronze":   int(r.get("bronze",   0)),
+                "silver":   int(r.get("silver",   0)),
+                "gold":     int(r.get("gold",     0)),
+                "platinum": int(r.get("platinum", 0)),
+                "diamond":  int(r.get("diamond",  0)),
             },
         }
-    except Exception:
-        return {}
+    except Exception as exc:
+        logger.error("ETF stats aggregation error: %s", exc, exc_info=True)
+        return empty
 
 
 # ── Revenue Reporting ──────────────────────────────────────────────────────────
