@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import MiyaMark from '@/components/MiyaIcon';
 import {
   aiChat, talent, jobs, profile as profileApi, etfPoints, notifications as notifApi,
 } from '@/lib/api';
@@ -251,12 +252,9 @@ function activityIcon(action: string): { icon: string; bg: string } {
 ──────────────────────────────────────────────────────────────────────────── */
 
 function BotAvatar({ size = 'md', online = false }: { size?: 'sm' | 'md'; online?: boolean }) {
-  const px = size === 'sm' ? 'w-8 h-8 rounded-lg text-xs' : 'w-10 h-10 rounded-xl text-sm';
   return (
     <div className="relative shrink-0">
-      <div className={`${px} bg-cobalt flex items-center justify-center shadow-sm`}>
-        <i className="fa-solid fa-robot text-white" style={{ fontSize: size === 'sm' ? 12 : 15 }} />
-      </div>
+      <MiyaMark size={size === 'sm' ? 32 : 40} className="drop-shadow-sm" />
       {online && <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />}
     </div>
   );
@@ -670,9 +668,7 @@ export default function ClientAiAssistantPage() {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 pt-4 pb-3 border-b border-gray-100">
-        <div className="w-9 h-9 rounded-lg bg-cobalt flex items-center justify-center">
-          <span className="text-white font-bold text-base">M</span>
-        </div>
+        <MiyaMark size={36} className="drop-shadow-sm" />
         <p className="font-bold text-gray-900 text-lg">Miya</p>
         <span className="text-[10px] font-bold bg-blue-50 text-cobalt border border-blue-200 px-1.5 py-0.5 rounded">AI</span>
       </div>
