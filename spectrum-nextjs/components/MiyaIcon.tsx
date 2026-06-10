@@ -5,24 +5,21 @@ import { useId } from 'react';
 /**
  * MiyaMark — Spectrum Connect's AI assistant identity.
  *
- * A rounded-square badge with the Spectrum violet→cobalt→sky gradient,
- * a friendly face (two soft eyes + smile) and a four-point spark —
- * the "intelligence" accent used across Miya surfaces.
+ * Circular badge with violet→cyan gradient, friendly face,
+ * dashed neural ring, and a four-point spark above the eyes.
  *
  * Pure inline SVG: scales crisply at any size, no asset request,
  * unique gradient ids per instance so multiple marks can coexist.
  */
 export default function MiyaMark({ size = 40, className = '' }: { size?: number; className?: string }) {
   const uid = useId();
-  const bg = `miya-bg-${uid}`;
-  const sheen = `miya-sheen-${uid}`;
-  const spark = `miya-spark-${uid}`;
+  const grad = `miya-grad-${uid}`;
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 48 48"
+      viewBox="0 0 512 512"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
@@ -30,45 +27,43 @@ export default function MiyaMark({ size = 40, className = '' }: { size?: number;
       aria-label="Miya AI"
     >
       <defs>
-        <linearGradient id={bg} x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#7C3AED" />
-          <stop offset="0.52" stopColor="#195AD7" />
-          <stop offset="1" stopColor="#38BDF8" />
-        </linearGradient>
-        <radialGradient id={sheen} cx="0.28" cy="0.18" r="0.9">
-          <stop stopColor="#FFFFFF" stopOpacity="0.38" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={spark} x1="33" y1="7" x2="42" y2="17" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#FDE68A" />
-          <stop offset="1" stopColor="#FFFFFF" />
+        <linearGradient id={grad} x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#6C63FF" />
+          <stop offset="100%" stopColor="#00D4FF" />
         </linearGradient>
       </defs>
 
-      {/* Badge */}
-      <rect x="2" y="2" width="44" height="44" rx="14" fill={`url(#${bg})`} />
-      <rect x="2" y="2" width="44" height="44" rx="14" fill={`url(#${sheen})`} />
+      {/* Background circle */}
+      <circle cx="256" cy="256" r="220" fill={`url(#${grad})`} />
 
-      {/* Eyes — soft vertical pills, slightly tilted inward for warmth */}
-      <rect x="14.6" y="19" width="4.8" height="9.4" rx="2.4" fill="#FFFFFF" />
-      <rect x="28.6" y="19" width="4.8" height="9.4" rx="2.4" fill="#FFFFFF" />
+      {/* AI face */}
+      <circle cx="190" cy="220" r="18" fill="white" />
+      <circle cx="322" cy="220" r="18" fill="white" />
 
       {/* Smile */}
       <path
-        d="M17.4 32.6c1.9 2.5 4.1 3.7 6.6 3.7s4.7-1.2 6.6-3.7"
-        stroke="#FFFFFF"
-        strokeWidth="2.7"
+        d="M180 310C205 340 307 340 332 310"
+        stroke="white"
+        strokeWidth="18"
         strokeLinecap="round"
-        fill="none"
       />
 
-      {/* Spark — the "AI" accent */}
-      <path
-        d="M37.2 7.4c.62 2.9 2 4.28 4.9 4.9-2.9.62-4.28 2-4.9 4.9-.62-2.9-2-4.28-4.9-4.9 2.9-.62 4.28-2 4.9-4.9z"
-        fill={`url(#${spark})`}
+      {/* Neural ring */}
+      <circle
+        cx="256"
+        cy="256"
+        r="170"
+        stroke="white"
+        strokeWidth="8"
+        strokeDasharray="10 16"
+        opacity="0.5"
       />
-      {/* Tiny companion spark */}
-      <circle cx="33" cy="14.6" r="1.1" fill="#FFFFFF" opacity="0.9" />
+
+      {/* Spark */}
+      <path
+        d="M256 120L272 160L312 176L272 192L256 232L240 192L200 176L240 160L256 120Z"
+        fill="white"
+      />
     </svg>
   );
 }
