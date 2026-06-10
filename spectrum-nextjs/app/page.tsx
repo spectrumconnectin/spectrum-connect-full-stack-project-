@@ -102,10 +102,13 @@ export default function HomePage() {
         <div className="hero-grid" style={{ maxWidth: 1100, margin: '0 auto', position: 'relative', display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 56, alignItems: 'center' }}>
           <div>
             <h1 className="mk-reveal" style={{ fontSize: 'clamp(34px, 5vw, 58px)', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', margin: '0 0 20px' }}>
+              <span style={{ display: 'block', fontSize: '0.32em', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.75)', marginBottom: 14 }}>
+                Spectrum Connect
+              </span>
               Find trusted creators.<br />Build amazing teams.<br />Work better together.
             </h1>
             <p className="mk-reveal" style={{ fontSize: 17, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)', margin: '0 0 32px', maxWidth: 480 }}>
-              A creative marketplace built on trust — verified creators, fair payments, and projects matched to your needs.
+              Spectrum Connect is a creative marketplace built on trust — verified creators, fair payments, and projects matched to your needs.
             </p>
             <div className="mk-reveal" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <Link href="/signup" className="home-btn-primary" style={{ background: '#fff', color: '#1e3a8a', padding: '14px 28px', borderRadius: 12, fontWeight: 700, fontSize: 15, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}>

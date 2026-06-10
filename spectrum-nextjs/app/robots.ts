@@ -7,11 +7,20 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         disallow: [
-          '/creator/dashboard',
-          '/client/dashboard',
+          // Private app surfaces — block the whole sections, not just dashboards
+          '/creator/',
+          '/client/',
           '/admin/',
           '/api/',
-          '/(auth)/',
+          '/backend/',
+          // Thin auth-flow pages with no search value (login/signup stay
+          // crawlable — they catch navigational "spectrum connect login" queries)
+          '/oauth-callback',
+          '/oauth-error',
+          '/verify-email',
+          '/reset-password',
+          '/forgot-password',
+          '/onboarding/',
         ],
       },
     ],

@@ -59,21 +59,14 @@ export const metadata: Metadata = {
     title: "Spectrum Connect — Hire Verified Creative Professionals",
     description:
       "The premium creative marketplace with AI-powered matching, milestone escrow, and the lowest fees in the industry — just 12% total, split between creator and client.",
-    images: [
-      {
-        url: `${BASE_URL}/assets/spectrum-logo.svg`,
-        width: 1200,
-        height: 630,
-        alt: "Spectrum Connect — Creative Marketplace",
-      },
-    ],
+    // og:image comes from app/opengraph-image.tsx (real PNG — SVG og images
+    // are ignored by Google and every major social scraper).
   },
   twitter: {
     card: "summary_large_image",
     title: "Spectrum Connect — Hire Verified Creative Professionals",
     description:
       "AI-powered creative marketplace. Verified creators. Milestone escrow. Just 12% total fee — half of Fiverr.",
-    images: [`${BASE_URL}/assets/spectrum-logo.svg`],
     creator: "@spectrumconect",
     site: "@spectrumconect",
   },
@@ -94,10 +87,23 @@ const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Spectrum Connect",
+  // Help Google associate brand-name variants (incl. the domain spelling)
+  // with this single entity.
+  alternateName: ["SpectrumConnect", "Spectrum Conect", "Spectrum Connect Marketplace"],
+  legalName: "Spectrum Connect",
+  slogan: "Find trusted creators. Build amazing teams. Work better together.",
   url: BASE_URL,
   logo: `${BASE_URL}/assets/spectrum-logo.svg`,
   description:
     "Spectrum Connect is a premium creative marketplace connecting clients with verified creative professionals using AI-powered matching and milestone-based escrow payments.",
+  knowsAbout: [
+    "creative marketplace",
+    "freelance hiring",
+    "escrow payments",
+    "AI creator matching",
+    "video production",
+    "graphic design",
+  ],
   foundingDate: "2024",
   founders: [
     { "@type": "Person", name: "Jamie Rivera", jobTitle: "Co-founder & CEO" },
@@ -122,6 +128,7 @@ const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "Spectrum Connect",
+  alternateName: "SpectrumConnect",
   url: BASE_URL,
   potentialAction: {
     "@type": "SearchAction",
