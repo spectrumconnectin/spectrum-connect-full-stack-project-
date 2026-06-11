@@ -161,83 +161,89 @@ def _raw_user_summary(doc: dict) -> dict:
 
 @router.get("/stats", summary="Platform-wide metrics")
 async def get_platform_stats(admin: User = Depends(get_admin_user)):
-    """Return headline metrics for the admin dashboard."""
+    """Return headline metrics for the admin dashboard.
+
+    The three stat groups (users / financial / ETF) hit independent
+    collections, so they run concurrently — total latency is the slowest
+    group, not the sum of all of them.
+    """
     from app.models.etf_points import EtfPoints
     import asyncio as _aio
-    try:
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        from bson import ObjectId as _BsonOID
-        cutoff_id = _BsonOID.from_datetime(thirty_days_ago)
-        # Use motor directly so all users are counted regardless of Beanie validation
-        _ucol2 = User.get_motor_collection()
-        (
-            total_users, creators, clients, admins, verified, suspended, new_users_30d,
-        ) = await _aio.gather(
-            _ucol2.count_documents({}),
-            _ucol2.count_documents({"account_type": {"$in": ["crew", "both"]}}),
-            _ucol2.count_documents({"account_type": {"$in": ["producer", "both"]}}),
-            _ucol2.count_documents({"user_role": {"$in": ["admin", "moderator"]}}),
-            _ucol2.count_documents({"is_verified": True}),
-            _ucol2.count_documents({"is_active": False}),
-            _ucol2.count_documents({"_id": {"$gte": cutoff_id}}),
-        )
-    except Exception:
-        total_users = creators = clients = admins = verified = suspended = new_users_30d = 0
 
-    # Financial stats — use MongoDB aggregation pipeline to sum amounts server-side.
-    try:
-        from app.models.schema import Transaction as TxModel
-        from app.models.escrow import Escrow as EscrowModel
+    async def _user_counts():
+        try:
+            thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+            from bson import ObjectId as _BsonOID
+            cutoff_id = _BsonOID.from_datetime(thirty_days_ago)
+            # Use motor directly so all users are counted regardless of Beanie validation
+            _ucol2 = User.get_motor_collection()
+            return await _aio.gather(
+                _ucol2.count_documents({}),
+                _ucol2.count_documents({"account_type": {"$in": ["crew", "both"]}}),
+                _ucol2.count_documents({"account_type": {"$in": ["producer", "both"]}}),
+                _ucol2.count_documents({"user_role": {"$in": ["admin", "moderator"]}}),
+                _ucol2.count_documents({"is_verified": True}),
+                _ucol2.count_documents({"is_active": False}),
+                _ucol2.count_documents({"_id": {"$gte": cutoff_id}}),
+            )
+        except Exception:
+            return (0, 0, 0, 0, 0, 0, 0)
 
-        # Aggregate sums in one round-trip instead of loading all transactions
-        pipeline = [
-            {"$match": {"status": "completed"}},
-            {"$group": {
-                "_id": None,
-                "total_volume":    {"$sum": "$amount"},
-                "total_fees":      {"$sum": "$platform_fee"},
-                "client_fee_usd":  {"$sum": "$client_fee"},
-                "creator_fee_usd": {"$sum": "$creator_fee"},
-            }},
-        ]
-        agg_result = await TxModel.get_pymongo_collection().aggregate(pipeline).to_list(None)
-        if agg_result:
-            total_volume    = round(agg_result[0].get("total_volume",    0), 2)
-            total_fees      = round(agg_result[0].get("total_fees",      0), 2)
-            client_fee_usd  = round(agg_result[0].get("client_fee_usd",  0), 2)
-            creator_fee_usd = round(agg_result[0].get("creator_fee_usd", 0), 2)
-        else:
-            total_volume = total_fees = client_fee_usd = creator_fee_usd = 0.0
+    async def _financials():
+        try:
+            from app.models.schema import Transaction as TxModel
+            from app.models.escrow import Escrow as EscrowModel
+            pipeline = [
+                {"$match": {"status": "completed"}},
+                {"$group": {
+                    "_id": None,
+                    "total_volume":    {"$sum": "$amount"},
+                    "total_fees":      {"$sum": "$platform_fee"},
+                    "client_fee_usd":  {"$sum": "$client_fee"},
+                    "creator_fee_usd": {"$sum": "$creator_fee"},
+                }},
+            ]
+            agg_task = TxModel.get_pymongo_collection().aggregate(pipeline).to_list(None)
+            agg_result, active_e, completed_e, disputed_e = await _aio.gather(
+                agg_task,
+                EscrowModel.find({"status": {"$in": ["active", "funded", "in_progress"]}}).count(),
+                EscrowModel.find({"status": "completed"}).count(),
+                EscrowModel.find({"status": "disputed"}).count(),
+            )
+            if agg_result:
+                r = agg_result[0]
+                return (
+                    round(r.get("total_volume", 0), 2), round(r.get("total_fees", 0), 2),
+                    round(r.get("client_fee_usd", 0), 2), round(r.get("creator_fee_usd", 0), 2),
+                    active_e, completed_e, disputed_e,
+                )
+            return (0.0, 0.0, 0.0, 0.0, active_e, completed_e, disputed_e)
+        except Exception:
+            return (0.0, 0.0, 0.0, 0.0, 0, 0, 0)
 
-        # Escrow status counts
-        active_escrow, completed_escrow, disputed_escrow = await _aio.gather(
-            EscrowModel.find({"status": {"$in": ["active", "funded", "in_progress"]}}).count(),
-            EscrowModel.find({"status": "completed"}).count(),
-            EscrowModel.find({"status": "disputed"}).count(),
-        )
-    except Exception:
-        total_volume = active_escrow = completed_escrow = disputed_escrow = 0
-        total_fees = client_fee_usd = creator_fee_usd = 0
+    async def _etf_stats():
+        try:
+            etf_pipeline = [
+                {"$group": {
+                    "_id": None,
+                    "total_lifetime": {"$sum": "$lifetime_points"},
+                    "platinum_users": {"$sum": {"$cond": [{"$eq": ["$level", "platinum"]}, 1, 0]}},
+                    "gold_users":     {"$sum": {"$cond": [{"$eq": ["$level", "gold"]},     1, 0]}},
+                }}
+            ]
+            etf_result = await EtfPoints.get_pymongo_collection().aggregate(etf_pipeline).to_list(None)
+            if etf_result:
+                r = etf_result[0]
+                return (int(r.get("total_lifetime", 0)), int(r.get("platinum_users", 0)), int(r.get("gold_users", 0)))
+            return (0, 0, 0)
+        except Exception:
+            return (0, 0, 0)
 
-    # ETF stats — aggregate in DB
-    try:
-        etf_pipeline = [
-            {"$group": {
-                "_id": None,
-                "total_lifetime": {"$sum": "$lifetime_points"},
-                "platinum_users": {"$sum": {"$cond": [{"$eq": ["$level", "platinum"]}, 1, 0]}},
-                "gold_users":     {"$sum": {"$cond": [{"$eq": ["$level", "gold"]},     1, 0]}},
-            }}
-        ]
-        etf_result = await EtfPoints.get_pymongo_collection().aggregate(etf_pipeline).to_list(None)
-        if etf_result:
-            total_points_awarded = int(etf_result[0].get("total_lifetime", 0))
-            platinum_users       = int(etf_result[0].get("platinum_users", 0))
-            gold_users           = int(etf_result[0].get("gold_users",     0))
-        else:
-            total_points_awarded = platinum_users = gold_users = 0
-    except Exception:
-        total_points_awarded = platinum_users = gold_users = 0
+    user_res, fin_res, etf_res = await _aio.gather(_user_counts(), _financials(), _etf_stats())
+    total_users, creators, clients, admins, verified, suspended, new_users_30d = user_res
+    (total_volume, total_fees, client_fee_usd, creator_fee_usd,
+     active_escrow, completed_escrow, disputed_escrow) = fin_res
+    total_points_awarded, platinum_users, gold_users = etf_res
 
     return {
         "users": {
@@ -2016,4 +2022,87 @@ async def send_broadcast(
         "target_segment":  body.target_segment,
         "recipient_count": recipient_count,
         "message":         f"Broadcast sent to {recipient_count} users.",
+    }
+
+
+# ── Danger Zone: full platform data wipe ─────────────────────────────────────
+
+class WipeDataBody(BaseModel):
+    password: str          # acting admin re-enters their password
+    confirmation: str      # must equal _WIPE_PHRASE
+
+
+# Collections that survive a wipe: admin/moderator accounts live in `users`
+# (filtered below), platform configuration, and the audit trail (so the wipe
+# itself stays on record). Everything else is operational/user data.
+_WIPE_PRESERVE = {"users", "platform_settings", "audit_logs"}
+_WIPE_PHRASE = "WIPE ALL DATA"
+
+
+@router.post("/wipe-data", summary="DANGER: erase all platform data except admin accounts")
+async def wipe_all_data(body: WipeDataBody, admin: User = Depends(get_superadmin_user)):
+    """
+    Irreversibly delete every document in every collection EXCEPT:
+      - admin/moderator accounts in `users`
+      - platform_settings
+      - audit_logs (this wipe is recorded there)
+
+    Requires a full admin (moderators are blocked by get_superadmin_user) and
+    re-entry of that admin's password. Intended for clearing test data before
+    going live.
+    """
+    from app.auth.auth import verify_password
+    from app.services.audit_service import log_event
+
+    # Belt-and-suspenders: the UI also sends the typed confirmation phrase.
+    if body.confirmation.strip() != _WIPE_PHRASE:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Confirmation phrase must be exactly "{_WIPE_PHRASE}".',
+        )
+
+    # Verify the acting admin's password before doing anything destructive.
+    if not admin.password_hash or not verify_password(body.password, admin.password_hash):
+        raise HTTPException(status_code=403, detail="Incorrect password.")
+
+    db = User.get_motor_collection().database
+    deleted: dict = {}
+
+    # 1) Wipe every non-preserved collection wholesale.
+    for name in await db.list_collection_names():
+        if name in _WIPE_PRESERVE or name.startswith("system."):
+            continue
+        try:
+            res = await db[name].delete_many({})
+            if res.deleted_count:
+                deleted[name] = res.deleted_count
+        except Exception:
+            pass
+
+    # 2) In `users`, delete everyone who is NOT an admin/moderator.
+    try:
+        res = await db["users"].delete_many({"user_role": {"$nin": ["admin", "moderator"]}})
+        if res.deleted_count:
+            deleted["users"] = res.deleted_count
+    except Exception:
+        pass
+
+    total = sum(deleted.values())
+
+    await log_event(
+        "admin.data.wiped",
+        actor=admin,
+        metadata={"collections": deleted, "total_documents": total},
+        severity="critical",
+    )
+
+    return {
+        "success": True,
+        "total_documents_deleted": total,
+        "collections": deleted,
+        "preserved": sorted(_WIPE_PRESERVE),
+        "message": (
+            f"Wiped {total} documents across {len(deleted)} collection(s). "
+            "Admin accounts and platform settings were preserved."
+        ),
     }
