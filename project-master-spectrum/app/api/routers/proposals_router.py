@@ -611,10 +611,15 @@ async def rate_proposal(
         old_rating = (creator.profile.rating       if creator.profile else None) or 0.0
         new_count  = old_count + 1
         new_rating = round((old_rating * old_count + overall) / new_count, 2)
-        # Write to user.profile.rating (where the field is defined)
+        # Write to user.profile.rating (where the field is defined) AND the
+        # top-level User.rating / review_count, which the talent-search cards
+        # read. Keeping both in sync prevents the headline rating from showing
+        # on the profile but missing in search results.
         await creator.update({"$set": {
             "profile.rating": new_rating,
             "profile.review_count": new_count,
+            "rating": new_rating,
+            "review_count": new_count,
         }})
         # Sync to CrewProfile.rating so Smart Connect ranking is accurate
         try:

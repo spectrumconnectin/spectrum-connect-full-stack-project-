@@ -245,6 +245,32 @@ class ProfileService:
 
             public_data["profile"] = profile_data
 
+        # ── Reviews: derive the rating aggregate from actual review records ──
+        # Self-healing: the headline rating/review_count are computed from the
+        # client_rating documents that actually exist, so a creator's reviews
+        # always show even if the cached profile.rating was never updated when
+        # the review was written (older reviews, or a write that didn't land).
+        derived_rating = None
+        derived_review_count = 0
+        try:
+            from app.models.schema import Application
+            reviewed = await Application.find(
+                {"crew_id": user.id, "client_rating": {"$ne": None}}
+            ).to_list()
+            derived_review_count = len(reviewed)
+            if derived_review_count:
+                total = sum(float((a.client_rating or {}).get("overall", 0) or 0) for a in reviewed)
+                derived_rating = round(total / derived_review_count, 2)
+        except Exception:
+            pass
+
+        stored_rating = user.profile.rating if user.profile else None
+        stored_count = (user.profile.review_count if user.profile else None) or 0
+        final_rating = derived_rating if derived_review_count else stored_rating
+        final_count = derived_review_count if derived_review_count else stored_count
+        public_data["rating"] = final_rating
+        public_data["review_count"] = final_count
+
         # ── Compute live stats — batch query, no N+1 ─────────────────────────
         active_projects_count = 0
         projects_completed_count = 0
@@ -283,6 +309,11 @@ class ProfileService:
         except Exception:
             pass
 
+        # Every reviewed project is, by definition, a completed one — so the
+        # completed count can never be lower than the number of reviews. This
+        # fixes "Completed: 0" on creators who clearly finished reviewed work.
+        projects_completed_count = max(projects_completed_count, derived_review_count)
+
         # Override completed_projects in public_data with live value
         public_data["completed_projects"] = projects_completed_count
 
@@ -294,7 +325,7 @@ class ProfileService:
             "response_time": (user.stats.response_time if user.stats else None) or 0,
             "profile_views": (user.stats.profile_views if user.stats else None) or 0,
             "total_connections": (user.stats.total_connections if user.stats else None) or 0,
-            "client_satisfaction": round((getattr(user, "rating", 0) or 0) * 20, 1),
+            "client_satisfaction": round((final_rating or 0) * 20, 1),
         }
 
         # Show earnings only if user allows
