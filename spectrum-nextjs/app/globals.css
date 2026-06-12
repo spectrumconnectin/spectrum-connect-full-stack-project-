@@ -90,7 +90,7 @@ body {
 .card { width: 100%; max-width: 460px; background: #fff; border-radius: 12px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06); padding: 36px 36px 32px 36px; }
 .card h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 6px 0; color: #111827; }
 .card .lede { font-size: 14px; color: #6b7280; margin: 0 0 22px 0; line-height: 1.5; }
-.social { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.social { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 18px; }
 .btn-social { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #111827; font: 500 14px/1 var(--font-inter, 'Inter'), sans-serif; cursor: pointer; transition: background 120ms ease, border-color 120ms ease, transform 60ms ease; }
 .btn-social:hover { background: #f9fafb; border-color: #d1d5db; }
 .btn-social:active { transform: translateY(1px); }
