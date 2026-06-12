@@ -1169,6 +1169,11 @@ class Notification(Document):
             "is_read",
             "type",
             "expires_at",
+            # Recent-notifications-for-a-user query: filter by user_id, sort by _id desc.
+            # Compound index lets Mongo serve it index-only with no in-memory sort.
+            [("user_id", 1), ("_id", -1)],
+            # Unread-count badge query: filter by user_id + is_read.
+            [("user_id", 1), ("is_read", 1)],
         ]
 
 # ============================================================================

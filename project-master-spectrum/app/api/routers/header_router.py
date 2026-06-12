@@ -44,11 +44,20 @@ async def get_notifications(
 ) -> Dict[str, Any]:
     """Get recent notifications for the current user."""
     try:
-        notifications = await Notification.find(
-            Notification.user_id == current_user.id
-        ).sort(-Notification.id).limit(limit).to_list()
-
-        unread_count = sum(1 for n in notifications if not n.is_read)
+        import asyncio
+        # Run the page fetch and the true unread count concurrently — both are
+        # index-served. Counting only the fetched page (the old approach)
+        # under-reported the badge whenever unread > limit, and the badge poll
+        # uses limit=1, which made it almost always wrong.
+        notifications, unread_count = await asyncio.gather(
+            Notification.find(
+                Notification.user_id == current_user.id
+            ).sort(-Notification.id).limit(limit).to_list(),
+            Notification.find(
+                Notification.user_id == current_user.id,
+                Notification.is_read == False,  # noqa: E712 (Beanie needs ==)
+            ).count(),
+        )
 
         items = []
         for n in notifications:

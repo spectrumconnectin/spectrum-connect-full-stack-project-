@@ -37,8 +37,8 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
-  const [prevUnread, setPrevUnread] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -52,45 +52,37 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Fetch the full notification list
+  // Fetch the full notification list. Stale-while-revalidate: keep showing
+  // whatever's already in `items` and refresh in the background, so opening
+  // the dropdown is instant after the first load. The spinner only shows
+  // while there's genuinely nothing cached to display yet.
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const res = await notifApi.getAll(20);
       setItems(res.notifications);
       setUnread(res.unread_count);
-      setPrevUnread(res.unread_count);
+      setLoadedOnce(true);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
 
-  // Poll unread count every 15s — re-fetch full list if new unread arrived
+  // Prefetch the full list once on mount so the very first open is instant,
+  // then poll the unread badge cheaply every 15s.
   useEffect(() => {
+    fetchNotifications();
     const poll = async () => {
       try {
         const res = await notifApi.getAll(1);
-        const newCount = res.unread_count;
-        setUnread(newCount);
-        // If new notifications arrived since last fetch, invalidate the list
-        if (newCount > prevUnread) {
-          setPrevUnread(newCount);
-          // If dropdown is open, refresh immediately; otherwise mark stale
-          if (open) {
-            fetchNotifications();
-          } else {
-            // Will re-fetch next time dropdown opens
-            setItems([]);
-          }
-        }
+        setUnread(res.unread_count);
       } catch { /* silent */ }
     };
-    poll(); // initial load
-    const t = setInterval(poll, 15000); // poll every 15s
+    const t = setInterval(poll, 15000);
     return () => clearInterval(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, prevUnread]);
+  }, []);
 
-  // When dropdown opens, always fetch fresh data
+  // Opening shows cached items immediately and revalidates in the background.
   const handleOpen = () => {
     const next = !open;
     setOpen(next);
@@ -102,7 +94,6 @@ export default function NotificationBell() {
       await notifApi.markAllRead();
       setItems(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnread(0);
-      setPrevUnread(0);
     } catch { /* silent */ }
   };
 
@@ -153,7 +144,7 @@ export default function NotificationBell() {
 
           {/* Body */}
           <div className="max-h-[420px] overflow-y-auto">
-            {loading ? (
+            {loading && !loadedOnce ? (
               <div className="flex justify-center py-10">
                 <div className="w-6 h-6 border-2 border-cobalt border-t-transparent rounded-full animate-spin" />
               </div>
