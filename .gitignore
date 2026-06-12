@@ -49,3 +49,5 @@ tsconfig.tsbuildinfo
 backup-repo.git/
 *.bak
 *.swp
+scripts/seed_creators_created.json
+project-master-spectrum/scripts/seed_creators_created.json
