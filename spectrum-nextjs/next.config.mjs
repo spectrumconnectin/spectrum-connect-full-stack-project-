@@ -30,6 +30,8 @@ const nextConfig = {
       'ui-avatars.com',                // Fallback initials avatars
       'uxpilot-auth.appspot.com',      // Demo/placeholder avatars
       'lh3.googleusercontent.com',     // Google OAuth profile pictures
+      'randomuser.me',                 // Realistic portrait avatars (seed creators)
+      'images.unsplash.com',           // Portfolio sample imagery (seed creators)
     ],
   },
   // Don't broadcast the framework version in the X-Powered-By header.
