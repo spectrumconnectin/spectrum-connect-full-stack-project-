@@ -21,8 +21,10 @@ from app.core.rate_limit import rate_limiter
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# In‑memory store mapping OAuth "state" values to issued JWTs.
-oauth_state_tokens: Dict[str, str] = {}
+# OAuth CSRF state tokens and post-callback exchange codes are persisted in
+# MongoDB (app.models.oauth_state.OAuthState) rather than a per-process dict,
+# so they're shared across all workers and survive redeploys. See that model
+# for why the in-memory approach caused intermittent invalid_state errors.
 
 # In-memory OTP store: email -> {otp, expires_at, attempts}
 # NOTE: in-memory; only works for single-process deployments. For multi-instance
@@ -148,9 +150,11 @@ async def google_login():
     """
     from urllib.parse import urlencode
 
-    # Generate a cryptographically secure state token and store it server-side.
+    # Generate a cryptographically secure state token and persist it (shared
+    # across workers via MongoDB; auto-expires via TTL index).
+    from app.models.oauth_state import OAuthState
     state_token = secrets.token_urlsafe(32)
-    oauth_state_tokens[state_token] = True   # dict keyed by token; value is sentinel
+    await OAuthState(key=state_token, value="1").insert()
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -361,12 +365,16 @@ async def google_callback(code: str, state: str | None = None):
     - Sets httpOnly cookies for auth_token and user_role
     - Also includes token in URL for backward compatibility
     """
-    # Validate state to prevent CSRF
-    if not state or state not in oauth_state_tokens:
+    # Validate state to prevent CSRF. The token was persisted at /google_login;
+    # consume it one-time. find_one + delete is atomic enough here because the
+    # token is a 256-bit secret used exactly once.
+    from app.models.oauth_state import OAuthState
+    state_doc = await OAuthState.find_one(OAuthState.key == state) if state else None
+    if not state_doc:
         logger.warning("OAuth callback rejected: invalid or missing state token")
         return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error?reason=invalid_state")
     # Consume the state token — one-time use only.
-    oauth_state_tokens.pop(state, None)
+    await state_doc.delete()
 
     try:
         import httpx
@@ -438,7 +446,7 @@ async def google_callback(code: str, state: str | None = None):
         # code so the JWT is NEVER placed in the redirect URL (which would
         # expose it in access logs, browser history, and Referer headers).
         exchange_code = secrets.token_urlsafe(32)
-        oauth_state_tokens[f"exchange:{exchange_code}"] = jwt_token
+        await OAuthState(key=f"exchange:{exchange_code}", value=jwt_token).insert()
 
         # Redirect with only the opaque exchange code — no JWT in the URL.
         redirect_url = f"{settings.FRONTEND_URL}/oauth-callback?code={exchange_code}"
@@ -488,13 +496,17 @@ async def get_oauth_token(code: str):
     The code is single-use and expires from the in-memory store after retrieval.
     This prevents the JWT from ever appearing in a redirect URL / browser history.
     """
+    from app.models.oauth_state import OAuthState
     exchange_key = f"exchange:{code}"
-    jwt_token = oauth_state_tokens.pop(exchange_key, None)
-    if not jwt_token:
+    exchange_doc = await OAuthState.find_one(OAuthState.key == exchange_key)
+    if not exchange_doc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired exchange code.",
         )
+    jwt_token = exchange_doc.value
+    # Single-use: delete after retrieval.
+    await exchange_doc.delete()
     return {"access_token": jwt_token, "token_type": "bearer"}
 
 @router.get("/verify-email", summary="Verify email address")

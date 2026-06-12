@@ -26,6 +26,7 @@ from app.models.community import (
 )
 from app.models.etf import ETFVault, ETFContribution, ETFLedger
 from app.models.etf_points import EtfPoints, EtfEvent
+from app.models.oauth_state import OAuthState
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
@@ -232,6 +233,7 @@ async def startup_db_client():
                 PlatformSettings,
                 BroadcastNotification,
                 SmartConnectHistory,
+                OAuthState,
             ],
         )
         logger.info("Beanie initialized successfully — all models registered")
