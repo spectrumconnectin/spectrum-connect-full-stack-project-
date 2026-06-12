@@ -32,6 +32,34 @@ async def _get_etf_levels_bulk(user_ids) -> dict:
         return {}
 
 
+async def _get_review_aggregates_bulk(user_ids) -> dict:
+    """Rating + review count for many creators in one aggregation.
+
+    Derived from the actual client_rating records on applications, so search
+    cards always reflect real reviews even when a creator's cached aggregate
+    fields were never updated. Returns {user_id_str: {"rating", "count"}}.
+    """
+    try:
+        from app.models.schema import Application
+        from bson import ObjectId
+        oids = [ObjectId(str(u)) for u in user_ids]
+        col = Application.get_motor_collection()
+        pipeline = [
+            {"$match": {"crew_id": {"$in": oids}, "client_rating": {"$ne": None}}},
+            {"$group": {
+                "_id": "$crew_id",
+                "count": {"$sum": 1},
+                "avg": {"$avg": "$client_rating.overall"},
+            }},
+        ]
+        out = {}
+        async for d in col.aggregate(pipeline):
+            out[str(d["_id"])] = {"rating": round(d.get("avg") or 0, 2), "count": int(d.get("count") or 0)}
+        return out
+    except Exception:
+        return {}
+
+
 def _pget(obj, attr, default=None):
     """Safely get an attribute from either a Pydantic model or a dict."""
     if obj is None:
@@ -53,14 +81,16 @@ async def search_talent(
     # ETF levels + presence for the whole result set in 2 queries total
     # (was 2 queries per user — 60 round-trips for a 30-result page).
     import asyncio
-    etf_map, presence_map = await asyncio.gather(
+    etf_map, presence_map, review_map = await asyncio.gather(
         _get_etf_levels_bulk([u.id for u in results]),
         PresenceService.get_presence_bulk([u.id for u in results]),
+        _get_review_aggregates_bulk([u.id for u in results]),
     )
     etf_levels = [etf_map.get(str(u.id), "bronze") for u in results]
     presence_data = [presence_map.get(str(u.id), {"is_online": False, "last_activity": None}) for u in results]
 
     def serialize(user, etf_level: str, presence: dict):
+        review_agg = review_map.get(str(user.id))
         profile = user.profile
         stats = user.stats or {}
         stats_get = stats.get if isinstance(stats, dict) else lambda k, d=None: getattr(stats, k, d)
@@ -115,9 +145,13 @@ async def search_talent(
             "skills": skill_names,
             "hourly_rate_min": _pget(profile, "hourly_rate_min"),
             "hourly_rate_max": _pget(profile, "hourly_rate_max"),
-            # rating / review_count are stored directly on User, not user.profile
-            "rating": getattr(user, "rating", None) or stats_get("client_satisfaction") or 0.0,
-            "review_count": getattr(user, "review_count", None) or 0,
+            # Prefer ratings derived live from real review records; fall back to
+            # the cached aggregate on User. Keeps search cards in sync with the
+            # profile even when the stored fields were never updated.
+            "rating": (review_agg["rating"] if review_agg else
+                       (getattr(user, "rating", None) or _pget(profile, "rating") or 0.0)),
+            "review_count": (review_agg["count"] if review_agg else
+                             (getattr(user, "review_count", None) or _pget(profile, "review_count") or 0)),
             # Stage 4 additions
             "etf_level": etf_level if isinstance(etf_level, str) else "bronze",
             # Profile-set availability (busy/available/not_available) — null if not set
