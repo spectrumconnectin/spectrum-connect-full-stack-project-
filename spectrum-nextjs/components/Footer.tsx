@@ -44,6 +44,7 @@ export default function Footer() {
           <h5>Company</h5>
           <ul>
             <li><Link href="/about">About Us</Link></li>
+            <li><Link href="/call-the-ceo">Call the CEO</Link></li>
             <li><Link href="/community">Community</Link></li>
             <li><a href="#">Careers</a></li>
             <li><a href="#">Blog</a></li>

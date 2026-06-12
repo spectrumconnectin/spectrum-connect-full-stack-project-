@@ -1925,3 +1925,25 @@ export const aiChat = {
   send: (messages: Array<{ role: string; content: string }>): Promise<{ response: string }> =>
     request('/ai/chat', { method: 'POST', body: JSON.stringify({ messages }) }),
 };
+
+// ── Call the CEO ──────────────────────────────────────────────────────────────
+
+export interface CeoCallPayload {
+  full_name: string;
+  email: string;
+  company_name?: string;
+  phone?: string;
+  country?: string;
+  subject?: string;
+  purpose: string;
+  message?: string;
+  meeting_type?: string;
+  preferred_date?: string;
+  preferred_time?: string;
+}
+
+export const ceoCalls = {
+  /** Public submission — no auth required. */
+  submit: (payload: CeoCallPayload): Promise<{ success: boolean; id: string; message: string }> =>
+    request('/ceo-calls', { method: 'POST', body: JSON.stringify(payload) }, false),
+};

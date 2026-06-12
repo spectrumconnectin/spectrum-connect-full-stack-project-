@@ -27,6 +27,7 @@ from app.models.community import (
 from app.models.etf import ETFVault, ETFContribution, ETFLedger
 from app.models.etf_points import EtfPoints, EtfEvent
 from app.models.oauth_state import OAuthState
+from app.models.ceo_call import CeoCallRequest
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
 from app.models.skill_challenge import SkillChallenge, ChallengeSubmission, SkillBadge
@@ -40,6 +41,7 @@ from app.api.routers.client_dashboard import router as client_dashboard_router
 from app.api.routers.account_router import router as account_router
 from app.api.routers.blog_router import router as blog_router
 from app.api.routers.contact_router import router as contact_router
+from app.api.routers.ceo_router import router as ceo_router
 from app.api.routers.smart_connect_router import router as smart_connect_router
 from app.api.routes.messages import router as messages_router
 from app.api.routers.profile_router import router as profile_router
@@ -170,6 +172,7 @@ app.include_router(community_router, tags=["Community"])
 app.include_router(talent_router, tags=["Talent"])
 app.include_router(blog_router, tags=["Blog"])
 app.include_router(contact_router, tags=["Contact"])
+app.include_router(ceo_router, tags=["Call the CEO"])
 app.include_router(header_router, tags=["Header"])
 app.include_router(ai_router, tags=["AI Assistant"])
 app.include_router(service_router, prefix="/services", tags=["Services"])
@@ -234,6 +237,7 @@ async def startup_db_client():
                 BroadcastNotification,
                 SmartConnectHistory,
                 OAuthState,
+                CeoCallRequest,
             ],
         )
         logger.info("Beanie initialized successfully — all models registered")
