@@ -247,6 +247,19 @@ async def register_user(
     )
     await user_db.insert()
 
+    # Activity log
+    try:
+        from app.services.audit_service import log_event
+        await log_event(
+            "user.signup",
+            actor=user_db,
+            target_type="user",
+            target_id=str(user_db.id),
+            metadata={"account_type": user_db.account_type, "username": user_db.username},
+        )
+    except Exception:
+        pass
+
     # Generate OTP and store it (cryptographically secure RNG)
     otp = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = datetime.utcnow() + timedelta(minutes=10)

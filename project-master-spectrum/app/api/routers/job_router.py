@@ -89,6 +89,17 @@ async def create_job_post(
     ```
     """
     job = await JobService.create_job_post(current_user, job_data)
+    try:
+        from app.services.audit_service import log_event
+        await log_event(
+            "job.posted",
+            actor=current_user,
+            target_type="job",
+            target_id=str(job.id),
+            metadata={"title": job.title, "department": getattr(job, "department", None)},
+        )
+    except Exception:
+        pass
     return job_to_dict(job)
 
 

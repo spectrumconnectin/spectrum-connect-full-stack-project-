@@ -94,6 +94,19 @@ async def submit_proposal(
     )
     await app.insert()
 
+    # Activity log
+    try:
+        from app.services.audit_service import log_event
+        await log_event(
+            "application.submitted",
+            actor=current_user,
+            target_type="job",
+            target_id=str(job.id),
+            metadata={"job_title": job.title, "application_id": str(app.id), "role": data.role},
+        )
+    except Exception:
+        pass
+
     # Atomically increment proposal count to avoid race conditions under high load.
     # Also flip status to in_review if the job is still open.
     await job.update({"$inc": {"proposal_count": 1}})
@@ -632,6 +645,19 @@ async def rate_proposal(
                 await cp.save()
         except Exception:
             pass
+
+    # Activity log
+    try:
+        from app.services.audit_service import log_event
+        await log_event(
+            "review.submitted",
+            actor=current_user,
+            target_type="user",
+            target_id=str(app.crew_id),
+            metadata={"job_title": job.title, "overall": overall},
+        )
+    except Exception:
+        pass
 
     # Notify creator they received a review
     try:
