@@ -242,6 +242,22 @@ class DisputeService:
         if not escrow:
             raise HTTPException(status_code=404, detail="Escrow not found.")
 
+        # ── Atomic claim against concurrent double-resolution ─────────────────
+        # Two admins resolving simultaneously must not both move escrow funds.
+        # Flip the dispute to a transient 'resolving' state; if it no longer
+        # matches an open/under_review dispute, someone else already claimed it.
+        # Done AFTER escrow validation so a missing escrow can't strand the
+        # dispute in the transient state.
+        claim = await dispute.get_motor_collection().find_one_and_update(
+            {"_id": dispute.id, "status": {"$in": ["open", "under_review"]}},
+            {"$set": {"status": "resolving"}},
+        )
+        if claim is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This dispute is already being resolved or has been resolved.",
+            )
+
         now = datetime.utcnow()
 
         # Find the disputed milestone amount
@@ -258,25 +274,36 @@ class DisputeService:
                 if m.status in {"funded", "disputed"}
             )
 
+        # Resolution applies only to the disputed milestone when one is named;
+        # otherwise it applies to all funded/disputed milestones on the escrow.
+        target_mid = dispute.milestone_id
+
+        # Validate the split amount up front so a bad request doesn't leave the
+        # dispute stuck in the transient 'resolving' state.
+        if resolution_type in {"partial_refund", "split"} and resolution_amount is None:
+            # Release the claim before erroring out.
+            await dispute.get_motor_collection().update_one(
+                {"_id": dispute.id}, {"$set": {"status": "under_review"}}
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="resolution_amount is required for partial_refund or split.",
+            )
+
         # Execute resolution
         if resolution_type == "full_refund":
-            await DisputeService._apply_full_refund(escrow, dispute, now)
+            await DisputeService._apply_full_refund(escrow, dispute, now, target_mid)
             actual_resolution_amount = disputed_amount
             new_dispute_status = "resolved_client_favor"
 
         elif resolution_type == "release_to_creator":
-            await DisputeService._apply_release_to_creator(escrow, dispute, now)
+            await DisputeService._apply_release_to_creator(escrow, dispute, now, target_mid)
             actual_resolution_amount = disputed_amount
             new_dispute_status = "resolved_creator_favor"
 
         elif resolution_type in {"partial_refund", "split"}:
-            if resolution_amount is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="resolution_amount is required for partial_refund or split.",
-                )
             await DisputeService._apply_split(
-                escrow, dispute, resolution_amount, disputed_amount, now
+                escrow, dispute, resolution_amount, disputed_amount, now, target_mid
             )
             actual_resolution_amount = resolution_amount
             new_dispute_status = "resolved_client_favor"  # partial win for client
@@ -307,30 +334,48 @@ class DisputeService:
     # ── Resolution helpers ────────────────────────────────────────────────
 
     @staticmethod
+    def _in_scope(m, target_mid: Optional[str]) -> bool:
+        """A milestone is in scope for resolution when it is funded/disputed
+        AND (no specific milestone was named OR it is the named one)."""
+        if m.status not in {"disputed", "funded"}:
+            return False
+        return target_mid is None or m.milestone_id == target_mid
+
+    @staticmethod
     async def _apply_full_refund(
-        escrow: Escrow, dispute: Dispute, now: datetime
+        escrow: Escrow, dispute: Dispute, now: datetime,
+        target_mid: Optional[str] = None,
     ):
-        """Refund all disputed/funded milestones to client."""
+        """Refund the in-scope disputed/funded milestone(s) to client."""
         for m in escrow.milestones:
-            if m.status in {"disputed", "funded"}:
+            if DisputeService._in_scope(m, target_mid):
                 m.status = "refunded"
                 m.refunded_at = now
                 escrow.refunded_amount = round(escrow.refunded_amount + m.amount, 2)
 
-        escrow.status = "refunded"
+        # Close the escrow only when nothing fundable/disputed remains.
+        remaining = any(m.status in {"funded", "disputed"} for m in escrow.milestones)
+        if not remaining:
+            all_terminal = all(
+                m.status in {"released", "refunded"} for m in escrow.milestones
+            )
+            escrow.status = "refunded" if all_terminal else "active"
+        else:
+            escrow.status = "active"
         escrow.updated_at = now
         await escrow.save()
 
     @staticmethod
     async def _apply_release_to_creator(
-        escrow: Escrow, dispute: Dispute, now: datetime
+        escrow: Escrow, dispute: Dispute, now: datetime,
+        target_mid: Optional[str] = None,
     ):
-        """Release disputed milestones to creator despite the dispute."""
+        """Release the in-scope disputed milestone(s) to creator despite the dispute."""
         tx_id = str(uuid.uuid4())
         released = 0.0
 
         for m in escrow.milestones:
-            if m.status in {"disputed", "funded"}:
+            if DisputeService._in_scope(m, target_mid):
                 m.status = "released"
                 m.released_at = now
                 m.release_transaction_id = tx_id
@@ -338,6 +383,8 @@ class DisputeService:
 
         escrow.released_amount = round(escrow.released_amount + released, 2)
 
+        # Complete the escrow only when every milestone is terminal; otherwise
+        # keep it active so the remaining funded milestones can proceed.
         all_done = all(
             m.status in {"released", "refunded"} for m in escrow.milestones
         )
@@ -376,13 +423,17 @@ class DisputeService:
         client_amount: float,
         total_disputed: float,
         now: datetime,
+        target_mid: Optional[str] = None,
     ):
         """Split disputed amount: client_amount to client, rest to creator."""
+        # Clamp the client's share to the disputed total so a bad admin input
+        # can't refund more than was in dispute or produce a negative payout.
+        client_amount = max(0.0, min(round(float(client_amount), 2), round(float(total_disputed), 2)))
         creator_amount = round(total_disputed - client_amount, 2)
         tx_id = str(uuid.uuid4())
 
         for m in escrow.milestones:
-            if m.status in {"disputed", "funded"}:
+            if DisputeService._in_scope(m, target_mid):
                 m.status = "released"
                 m.released_at = now
                 m.release_transaction_id = tx_id
@@ -399,11 +450,8 @@ class DisputeService:
         await escrow.save()
 
         if creator_amount > 0:
-            # Apply commission to the creator's portion only — the client
-            # portion is a refund and reverses its share of fees separately
-            # (handled by the caller via _apply_full_refund if needed).
             fees = calc_commission(creator_amount, currency=escrow.currency).to_dict()
-            transaction = Transaction(
+            await Transaction(
                 transaction_id=tx_id,
                 from_user_id=escrow.client_id,
                 to_user_id=escrow.creator_id,
@@ -420,8 +468,7 @@ class DisputeService:
                 initiated_at=now,
                 processed_at=now,
                 completed_at=now,
-            )
-            await transaction.insert()
+            ).insert()
 
     # ------------------------------------------------------------------ #
     # Read                                                                 #

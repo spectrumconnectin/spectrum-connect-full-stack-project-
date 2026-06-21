@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from beanie import Document, PydanticObjectId
+from pymongo import IndexModel, ASCENDING
 import uuid
 
 # ============================================================================
@@ -1092,7 +1093,10 @@ class Transaction(Document):
     class Settings:
         name = "transactions"
         indexes = [
-            "transaction_id",
+            # Unique: a given transaction_id can exist at most once. This is the
+            # last line of defense against duplicate-payment writes — even if a
+            # release path is somehow re-entered, the second insert fails.
+            IndexModel([("transaction_id", ASCENDING)], unique=True, name="uniq_transaction_id"),
             "from_user_id",
             "to_user_id",
             "order_id",

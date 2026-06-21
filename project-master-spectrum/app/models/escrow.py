@@ -94,6 +94,17 @@ class EscrowMilestone(BaseModel):
     # Transaction ID created when released
     release_transaction_id: Optional[str] = None
 
+    # ── Stripe payment linkage (set when funded via the Stripe webhook) ──────────
+    # The PaymentIntent that actually collected the funds, and the real Stripe
+    # processing fee charged on that capture. Persisted so the release-time
+    # Transaction records the true processing cost rather than a re-estimate.
+    stripe_payment_intent: Optional[str] = None
+    stripe_fee: Optional[float] = None
+    # The amount Stripe actually captured for this milestone, in the escrow
+    # currency. Used to verify the client paid the full expected amount before
+    # the milestone is marked funded.
+    amount_paid: Optional[float] = None
+
 
 # ── Escrow Document ───────────────────────────────────────────────────────────
 

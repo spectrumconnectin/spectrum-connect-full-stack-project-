@@ -22,7 +22,7 @@ PATCH /disputes/{dispute_id}/assign  [Admin] – admin self-assigns
 PATCH /disputes/{dispute_id}/resolve [Admin] – admin resolves
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -30,6 +30,8 @@ from app.models.schema import User
 from app.auth.auth import get_current_user, get_admin_user
 from app.services.escrow_service import EscrowService
 from app.services.dispute_service import DisputeService
+from app.services.audit_service import log_event
+from app.core.rate_limit import rate_limiter
 from app.api.schemas.escrow_schemas import (
     # Escrow
     CreateEscrowRequest,
@@ -61,6 +63,7 @@ dispute_router = APIRouter(prefix="/disputes", tags=["Spectrum Guarantee — Dis
 async def create_escrow(
     request: CreateEscrowRequest,
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("escrow_create", limit=30, window_seconds=60)),
 ):
     """
     **Client creates an escrow** for a project with one or more milestones.
@@ -144,7 +147,9 @@ async def get_escrow(
 async def release_milestone(
     escrow_id: str,
     request: ReleaseMilestoneRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("escrow_release", limit=30, window_seconds=60)),
 ):
     """
     **Client approves completed work** and releases milestone funds to the creator.
@@ -159,6 +164,22 @@ async def release_milestone(
         escrow_id=escrow_id,
         milestone_id=request.milestone_id,
         client_id=str(current_user.id),
+    )
+    # Audit trail — financial action.
+    await log_event(
+        "payment.released",
+        actor=current_user,
+        target_type="escrow",
+        target_id=escrow_id,
+        request=http_request,
+        metadata={
+            "milestone_id": request.milestone_id,
+            "amount_released": result.get("amount_released"),
+            "creator_payout": result.get("creator_payout"),
+            "transaction_id": result.get("transaction_id"),
+            "escrow_status": result.get("escrow_status"),
+        },
+        severity="info",
     )
     # Notify creator of released payment + confirm to client + update job status
     try:
@@ -333,7 +354,9 @@ async def release_milestone(
 async def refund_escrow(
     escrow_id: str,
     request: RefundEscrowRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("escrow_refund", limit=20, window_seconds=60)),
 ):
     """
     **Client requests a full refund** — returns all funded-but-unreleased milestone funds.
@@ -347,6 +370,20 @@ async def refund_escrow(
         escrow_id=escrow_id,
         requesting_user_id=str(current_user.id),
         reason=request.reason,
+    )
+    # Audit trail — financial action.
+    await log_event(
+        "payment.refunded",
+        actor=current_user,
+        target_type="escrow",
+        target_id=escrow_id,
+        request=http_request,
+        metadata={
+            "refund_total": result.get("refund_total"),
+            "client_total_refund": result.get("client_total_refund"),
+            "reason": request.reason,
+        },
+        severity="warning",
     )
     return result
 
@@ -527,6 +564,7 @@ async def assign_dispute(
 async def resolve_dispute(
     dispute_id: str,
     request: ResolveDisputeRequest,
+    http_request: Request,
     admin: User = Depends(get_admin_user),
 ):
     """
@@ -549,6 +587,20 @@ async def resolve_dispute(
         resolution_type=request.resolution_type,
         resolution_notes=request.resolution_notes,
         resolution_amount=request.resolution_amount,
+    )
+    # Audit trail — admin moves escrow funds.
+    await log_event(
+        "dispute.resolved",
+        actor=admin,
+        target_type="dispute",
+        target_id=dispute_id,
+        request=http_request,
+        metadata={
+            "resolution_type": request.resolution_type,
+            "resolution_amount": result.get("resolution_amount"),
+            "escrow_status": result.get("escrow_status"),
+        },
+        severity="warning",
     )
     # Notify both parties of the resolution
     try:

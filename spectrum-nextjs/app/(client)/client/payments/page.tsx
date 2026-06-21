@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem, stripeApi } from '@/lib/api';
+import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem, stripeApi, commission, CommissionBreakdown } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -402,6 +402,21 @@ function FundProjectModal({
   const [milestoneTitle, setMilestoneTitle] = useState('Project Payment');
   const [step, setStep] = useState<'setup' | 'redirecting'>('setup');
   const [error, setError] = useState('');
+  const [fees, setFees] = useState<CommissionBreakdown | null>(null);
+
+  // Preview the exact total the client will be charged at Stripe checkout
+  // (subtotal + platform service fee). Mirrors the server-side amount.
+  useEffect(() => {
+    const n = Number(amount);
+    if (!n || n <= 0) { setFees(null); return; }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      commission.preview(n, 'USD')
+        .then(b => { if (!cancelled) setFees(b); })
+        .catch(() => { if (!cancelled) setFees(null); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [amount]);
 
   const handleFund = async () => {
     if (!amount || Number(amount) <= 0) {
@@ -518,6 +533,24 @@ function FundProjectModal({
                   )}
                 </div>
               </div>
+
+              {/* Exact charge breakdown — matches the server-derived Stripe amount */}
+              {fees && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 mt-4 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Milestone subtotal</span>
+                    <span className="font-medium text-gray-700 tabular-nums">${fees.project_subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Platform service fee</span>
+                    <span className="font-medium text-gray-700 tabular-nums">${fees.client_fee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-gray-200 pt-1.5">
+                    <span className="text-sm font-bold text-gray-900">Total charged at checkout</span>
+                    <span className="text-sm font-bold text-cobalt tabular-nums">${fees.client_total.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-blue-50 rounded-xl p-3 mt-4 text-xs text-cobalt">
                 <i className="fa-solid fa-lock mr-2"></i>

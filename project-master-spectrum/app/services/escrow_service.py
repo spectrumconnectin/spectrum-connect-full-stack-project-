@@ -64,6 +64,30 @@ class EscrowService:
                 detail="Creator not found.",
             )
 
+        # A client cannot escrow against themselves.
+        if str(creator_id) == str(client_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot create an escrow with yourself as the creator.",
+            )
+
+        # AUTHORIZATION: if this escrow is tied to a job post, the requesting
+        # user must own that job. Prevents creating escrows against jobs the
+        # user does not control (parameter tampering on job_post_id).
+        if job_post_id:
+            from app.models.schema import JobPost
+            try:
+                job = await JobPost.get(PydanticObjectId(job_post_id))
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid job_post_id.")
+            if not job:
+                raise HTTPException(status_code=404, detail="Job post not found.")
+            if str(job.client_id) != str(client_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You do not own this job post.",
+                )
+
         # Build milestone objects
         milestone_docs = []
         total = 0.0
@@ -115,10 +139,15 @@ class EscrowService:
         client_id: str,
         stripe_payment_intent: Optional[str] = None,
         stripe_fee: Optional[float] = None,
+        amount_paid: Optional[float] = None,
+        expected_cents: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Mark a milestone as funded after Stripe Checkout confirms payment.
         Called exclusively by the Stripe webhook handler.
+
+        The status flip is performed as an atomic claim so duplicate webhook
+        deliveries (Stripe retries) cannot double-increment funded_amount.
         """
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
@@ -146,18 +175,59 @@ class EscrowService:
                 detail=f"Milestone is already '{milestone.status}'. Only pending milestones can be funded.",
             )
 
-        milestone.status = "funded"
-        milestone.funded_at = datetime.utcnow()
-        if stripe_payment_intent:
-            milestone.stripe_payment_intent = stripe_payment_intent
-        if stripe_fee is not None:
-            milestone.stripe_fee = stripe_fee
+        # Defense-in-depth: re-derive the expected charge from the milestone and
+        # confirm it matches what the checkout session was created for. Guards
+        # against a milestone amount being mutated between session creation and
+        # capture.
+        fees = calc_commission(milestone.amount, currency=escrow.currency)
+        expected_from_milestone = int(round(float(fees.to_dict()["client_total"]) * 100))
+        if expected_cents is not None and expected_cents != expected_from_milestone:
+            raise HTTPException(
+                status_code=400,
+                detail="Captured amount does not match the milestone's current price.",
+            )
 
-        escrow.funded_amount = round(
-            escrow.funded_amount + milestone.amount, 2
+        now = datetime.utcnow()
+        coll = escrow.get_motor_collection()
+
+        # ── Atomic claim: pending → funded for THIS milestone only ────────────
+        set_fields = {
+            "milestones.$[m].status": "funded",
+            "milestones.$[m].funded_at": now,
+            "updated_at": now,
+        }
+        if stripe_payment_intent:
+            set_fields["milestones.$[m].stripe_payment_intent"] = stripe_payment_intent
+        if stripe_fee is not None:
+            set_fields["milestones.$[m].stripe_fee"] = stripe_fee
+        if amount_paid is not None:
+            set_fields["milestones.$[m].amount_paid"] = amount_paid
+
+        claimed = await coll.find_one_and_update(
+            {
+                "_id": escrow.id,
+                "status": "active",
+                "milestones": {
+                    "$elemMatch": {"milestone_id": milestone_id, "status": "pending"}
+                },
+            },
+            {
+                "$set": set_fields,
+                "$inc": {"funded_amount": round(float(milestone.amount), 2)},
+            },
+            array_filters=[{"m.milestone_id": milestone_id}],
         )
-        escrow.updated_at = datetime.utcnow()
-        await escrow.save()
+        if claimed is None:
+            # A concurrent/duplicate webhook already funded it.
+            raise HTTPException(
+                status_code=400,
+                detail="Milestone is already funded (duplicate funding prevented).",
+            )
+
+        # Refresh the in-memory copy so the response/ETF block below is accurate.
+        milestone.status = "funded"
+        milestone.funded_at = now
+        escrow.funded_amount = round(escrow.funded_amount + float(milestone.amount), 2)
 
         # ETF Points — client funded a milestone (engagement signal).
         # Blocked when client and creator are the same account (self-job).
@@ -174,12 +244,9 @@ class EscrowService:
         except Exception:
             pass
 
-        # Compute the v1 8/4 commission so the client UI can show what they
-        # were actually charged (subtotal + client_fee). No Transaction is
-        # written at the funding step — funds are only held in escrow here;
-        # the charge transaction is recorded on release.
-        fees = calc_commission(milestone.amount, currency=escrow.currency)
-
+        # `fees` was already computed above for the amount verification. No
+        # Transaction is written at the funding step — funds are only held in
+        # escrow here; the charge transaction is recorded on release.
         return {
             "success": True,
             "escrow_id": escrow_id,
@@ -210,8 +277,17 @@ class EscrowService:
         """
         Client approves completed work and releases milestone funds to creator.
         Creates an immutable Transaction record.
-        Set is_auto_release=True to bypass the client_id ownership check
-        (used by the auto-release background job).
+
+        Concurrency model
+        ------------------
+        All mutations to the escrow document are done via targeted atomic
+        operators (positional arrayFilters + $inc), never a full-document
+        ``save()`` of a possibly-stale in-memory copy. This makes the release
+        safe under concurrent releases of *different* milestones on the same
+        escrow and under the auto-release job racing a manual release.
+
+        Set is_auto_release=True to bypass the client_id ownership check and
+        the manual review gate (used by the auto-release background job).
         """
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
@@ -232,13 +308,13 @@ class EscrowService:
         if not milestone:
             raise HTTPException(status_code=404, detail="Milestone not found.")
 
-        # Allow 'delivered' for auto-release only, 'approved' for manual release.
-        # Funded milestones cannot be released without delivery.
-        allowed_statuses = ("funded", "approved", "delivered")
-        if milestone.status not in allowed_statuses:
+        # A milestone is releasable from funded (client pays early), approved, or
+        # delivered. Disputed/refunded/released/pending are not releasable.
+        releasable_statuses = ("funded", "approved", "delivered")
+        if milestone.status not in releasable_statuses:
             raise HTTPException(
                 status_code=400,
-                detail=f"Milestone must be approved or delivered before release (current: '{milestone.status}').",
+                detail=f"Milestone cannot be released from status '{milestone.status}'.",
             )
 
         # Payment-protection gate: manual releases from 'delivered' state require the
@@ -263,56 +339,56 @@ class EscrowService:
                     ),
                 )
 
-        # If in 'delivered' state, auto-approve before release
-        if milestone.status == "delivered":
-            milestone.status = "approved"
-
         now = datetime.utcnow()
         tx_id = str(uuid.uuid4())
+        amount = float(milestone.amount)
+        coll = escrow.get_motor_collection()
 
-        # ── Idempotency guard against rapid double-click / concurrent requests ──
-        # Atomically flip the milestone status from (approved/delivered) → released.
-        # If another request already changed it to 'released', this update will
-        # match 0 documents and we raise a 409 instead of creating a duplicate
-        # transaction.  We use the raw motor collection for the atomic update.
-        try:
-            from pymongo import ReturnDocument
-            result = await escrow.get_motor_collection().find_one_and_update(
-                {
-                    "_id": escrow.id,
-                    "milestones.milestone_id": milestone_id,
-                    "milestones.status": {"$in": ["approved", "delivered"]},
+        # ── Atomic claim ──────────────────────────────────────────────────────
+        # Flip ONLY this milestone (matched by $elemMatch so milestone_id and
+        # status apply to the SAME array element) from a releasable status to a
+        # transient 'releasing' status. If it no longer matches — because a
+        # concurrent request, the auto-release job, or a previous click already
+        # claimed it — we abort with 409 and never create a duplicate payment.
+        claimed = await coll.find_one_and_update(
+            {
+                "_id": escrow.id,
+                "status": "active",
+                "milestones": {
+                    "$elemMatch": {
+                        "milestone_id": milestone_id,
+                        "status": {"$in": list(releasable_statuses)},
+                    }
                 },
-                {"$set": {"milestones.$.status": "releasing"}},
-                return_document=ReturnDocument.AFTER,
+            },
+            {"$set": {"milestones.$[m].status": "releasing", "updated_at": now}},
+            array_filters=[{"m.milestone_id": milestone_id}],
+        )
+        if claimed is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Milestone is already being released or has already been paid. Duplicate release prevented.",
             )
-            if result is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Milestone is already being released or has already been paid. Duplicate release prevented.",
-                )
-        except HTTPException:
-            raise
-        except ImportError:
-            pass  # pymongo not available in test environment — skip atomic guard
 
         # Apply v1 8/4 commission split — see app/services/commission_service.py.
-        fees = calc_commission(milestone.amount, currency=escrow.currency)
+        fees = calc_commission(amount, currency=escrow.currency)
         fees_dict = fees.to_dict()
 
-        # Create transaction record. `amount` is the gross subtotal; we
-        # also record the full fee breakdown so historical reads are exact
-        # and reproducible under future rate changes (via commission_version).
-        # Use the Stripe fee recorded at funding time; fall back to standard rate
-        stripe_fee = getattr(milestone, "stripe_fee", None) or round(
-            fees_dict["client_total"] * 0.029 + 0.30, 2
-        )
+        # Record the real Stripe processing fee captured at funding time; fall
+        # back to the standard rate only for legacy milestones that pre-date
+        # Stripe linkage.
+        stripe_fee = getattr(milestone, "stripe_fee", None)
+        if stripe_fee is None:
+            stripe_fee = round(fees_dict["client_total"] * 0.029 + 0.30, 2)
+
+        # Create the immutable transaction. The unique index on transaction_id is
+        # the final backstop against duplicate-payment writes.
         transaction = Transaction(
             transaction_id=tx_id,
             from_user_id=escrow.client_id,
             to_user_id=escrow.creator_id,
             type="payment",
-            amount=milestone.amount,
+            amount=amount,
             currency=escrow.currency,
             platform_fee=fees_dict["platform_take"],
             creator_fee=fees_dict["creator_fee"],
@@ -320,32 +396,60 @@ class EscrowService:
             commission_version=fees_dict["commission_version"],
             payment_processing_fee=stripe_fee,
             net_amount=fees_dict["creator_payout"],
+            payment_provider="stripe",
+            external_transaction_id=getattr(milestone, "stripe_payment_intent", None),
             status="completed",
             initiated_at=now,
             processed_at=now,
             completed_at=now,
         )
-        await transaction.insert()
+        try:
+            await transaction.insert()
+        except Exception:
+            # Transaction write failed (e.g. duplicate tx_id) — roll the claim
+            # back so the milestone can be retried, then surface the error.
+            await coll.update_one(
+                {"_id": escrow.id},
+                {"$set": {"milestones.$[m].status": milestone.status}},
+                array_filters=[{"m.milestone_id": milestone_id}],
+            )
+            raise HTTPException(status_code=500, detail="Failed to record payment transaction.")
 
-        # Update milestone
-        milestone.status = "released"
-        milestone.released_at = now
-        milestone.release_transaction_id = tx_id
-
-        # Update escrow totals
-        escrow.released_amount = round(escrow.released_amount + milestone.amount, 2)
-        escrow.updated_at = now
-
-        # Check if all milestones are terminal (released/refunded)
-        all_done = all(
-            m.status in {"released", "refunded"}
-            for m in escrow.milestones
+        # ── Finalize atomically ───────────────────────────────────────────────
+        # Mark released + bump released_amount in one targeted update. No
+        # full-document save, so concurrent releases of sibling milestones can't
+        # clobber each other.
+        await coll.update_one(
+            {"_id": escrow.id},
+            {
+                "$set": {
+                    "milestones.$[m].status": "released",
+                    "milestones.$[m].released_at": now,
+                    "milestones.$[m].release_transaction_id": tx_id,
+                    "milestones.$[m].auto_released": bool(is_auto_release),
+                    "updated_at": now,
+                },
+                "$inc": {"released_amount": round(amount, 2)},
+            },
+            array_filters=[{"m.milestone_id": milestone_id}],
         )
-        if all_done:
-            escrow.status = "completed"
-            escrow.completed_at = now
 
-        await escrow.save()
+        # ── Completion check ──────────────────────────────────────────────────
+        # Re-read the fresh document and, if every milestone is now terminal,
+        # flip the escrow to completed. The status guard makes this idempotent.
+        fresh = await Escrow.get(escrow.id)
+        escrow_status = fresh.status if fresh else "active"
+        if fresh and all(m.status in {"released", "refunded"} for m in fresh.milestones):
+            await coll.update_one(
+                {"_id": escrow.id, "status": "active"},
+                {"$set": {"status": "completed", "completed_at": now}},
+            )
+            escrow_status = "completed"
+
+        # Expose the computed status to the rest of the method via the in-memory
+        # object (used by the ETF bonus block below and the response).
+        escrow.status = escrow_status
+        escrow.released_amount = round((fresh.released_amount if fresh else escrow.released_amount), 2)
 
         # ETF Points — milestone release awards both parties (client for
         # paying on time, creator for delivering). Blocked on self-deal.
@@ -437,9 +541,28 @@ class EscrowService:
                 detail=f"Cannot refund escrow with status '{escrow.status}'.",
             )
 
+        now = datetime.utcnow()
+        coll = escrow.get_motor_collection()
+
+        # ── Atomic claim against concurrent double-refund / refund-vs-release ──
+        # Flip the escrow from a non-terminal state to a transient 'refunding'
+        # status. This blocks concurrent refunds (they no longer match) and
+        # release_milestone (which requires status == 'active').
+        claimed = await coll.find_one_and_update(
+            {"_id": escrow.id, "status": {"$nin": ["completed", "refunded", "cancelled", "refunding"]}},
+            {"$set": {"status": "refunding", "updated_at": now}},
+        )
+        if claimed is None:
+            raise HTTPException(
+                status_code=409,
+                detail="This escrow is already being refunded or is in a terminal state.",
+            )
+
+        # Re-read fresh after claiming so milestone statuses are current.
+        escrow = await Escrow.get(PydanticObjectId(escrow_id))
+
         refund_total = 0.0
         client_fee_refund_total = 0.0
-        now = datetime.utcnow()
 
         for milestone in escrow.milestones:
             if milestone.status == "funded":

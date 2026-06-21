@@ -33,14 +33,20 @@ async def _release_milestone(esc, milestone, reason: str = "auto_release"):
     from beanie import PydanticObjectId
 
     try:
+        # release_milestone performs the release atomically AND sets
+        # milestone.auto_released=True via a targeted update. We must NOT save
+        # the stale `esc` doc here — doing so would clobber the release that
+        # release_milestone just persisted (re-reverting the milestone status
+        # and re-opening it to a second release / double-payment).
         await EscrowService.release_milestone(
             escrow_id=str(esc.id),
             milestone_id=milestone.milestone_id,
             client_id=str(esc.client_id),
             is_auto_release=True,
         )
+        # Keep the in-memory copy consistent for the notifications below.
         milestone.auto_released = True
-        await esc.save()
+        milestone.status = "released"
         logger.info(
             "Auto-released milestone %s on escrow %s (reason: %s)",
             milestone.milestone_id, esc.id, reason,
