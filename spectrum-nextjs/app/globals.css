@@ -1550,3 +1550,107 @@ body { overflow-x: hidden; }
     padding-right: 20px !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PREMIUM NATIVE-FEEL LAYER
+   Cross-cutting polish that makes the responsive app feel like a native mobile
+   application. Scoped so desktop behaviour is unchanged:
+   · layout tweaks → @media (max-width: 767px)
+   · touch-only interactions → @media (pointer: coarse)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Crisper text + no auto text inflation on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Kill the grey/blue tap flash on every touch — the #1 "this is a website" tell */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Contain page rubber-banding (no scroll-chaining to the body behind modals) */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Momentum scrolling for every internal scroll region on iOS */
+.no-scrollbar,
+.overflow-y-auto,
+.overflow-auto,
+.overflow-x-auto,
+[class*="overflow-"] {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Notch-aware top padding for sticky headers (pairs with .safe-bottom) */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* iOS zooms the page whenever a focused field is < 16px. Force 16px on phones
+   so focusing an input never triggers that jarring zoom-and-reflow. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  .input {
+    font-size: 16px !important;
+  }
+}
+
+/* Instant, tactile press feedback on touch devices only (desktop hover stays
+   as-is). Buttons, links-as-buttons, and anything opting in via .sc-press. */
+@media (pointer: coarse) {
+  button:active,
+  a[role="button"]:active,
+  [role="button"]:active,
+  .sc-press:active,
+  .sc-card-press:active {
+    transform: scale(0.972);
+    transition: transform 0.07s ease;
+  }
+  /* Cards that act as links get a subtle settle on tap */
+  .sc-card-press:active {
+    transform: scale(0.99);
+    opacity: 0.96;
+  }
+}
+
+/* App chrome shouldn't be text-selectable — feels like a native shell */
+nav, header, .bottom-nav, .sc-bottom-nav {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Premium frosted bottom navigation. Applied where layouts add .sc-bottom-nav;
+   also upgrades the existing utility-class bottom nav via the structural
+   selector below. */
+.sc-bottom-nav,
+nav[class*="fixed bottom-0"] {
+  background: rgba(255, 255, 255, 0.86) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.05), 0 -8px 24px rgba(15,23,42,0.06);
+}
+
+/* Active tab indicator dot for the bottom nav (works with the existing markup:
+   the active <a> already gets text-cobalt). */
+@media (max-width: 767px) {
+  nav[class*="fixed bottom-0"] a {
+    position: relative;
+  }
+}
+
+/* Honour reduced-motion: drop the press-scale for users who ask for it */
+@media (prefers-reduced-motion: reduce) {
+  button:active, a[role="button"]:active, [role="button"]:active,
+  .sc-press:active, .sc-card-press:active {
+    transform: none !important;
+  }
+}

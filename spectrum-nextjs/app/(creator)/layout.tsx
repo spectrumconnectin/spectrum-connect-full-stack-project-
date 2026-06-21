@@ -211,19 +211,22 @@ function CreatorHeader() {
 function CreatorBottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center">
+    <nav className="sc-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/70 flex items-center safe-bottom">
       {bottomNav.map(({ href, label, icon, primary }) => {
         const active = pathname === href || (href !== '/creator/dashboard' && pathname.startsWith(href + '/'));
         return (
           <Link key={href} href={href}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${
+            className={`sc-press flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${
               primary ? 'relative' : active ? 'text-cobalt' : 'text-gray-400'
             }`}>
+            {!primary && active && (
+              <span className="absolute top-0 h-0.5 w-7 rounded-full bg-cobalt" />
+            )}
             {primary
-              ? <div className="w-12 h-12 bg-cobalt rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 -mt-5">
+              ? <div className="w-12 h-12 bg-cobalt rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 -mt-5 active:scale-95 transition-transform">
                   <i className="fa-solid fa-bolt text-white text-lg" />
                 </div>
-              : <i className={`fa-solid ${icon} text-lg`} />
+              : <i className={`fa-solid ${icon} text-lg transition-transform ${active ? 'scale-110' : ''}`} />
             }
             {!primary && <span className={`text-[10px] font-medium ${active ? 'text-cobalt' : 'text-gray-400'}`}>{label}</span>}
           </Link>

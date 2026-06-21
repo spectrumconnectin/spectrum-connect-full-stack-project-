@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -14,6 +14,16 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 const BASE_URL = "https://spectrumconect.com";
+
+// Viewport — `viewport-fit: cover` is required for env(safe-area-inset-*) to
+// resolve to non-zero values on notched phones (iPhone X+), which the bottom
+// nav and sticky headers rely on. We allow pinch-zoom for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
