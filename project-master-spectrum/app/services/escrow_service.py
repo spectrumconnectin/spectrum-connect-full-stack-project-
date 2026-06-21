@@ -113,10 +113,12 @@ class EscrowService:
         escrow_id: str,
         milestone_id: str,
         client_id: str,
+        stripe_payment_intent: Optional[str] = None,
+        stripe_fee: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
-        Client funds a specific milestone (simulates payment capture).
-        In production this would trigger a Stripe PaymentIntent capture.
+        Mark a milestone as funded after Stripe Checkout confirms payment.
+        Called exclusively by the Stripe webhook handler.
         """
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
@@ -146,6 +148,10 @@ class EscrowService:
 
         milestone.status = "funded"
         milestone.funded_at = datetime.utcnow()
+        if stripe_payment_intent:
+            milestone.stripe_payment_intent = stripe_payment_intent
+        if stripe_fee is not None:
+            milestone.stripe_fee = stripe_fee
 
         escrow.funded_amount = round(
             escrow.funded_amount + milestone.amount, 2
@@ -297,6 +303,10 @@ class EscrowService:
         # Create transaction record. `amount` is the gross subtotal; we
         # also record the full fee breakdown so historical reads are exact
         # and reproducible under future rate changes (via commission_version).
+        # Use the Stripe fee recorded at funding time; fall back to standard rate
+        stripe_fee = getattr(milestone, "stripe_fee", None) or round(
+            fees_dict["client_total"] * 0.029 + 0.30, 2
+        )
         transaction = Transaction(
             transaction_id=tx_id,
             from_user_id=escrow.client_id,
@@ -308,7 +318,7 @@ class EscrowService:
             creator_fee=fees_dict["creator_fee"],
             client_fee=fees_dict["client_fee"],
             commission_version=fees_dict["commission_version"],
-            payment_processing_fee=0.0,
+            payment_processing_fee=stripe_fee,
             net_amount=fees_dict["creator_payout"],
             status="completed",
             initiated_at=now,

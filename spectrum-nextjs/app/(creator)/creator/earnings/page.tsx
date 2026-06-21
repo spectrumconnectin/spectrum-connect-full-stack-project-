@@ -274,19 +274,19 @@ export default function EarningsPage() {
         </>
       )}
 
-      {/* Withdraw modal */}
+      {/* Payout modal */}
       {showModal && (
         <div className="sc-modal-backdrop">
-          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 420, padding: 0 }}>
+          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 440, padding: 0 }}>
             <div className="px-7 pt-7 pb-6 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <i className="fa-solid fa-arrow-down text-cobalt"></i>
+                    <i className="fa-solid fa-building-columns text-cobalt"></i>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">Withdraw Funds</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Funds arrive in 1–2 business days</p>
+                    <h3 className="text-lg font-bold text-gray-900">Request Payout</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Funds transferred directly to your bank</p>
                   </div>
                 </div>
                 <button onClick={() => setShowModal(false)}
@@ -296,71 +296,63 @@ export default function EarningsPage() {
               </div>
             </div>
 
-            <div className="px-7 py-6 space-y-5">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
-                  <input type="text" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)}
-                    className="w-full pl-8 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold text-gray-900 focus:outline-none focus:border-cobalt focus:bg-white transition" />
+            <div className="px-7 py-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
+                <i className="fa-solid fa-circle-info text-cobalt mt-0.5 flex-shrink-0"></i>
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">How payouts work</p>
+                  <p className="text-xs leading-relaxed text-blue-700">
+                    Your released milestone payments accumulate here. Email us at{' '}
+                    <a href="mailto:team.spectrumstudios@gmail.com" className="font-semibold underline">
+                      team.spectrumstudios@gmail.com
+                    </a>{' '}
+                    with your bank details and the amount to withdraw. We process all payouts within 3–5 business days.
+                  </p>
                 </div>
-                <p className="text-xs text-gray-400 mt-1.5 ml-1">
-                  Available: <span className="font-semibold text-gray-600">
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Available balance</span>
+                  <span className="font-bold text-gray-900">
                     ${(stats?.total_earned ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Withdraw to</label>
-                <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                  <div className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
-                    <i className="fa-solid fa-building-columns text-gray-700"></i>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">Bank Transfer</p>
-                    <p className="text-xs text-gray-400">Add a payment method to withdraw</p>
-                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Processing time</span>
+                  <span className="font-semibold text-gray-700">3–5 business days</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Payout fee</span>
+                  <span className="font-semibold text-emerald-600">Free</span>
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Withdrawal amount</span>
-                  <span className="font-semibold text-gray-900">${withdrawAmount || '0.00'}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Processing fee</span>
-                  <span className="font-semibold text-gray-400">Free</span>
-                </div>
-                <div className="border-t border-gray-200 pt-2.5 flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-900">You&apos;ll receive</span>
-                  <span className="text-base font-bold text-gray-900">${withdrawAmount || '0.00'}</span>
-                </div>
-              </div>
+              <p className="text-xs text-gray-400 text-center">
+                Automated instant payouts via Stripe Connect are coming soon.
+              </p>
             </div>
 
             <div className="px-7 pb-7">
-              <button onClick={() => { setShowModal(false); setWithdrawSuccess(true); setTimeout(() => setWithdrawSuccess(false), 4000); }}
-                className="w-full py-3.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-sm">
-                Confirm Withdrawal
-              </button>
+              <a href="mailto:team.spectrumstudios@gmail.com?subject=Payout%20Request&body=Hi%20Spectrum%20team%2C%0A%0AI'd%20like%20to%20request%20a%20payout.%0A%0AAmount%3A%20%24%0ABank%20details%3A%20%0A%0AThanks"
+                className="block w-full py-3.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-sm text-center">
+                <i className="fa-solid fa-envelope mr-2"></i>Email Payout Request
+              </a>
               <button onClick={() => setShowModal(false)}
                 className="w-full py-2.5 mt-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition">
-                Cancel
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Withdrawal submitted toast */}
       {withdrawSuccess && (
         <div className="fixed bottom-6 right-6 z-50 bg-green-600 text-white px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-fade-in">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
-          Withdrawal request submitted! Processing within 3–5 business days.
+          Payout request received! We&apos;ll process it within 3–5 business days.
         </div>
       )}
     </>

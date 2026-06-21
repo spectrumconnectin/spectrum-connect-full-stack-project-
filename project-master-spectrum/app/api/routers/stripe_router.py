@@ -146,8 +146,8 @@ async def _handle_event(event: stripe.Event) -> None:
 async def _on_checkout_completed(session: dict) -> None:
     """
     Mark the escrow milestone as funded when a Checkout Session is paid.
-    Idempotent: if the milestone is already funded (duplicate webhook),
-    we log and return without error.
+    Also sends creator notification and advances the linked job to in_progress.
+    Idempotent: if the milestone is already funded (duplicate webhook) we log and return.
     """
     if session.get("payment_status") != "paid":
         return
@@ -161,11 +161,19 @@ async def _on_checkout_completed(session: dict) -> None:
         logger.error("Webhook missing metadata: %s", meta)
         return
 
+    # Stripe charges 2.9% + $0.30 on the amount_total (in cents).
+    amount_total_cents = session.get("amount_total") or 0
+    stripe_fee = round((amount_total_cents / 100) * 0.029 + 0.30, 2)
+
     try:
-        await EscrowService.fund_milestone(escrow_id, milestone_id, client_id)
+        await EscrowService.fund_milestone(
+            escrow_id, milestone_id, client_id,
+            stripe_payment_intent=session.get("payment_intent"),
+            stripe_fee=stripe_fee,
+        )
         logger.info(
-            "Milestone funded via Stripe: escrow=%s milestone=%s",
-            escrow_id, milestone_id,
+            "Milestone funded via Stripe: escrow=%s milestone=%s fee=$%.2f",
+            escrow_id, milestone_id, stripe_fee,
         )
     except HTTPException as e:
         # 400 = already funded (idempotent), 403/404 = data issue — log but don't fail
@@ -173,3 +181,32 @@ async def _on_checkout_completed(session: dict) -> None:
             "fund_milestone skipped (status=%s): %s | escrow=%s milestone=%s",
             e.status_code, e.detail, escrow_id, milestone_id,
         )
+        return  # Don't try to send notifications if funding failed/was duplicate
+
+    # Notify creator + advance the linked job to in_progress
+    try:
+        from app.services.notification_service import NotificationService
+        from app.models.escrow import Escrow as EscrowDoc
+        from app.models.schema import JobPost
+        from beanie import PydanticObjectId as _OID
+
+        esc = await EscrowDoc.get(_OID(escrow_id))
+        if esc:
+            milestone = next((m for m in (esc.milestones or []) if m.milestone_id == milestone_id), None)
+            m_title = milestone.title if milestone else "Milestone"
+            m_amount = float(milestone.amount) if milestone else 0.0
+
+            await NotificationService.milestone_funded(
+                creator_id=str(esc.creator_id),
+                client_id=client_id,
+                milestone_title=m_title,
+                amount=m_amount,
+                escrow_id=escrow_id,
+            )
+            if esc.job_post_id:
+                job = await JobPost.get(esc.job_post_id)
+                if job and job.status in ("pending_funding", "open", "in_review"):
+                    job.status = "in_progress"
+                    await job.save()
+    except Exception:
+        logger.exception("Post-payment notification/job-update failed: escrow=%s", escrow_id)
