@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem } from '@/lib/api';
+import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem, stripeApi } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -384,7 +385,6 @@ function ReleaseModal({
 function FundProjectModal({
   job,
   creatorId,
-  onFunded,
   onClose,
 }: {
   job: JobPostItem;
@@ -392,7 +392,6 @@ function FundProjectModal({
   onFunded: () => void;
   onClose: () => void;
 }) {
-  // For fixed-price jobs the amount is always the fixed price — no overriding allowed
   const fixedPrice = job.budget_type === 'fixed' &&
     job.budget?.min && job.budget?.max &&
     job.budget.min === job.budget.max
@@ -401,22 +400,18 @@ function FundProjectModal({
     fixedPrice ? String(fixedPrice) : (job.budget?.min ? String(job.budget.min) : '')
   );
   const [milestoneTitle, setMilestoneTitle] = useState('Project Payment');
-  const [step, setStep] = useState<'setup' | 'processing' | 'done'>('setup');
-  const [txId, setTxId] = useState('');
+  const [step, setStep] = useState<'setup' | 'redirecting'>('setup');
   const [error, setError] = useState('');
-
-  const mockTxId = () =>
-    `TXN-SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
   const handleFund = async () => {
     if (!amount || Number(amount) <= 0) {
       setError('Please enter a valid amount'); return;
     }
     setError('');
-    setStep('processing');
+    setStep('redirecting');
 
     try {
-      // Step 1: Create escrow
+      // Create escrow in MongoDB first to get escrow_id + milestone_id
       const created = await escrow.create({
         creator_id: creatorId,
         job_post_id: job.id,
@@ -425,17 +420,21 @@ function FundProjectModal({
         currency: 'USD',
       });
 
-      // Step 2: Fetch escrow detail to get milestone IDs (create only returns escrow_id)
       const detail = await escrow.getById(created.escrow_id);
       const milestoneId = detail.milestones[0]?.milestone_id;
-      if (!milestoneId) throw new Error('Milestone not created');
+      if (!milestoneId) throw new Error('Milestone not found after creation');
 
-      // Step 3: Fund the milestone (simulated)
-      await escrow.fundMilestone(created.escrow_id, milestoneId);
+      // Create Stripe Checkout Session and redirect
+      const { checkout_url } = await stripeApi.createCheckoutSession({
+        escrow_id: created.escrow_id,
+        milestone_id: milestoneId,
+        amount: Number(amount),
+        currency: 'USD',
+        project_title: job.title,
+        milestone_title: milestoneTitle,
+      });
 
-      // Generate mock transaction ID
-      setTxId(mockTxId());
-      setStep('done');
+      window.location.href = checkout_url;
     } catch (e) {
       setError((e as Error).message);
       setStep('setup');
@@ -444,71 +443,44 @@ function FundProjectModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={step !== 'redirecting' ? onClose : undefined} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
 
-        {/* TEST MODE stripe */}
-        <div className="bg-amber-400 text-amber-900 text-xs font-bold text-center py-1.5 tracking-wide">
-          ⚗️ TEST MODE — SIMULATED PAYMENT — NO REAL MONEY
+        {/* Stripe branding bar */}
+        <div className="bg-[#635bff] text-white text-xs font-semibold text-center py-1.5 tracking-wide flex items-center justify-center gap-1.5">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/></svg>
+          Secured by Stripe
         </div>
 
         <div className="p-6">
-          {step === 'done' ? (
-            /* ── Success ── */
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i className="fa-solid fa-circle-check text-emerald-600 text-2xl"></i>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Payment Processed!</h3>
-              <p className="text-gray-500 text-sm mb-5">
-                ${Number(amount).toLocaleString()} is now held in escrow.
-                The creator has been notified and can begin work.
-              </p>
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Fund Project</h3>
+              <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{job.title}</p>
+            </div>
+            {step !== 'redirecting' && (
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            )}
+          </div>
 
-              {/* Mock transaction receipt */}
-              <div className="bg-gray-50 rounded-xl p-4 text-left mb-5 border border-gray-200">
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Transaction Receipt</p>
-                {[
-                  { label: 'Transaction ID', value: txId, mono: true },
-                  { label: 'Amount', value: `$${Number(amount).toLocaleString()}` },
-                  { label: 'Status', value: 'Simulated — Held in Escrow' },
-                  { label: 'Project', value: job.title },
-                  { label: 'Payment mode', value: 'TEST MODE (no real funds)' },
-                  { label: 'Timestamp', value: new Date().toLocaleString() },
-                ].map(({ label, value, mono }) => (
-                  <div key={label} className="flex justify-between items-start py-1.5 border-b border-gray-100 last:border-0">
-                    <span className="text-xs text-gray-500">{label}</span>
-                    <span className={`text-xs font-semibold text-gray-900 text-right ml-4 ${mono ? 'font-mono' : ''}`}>{value}</span>
-                  </div>
-                ))}
-              </div>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+              <i className="fa-solid fa-circle-exclamation mr-2"></i>{error}
+            </div>
+          )}
 
-              <div className="flex gap-3">
-                <button onClick={() => { onFunded(); onClose(); }}
-                  className="flex-1 py-2.5 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
-                  Done
-                </button>
+          {step === 'redirecting' ? (
+            <div className="flex flex-col items-center py-8 gap-4">
+              <div className="w-12 h-12 border-4 border-[#635bff] border-t-transparent rounded-full animate-spin"></div>
+              <div className="text-center">
+                <p className="font-semibold text-gray-800">Redirecting to secure checkout…</p>
+                <p className="text-xs text-gray-400 mt-1">You&apos;ll be taken to Stripe to complete payment</p>
               </div>
             </div>
           ) : (
-            /* ── Setup / Processing ── */
             <>
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Fund Project</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">{job.title}</p>
-                </div>
-                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
-                  <i className="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-
-              {error && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
-                  <i className="fa-solid fa-circle-exclamation mr-2"></i>{error}
-                </div>
-              )}
-
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Milestone title</label>
@@ -520,19 +492,15 @@ function FundProjectModal({
                     Amount (USD) <span className="text-red-500">*</span>
                   </label>
                   {fixedPrice ? (
-                    /* Fixed-price project — amount is locked */
-                    <div>
-                      <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                        <i className="fa-solid fa-tag text-emerald-600"></i>
-                        <div className="flex-1">
-                          <p className="text-sm font-bold text-emerald-900">Fixed Price</p>
-                          <p className="text-xs text-emerald-700">Set by the client at project creation — cannot be changed.</p>
-                        </div>
-                        <span className="text-xl font-bold text-emerald-700">${fixedPrice.toLocaleString()}</span>
+                    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                      <i className="fa-solid fa-tag text-emerald-600"></i>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-emerald-900">Fixed Price</p>
+                        <p className="text-xs text-emerald-700">Set at project creation — cannot be changed.</p>
                       </div>
+                      <span className="text-xl font-bold text-emerald-700">${fixedPrice.toLocaleString()}</span>
                     </div>
                   ) : (
-                    /* Negotiable / hourly / daily — editable */
                     <div>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
@@ -553,30 +521,18 @@ function FundProjectModal({
 
               <div className="bg-blue-50 rounded-xl p-3 mt-4 text-xs text-cobalt">
                 <i className="fa-solid fa-lock mr-2"></i>
-                Funds are held in <strong>simulated escrow</strong> and released only when you approve the work.
+                Funds are held in <strong>secure escrow</strong> and released only when you approve the work.
+                You will be redirected to Stripe to complete payment.
               </div>
 
-              {step === 'processing' && (
-                <div className="flex items-center gap-3 mt-4 p-3 bg-amber-50 rounded-xl">
-                  <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                  <div className="text-xs text-amber-800">
-                    <strong>Simulating payment processing…</strong>
-                    <br />Creating escrow and locking funds
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-3 mt-5">
-                <button onClick={onClose} disabled={step === 'processing'}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition disabled:opacity-50">
+                <button onClick={onClose}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition">
                   Cancel
                 </button>
-                <button onClick={handleFund} disabled={!amount || step === 'processing'}
+                <button onClick={handleFund} disabled={!amount}
                   className="flex-1 py-2.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
-                  {step === 'processing'
-                    ? <><i className="fa-solid fa-spinner animate-spin"></i> Processing…</>
-                    : <><i className="fa-solid fa-lock"></i> Fund Escrow</>
-                  }
+                  <i className="fa-solid fa-lock"></i> Pay with Stripe
                 </button>
               </div>
             </>
@@ -729,7 +685,12 @@ function PendingFundingSection({
   );
 }
 
-export default function PaymentsPage() {
+function PaymentsPageInner() {
+  const searchParams = useSearchParams();
+  const stripeResult = searchParams.get('payment'); // 'success' | 'cancelled' | null
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(stripeResult === 'success');
+
   const [details, setDetails] = useState<EscrowDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -739,6 +700,14 @@ export default function PaymentsPage() {
   // Fund project modal
   const [pendingJobs, setPendingJobs] = useState<JobPostItem[]>([]);
   const [fundingJob, setFundingJob] = useState<{ job: JobPostItem; creatorId: string } | null>(null);
+
+  // Auto-dismiss the Stripe success banner after 8 seconds
+  useEffect(() => {
+    if (showSuccessBanner) {
+      bannerTimerRef.current = setTimeout(() => setShowSuccessBanner(false), 8000);
+    }
+    return () => { if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current); };
+  }, [showSuccessBanner]);
 
   const loadEscrows = useCallback(async () => {
     setLoading(true);
@@ -824,14 +793,25 @@ export default function PaymentsPage() {
 
   return (
     <>
-      {/* TEST MODE banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3 mb-6">
-        <i className="fa-solid fa-flask text-amber-500 text-lg flex-shrink-0"></i>
-        <div>
-          <span className="font-bold text-amber-800 text-sm">TEST MODE — Simulated Payments</span>
-          <span className="text-amber-700 text-sm ml-2">No real money is being transferred. All transactions are simulated for testing purposes.</span>
+      {/* Stripe payment return banners */}
+      {showSuccessBanner && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center gap-3 mb-6">
+          <i className="fa-solid fa-circle-check text-emerald-500 text-lg flex-shrink-0"></i>
+          <div className="flex-1">
+            <span className="font-bold text-emerald-800 text-sm">Payment successful!</span>
+            <span className="text-emerald-700 text-sm ml-2">Your funds are now held in escrow. The creator has been notified and can begin work.</span>
+          </div>
+          <button onClick={() => setShowSuccessBanner(false)} className="text-emerald-400 hover:text-emerald-600 flex-shrink-0">
+            <i className="fa-solid fa-xmark"></i>
+          </button>
         </div>
-      </div>
+      )}
+      {stripeResult === 'cancelled' && (
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl px-5 py-3 flex items-center gap-3 mb-6">
+          <i className="fa-solid fa-circle-xmark text-gray-400 text-lg flex-shrink-0"></i>
+          <span className="text-gray-600 text-sm">Payment cancelled — no charge was made. You can fund the project any time.</span>
+        </div>
+      )}
 
       <section className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-1">Payments</h1>
@@ -1095,5 +1075,13 @@ export default function PaymentsPage() {
         />
       )}
     </>
+  );
+}
+
+export default function PaymentsPage() {
+  return (
+    <Suspense>
+      <PaymentsPageInner />
+    </Suspense>
   );
 }

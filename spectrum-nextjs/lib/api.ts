@@ -1947,3 +1947,24 @@ export const ceoCalls = {
   submit: (payload: CeoCallPayload): Promise<{ success: boolean; id: string; message: string }> =>
     request('/ceo-calls', { method: 'POST', body: JSON.stringify(payload) }, false),
 };
+
+// ── Stripe ──────────────────────────────────────────────────────────────────
+
+export interface StripeCheckoutRequest {
+  escrow_id: string;
+  milestone_id: string;
+  amount: number;
+  currency?: string;
+  project_title: string;
+  milestone_title?: string;
+}
+
+export interface StripeCheckoutResponse {
+  checkout_url: string;
+  session_id: string;
+}
+
+export const stripeApi = {
+  createCheckoutSession: (payload: StripeCheckoutRequest): Promise<StripeCheckoutResponse> =>
+    request('/stripe/checkout-session', { method: 'POST', body: JSON.stringify(payload) }),
+};

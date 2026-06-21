@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # Admin Registration — keep this secret, only share with trusted team
     ADMIN_REGISTRATION_KEY: str = _INSECURE_ADMIN_KEY
 
+    # Stripe
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
     # ── Commission (v1 split 8/4) ────────────────────────────────────────
     # See app/services/commission_service.py and the spec
     # "Spectrum Connect — Commission Logic (v1, Split 8/4)" for details.

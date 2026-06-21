@@ -70,6 +70,7 @@ from app.api.routers.portfolio_router import router as portfolio_router
 from app.api.routers.admin_router import router as admin_router
 from app.api.routers.report_router import router as report_router
 from app.api.routers.presence_router import router as presence_router
+from app.api.routers.stripe_router import router as stripe_router
 
 load_dotenv()
 
@@ -192,6 +193,7 @@ app.include_router(presence_router, tags=["User Presence"])
 app.include_router(portfolio_router, tags=["Portfolio"])
 app.include_router(admin_router, tags=["Admin Panel"])
 app.include_router(report_router, tags=["Reports"])
+app.include_router(stripe_router, tags=["Stripe Payments"])
 
 
 @app.get("/health")
