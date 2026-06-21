@@ -210,12 +210,15 @@ export default function ClientDashboardPage() {
               <div className="text-2xl font-bold text-gray-900">${totalReleased.toLocaleString()}</div>
               <p className="text-xs text-gray-400 mt-1">Total paid to creators</p>
             </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm flex items-center gap-3">
-              <i className="fa-solid fa-flask text-amber-500 flex-shrink-0"></i>
-              <div>
-                <p className="text-xs font-bold text-amber-800">TEST MODE</p>
-                <p className="text-xs text-amber-700">Simulated payments — no real money</p>
+            <div className="bg-white rounded-2xl border border-[#635bff]/20 p-5 shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-9 h-9 bg-[#635bff]/10 rounded-xl flex items-center justify-center">
+                  <i className="fa-solid fa-shield-halved text-[#635bff] text-sm"></i>
+                </div>
+                <span className="text-sm font-semibold text-gray-600">Protected</span>
               </div>
+              <div className="text-2xl font-bold text-gray-900">100%</div>
+              <p className="text-xs text-gray-400 mt-1">Escrow secured by Stripe</p>
             </div>
           </div>
         </section>

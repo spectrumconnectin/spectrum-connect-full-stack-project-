@@ -972,9 +972,11 @@ function PaymentsPageInner() {
                           + ${row.milestone.fees.client_fee.toFixed(2)} fee
                         </p>
                       )}
-                      {/* Mock transaction ID */}
+                      {/* Transaction reference — real release tx id once paid out */}
                       <p className="text-[10px] text-gray-400 font-mono">
-                        TXN-SIM-{row.escrow_id.slice(-8).toUpperCase()}
+                        {row.milestone.release_transaction_id
+                          ? `TXN-${row.milestone.release_transaction_id.slice(0, 8).toUpperCase()}`
+                          : `REF-${row.escrow_id.slice(-8).toUpperCase()}`}
                       </p>
                       <p className="text-xs text-gray-400">
                         {formatDate(row.milestone.released_at || row.milestone.funded_at || row.created_at)}
