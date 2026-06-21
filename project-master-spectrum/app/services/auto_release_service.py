@@ -133,10 +133,12 @@ async def run_auto_release_check():
     processed = released = reminders = 0
 
     try:
-        # Find all active escrows that have at least one delivered milestone
-        # We query broadly and filter in Python to avoid complex Beanie queries
+        # Find all active escrows that have at least one delivered milestone.
+        # NOTE: use a plain equality match — `EscrowDoc.status.in_([...])` raises
+        # `TypeError: 'ExpressionField' object is not callable` under Beanie 2.x,
+        # which previously aborted the entire scan (auto-release never fired).
         escrows = await EscrowDoc.find(
-            EscrowDoc.status.in_(["active"])
+            EscrowDoc.status == "active"
         ).to_list()
 
         for esc in escrows:

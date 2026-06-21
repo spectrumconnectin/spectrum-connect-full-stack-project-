@@ -443,9 +443,10 @@ async def update_proposal_status(
         await job.save()
     elif data.status == "rejected" and job.status in ("in_review", "pending_funding"):
         # If all proposals are now rejected/withdrawn, reopen the job
+        from beanie.operators import In as _In
         remaining = await Application.find(
             Application.project_id == job.id,
-            Application.status.in_(["submitted", "shortlisted", "interviewing", "accepted"]),
+            _In(Application.status, ["submitted", "shortlisted", "interviewing", "accepted"]),
         ).count()
         if remaining == 0:
             job.status = "open"
