@@ -1747,3 +1747,16 @@ nav[class*="fixed bottom-0"] {
 @media (prefers-reduced-motion: reduce) {
   .sc-card:hover { transform: none; }
 }
+
+/* Hide native number-input spinner arrows everywhere — they look unrefined and
+   crowd custom controls (MAX buttons, currency adornments). Apps like Stripe
+   use plain fields; users type amounts rather than click tiny steppers. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

@@ -26,6 +26,11 @@ function formatDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** Money with thousands separators + 2 decimals, e.g. 3,100.40 */
+function fmtMoney(n: number): string {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function BarChart({ data }: { data: { month: string; amount: number }[] }) {
   const max = Math.max(...data.map(d => d.amount), 1);
   return (
@@ -338,40 +343,38 @@ export default function EarningsPage() {
       {/* Payout modal */}
       {showModal && (
         <div className="sc-modal-backdrop" onClick={() => !withdrawing && setShowModal(false)}>
-          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 440, padding: 0 }} onClick={e => e.stopPropagation()}>
-            {/* PayPal-branded header */}
-            <div className="bg-[#003087] px-7 pt-7 pb-6 text-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/15 rounded-2xl flex items-center justify-center">
-                    <i className="fa-brands fa-paypal text-white text-lg"></i>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold">Withdraw to PayPal</h3>
-                    <p className="text-xs text-blue-200 mt-0.5">Sent instantly to your PayPal account</p>
-                  </div>
+          <div className="sc-modal-panel" style={{ maxWidth: 416, padding: 0 }} onClick={e => e.stopPropagation()}>
+            {/* Header — clean white with a PayPal mark */}
+            <div className="flex items-start justify-between px-6 pt-6 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#003087] flex items-center justify-center shadow-sm">
+                  <i className="fa-brands fa-paypal text-white text-xl"></i>
                 </div>
-                {!withdrawing && (
-                  <button onClick={() => setShowModal(false)}
-                    className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition text-white">
-                    <i className="fa-solid fa-xmark text-sm"></i>
-                  </button>
-                )}
+                <div>
+                  <h3 className="text-[17px] font-bold text-gray-900 leading-snug">Withdraw to PayPal</h3>
+                  <p className="text-[13px] text-gray-500 mt-0.5">Sent instantly to your account</p>
+                </div>
               </div>
+              {!withdrawing && (
+                <button onClick={() => setShowModal(false)} aria-label="Close"
+                  className="w-8 h-8 -mr-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              )}
             </div>
 
-            <div className="px-7 py-6 space-y-4">
+            <div className="px-6 pb-2 space-y-4">
               {withdrawError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
-                  <i className="fa-solid fa-circle-exclamation mr-1.5"></i>{withdrawError}
+                <div className="bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 text-[13px] text-red-700 flex items-start gap-2">
+                  <i className="fa-solid fa-circle-exclamation mt-0.5"></i><span>{withdrawError}</span>
                 </div>
               )}
 
               {/* Payouts not yet enabled on the platform */}
               {balance && !balance.payouts_enabled ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-800">
                   <p className="font-semibold mb-1"><i className="fa-solid fa-clock mr-1.5"></i>PayPal payouts launching soon</p>
-                  <p className="text-xs leading-relaxed text-amber-700">
+                  <p className="text-[13px] leading-relaxed text-amber-700">
                     Instant PayPal withdrawals are being finalised. Your balance is safe and will be withdrawable here shortly.
                   </p>
                 </div>
@@ -379,52 +382,55 @@ export default function EarningsPage() {
                 <>
                   {/* PayPal email */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">PayPal email</label>
+                    <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">PayPal email</label>
                     {editingEmail ? (
                       <div className="flex gap-2">
                         <input type="email" value={paypalEmail} onChange={e => setPaypalEmail(e.target.value)}
                           placeholder="you@example.com"
-                          className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:bg-white transition" />
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 transition" />
                         <button onClick={handleSaveEmail} disabled={savingEmail || !paypalEmail.trim()}
-                          className="px-4 py-3 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50">
+                          className="px-4 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50">
                           {savingEmail ? '…' : 'Save'}
                         </button>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                      <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-xl pl-3.5 pr-2 py-2.5">
                         <span className="text-sm font-medium text-gray-800 flex items-center gap-2 min-w-0">
-                          <i className="fa-brands fa-paypal text-[#003087]"></i>
+                          <i className="fa-brands fa-paypal text-[#003087] text-base"></i>
                           <span className="truncate">{paypalEmail}</span>
                         </span>
-                        <button onClick={() => setEditingEmail(true)} className="text-xs font-semibold text-cobalt hover:underline flex-shrink-0 ml-2">Change</button>
+                        <button onClick={() => setEditingEmail(true)}
+                          className="text-xs font-semibold text-cobalt hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition flex-shrink-0">Change</button>
                       </div>
                     )}
                   </div>
 
                   {/* Amount */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Amount</label>
+                    <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Amount</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
-                      <input type="number" min="0" step="0.01" value={withdrawAmount}
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg font-semibold">$</span>
+                      <input type="number" min="0" step="0.01" value={withdrawAmount} inputMode="decimal"
                         onChange={e => setWithdrawAmount(e.target.value)}
                         disabled={editingEmail}
-                        className="w-full pl-8 pr-20 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold text-gray-900 focus:outline-none focus:border-cobalt focus:bg-white transition disabled:opacity-60" />
+                        className="w-full pl-9 pr-16 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-bold text-gray-900 tracking-tight focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 focus:bg-white transition disabled:opacity-60" />
                       <button type="button" onClick={() => balance && setWithdrawAmount(balance.available.toFixed(2))}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-cobalt hover:underline">MAX</button>
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-cobalt bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition">MAX</button>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5 ml-1">
-                      Available: <span className="font-semibold text-gray-600">
+                    <p className="text-[12px] text-gray-400 mt-2 ml-0.5">
+                      Available <span className="font-semibold text-gray-600">
                         ${(balance?.available ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
-                      {balance && <> · Min ${balance.min_withdrawal.toFixed(2)}</>}
+                      {balance && <span className="text-gray-300"> · </span>}
+                      {balance && <>Min ${balance.min_withdrawal.toFixed(2)}</>}
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                  {/* Summary */}
+                  <div className="bg-gray-50 rounded-2xl px-4 py-3.5 space-y-2.5 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">You&apos;ll receive</span>
-                      <span className="font-bold text-gray-900">${(Number(withdrawAmount) || 0).toFixed(2)}</span>
+                      <span className="font-bold text-gray-900">${fmtMoney(Number(withdrawAmount) || 0)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">Payout fee</span>
@@ -432,21 +438,21 @@ export default function EarningsPage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">Arrives</span>
-                      <span className="font-semibold text-gray-700">Within minutes</span>
+                      <span className="font-medium text-gray-700">Within minutes</span>
                     </div>
                   </div>
                 </>
               )}
             </div>
 
-            <div className="px-7 pb-7">
+            <div className="px-6 pb-6 pt-3">
               {balance?.payouts_enabled && (
                 <button onClick={handleWithdraw}
                   disabled={withdrawing || editingEmail || !balance || balance.available <= 0 || Number(withdrawAmount) <= 0}
-                  className="w-full py-3.5 bg-[#0070ba] text-white rounded-xl font-bold text-sm hover:bg-[#003087] transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="w-full py-3.5 bg-[#0070ba] text-white rounded-xl font-bold text-sm hover:bg-[#005ea6] active:scale-[0.99] transition disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2">
                   {withdrawing
                     ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
-                    : <><i className="fa-brands fa-paypal"></i> Withdraw ${(Number(withdrawAmount) || 0).toFixed(2)}</>}
+                    : <><i className="fa-brands fa-paypal"></i> Withdraw ${fmtMoney(Number(withdrawAmount) || 0)}</>}
                 </button>
               )}
               <button onClick={() => setShowModal(false)} disabled={withdrawing}
