@@ -690,7 +690,7 @@ export default function CollaboratorProfilePage() {
       {/* ── Hire Directly Modal ── */}
       {showHire && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowHire(false)} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => setShowHire(false)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
             {hireDone ? (
               <div className="text-center py-6">
@@ -790,7 +790,7 @@ export default function CollaboratorProfilePage() {
       {/* ── Invite Modal ── */}
       {showInvite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowInvite(false)} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => setShowInvite(false)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
             {inviteSent ? (
               <div className="text-center py-6">

@@ -835,7 +835,7 @@ export default function ClientProjectDetailPage() {
       {showReleaseFundsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => { if (!releasingFunds) setShowReleaseFundsModal(false); }}>
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
             onClick={e => e.stopPropagation()}>
 
@@ -968,7 +968,7 @@ export default function ClientProjectDetailPage() {
 
       {/* ── Future Work Modal ── */}
       {showFutureWorkModal && hiredCreator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowFutureWorkModal(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-md p-4" onClick={() => setShowFutureWorkModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -1025,7 +1025,7 @@ export default function ClientProjectDetailPage() {
       {showRehireModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => setShowRehireModal(false)}>
-          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden"
             onClick={e => e.stopPropagation()}>
             {/* Header */}

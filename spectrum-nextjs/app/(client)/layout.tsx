@@ -158,7 +158,7 @@ function ClientHeader() {
       {/* Mobile drawer */}
       {drawerOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md" onClick={() => setDrawerOpen(false)} />
           <div className="relative w-72 max-w-[85vw] bg-white h-full flex flex-col shadow-2xl">
             <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}

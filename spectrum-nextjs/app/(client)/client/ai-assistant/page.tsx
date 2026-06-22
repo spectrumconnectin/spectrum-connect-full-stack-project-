@@ -911,7 +911,7 @@ export default function ClientAiAssistantPage() {
         {/* LEFT DRAWER (mobile) */}
         {leftOpen && (
           <>
-            <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setLeftOpen(false)} />
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 lg:hidden" onClick={() => setLeftOpen(false)} />
             <aside className="fixed inset-y-0 left-0 w-72 bg-white z-50 lg:hidden shadow-2xl flex flex-col">
               <button onClick={() => setLeftOpen(false)} className="absolute top-3.5 right-3 w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 flex items-center justify-center z-10">
                 <i className="fa-solid fa-xmark" />
@@ -1130,7 +1130,7 @@ export default function ClientAiAssistantPage() {
         {/* RIGHT DRAWER (below xl) */}
         {rightOpen && (
           <>
-            <div className="fixed inset-0 bg-black/40 z-40 xl:hidden" onClick={() => setRightOpen(false)} />
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-40 xl:hidden" onClick={() => setRightOpen(false)} />
             <aside className="fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-white z-50 xl:hidden shadow-2xl">
               <button onClick={() => setRightOpen(false)} className="absolute top-3.5 right-3 w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 flex items-center justify-center z-10">
                 <i className="fa-solid fa-xmark" />

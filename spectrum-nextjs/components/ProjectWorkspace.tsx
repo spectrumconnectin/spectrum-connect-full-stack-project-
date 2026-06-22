@@ -875,7 +875,7 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
       {/* Final Delivery Modal */}
       {showDeliveryModal && selectedMilestone && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!submitting) setShowDeliveryModal(false); }} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => { if (!submitting) setShowDeliveryModal(false); }} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden">
 
             {submitted ? (
@@ -1036,7 +1036,7 @@ function DeliverablesTab({ msgs, myUserId, role, escrowDetail, onRefresh, onSend
       {/* Request Revision Modal (client) */}
       {revisionTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!requestingRevision) setRevisionTarget(null); }} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => { if (!requestingRevision) setRevisionTarget(null); }} />
           <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-md z-10 flex flex-col max-h-[92vh]">
             {/* Header — always visible */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -1881,7 +1881,7 @@ export default function ProjectWorkspace({ jobId, role, projectId, myUserId = ''
       {/* Shared Request Revision Modal — opened from Milestones or Deliverables tab */}
       {sharedRevisionTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!sharedRequestingRevision) setSharedRevisionTarget(null); }} />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-md" onClick={() => { if (!sharedRequestingRevision) setSharedRevisionTarget(null); }} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
