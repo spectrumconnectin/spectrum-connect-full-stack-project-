@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { earnings, EarningTransaction, EarningsStats } from '@/lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { earnings, EarningTransaction, EarningsStats, PayoutBalance } from '@/lib/api';
 
 const TXN_STATUS_STYLE: Record<string, string> = {
   completed:  'bg-emerald-50 text-emerald-700',
@@ -53,9 +53,26 @@ export default function EarningsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [withdrawSuccess, setWithdrawSuccess] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  // Payout state
+  const [balance, setBalance] = useState<PayoutBalance | null>(null);
+  const [paypalEmail, setPaypalEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+
+  const loadBalance = useCallback(async () => {
+    try {
+      const b = await earnings.getBalance();
+      setBalance(b);
+      setPaypalEmail(b.paypal_email ?? '');
+      setEditingEmail(!b.paypal_email);
+      setWithdrawAmount(b.available > 0 ? b.available.toFixed(2) : '');
+    } catch { /* balance is best-effort */ }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -66,11 +83,44 @@ export default function EarningsPage() {
       .then(([s, t]) => {
         setStats(s);
         setTxns(t);
-        setWithdrawAmount(s.total_earned > 0 ? s.total_earned.toFixed(2) : '0.00');
       })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
-  }, []);
+    loadBalance();
+  }, [loadBalance]);
+
+  const openWithdraw = async () => {
+    setWithdrawError('');
+    setShowModal(true);
+    await loadBalance();
+  };
+
+  const handleSaveEmail = async () => {
+    setSavingEmail(true); setWithdrawError('');
+    try {
+      await earnings.savePayoutMethod(paypalEmail.trim());
+      setEditingEmail(false);
+      await loadBalance();
+    } catch (e) { setWithdrawError((e as Error).message); }
+    finally { setSavingEmail(false); }
+  };
+
+  const handleWithdraw = async () => {
+    const amt = Number(withdrawAmount);
+    if (!amt || amt <= 0) { setWithdrawError('Enter a valid amount.'); return; }
+    setWithdrawing(true); setWithdrawError('');
+    try {
+      const res = await earnings.withdraw(amt);
+      setShowModal(false);
+      setWithdrawSuccess(res.message);
+      setTimeout(() => setWithdrawSuccess(''), 6000);
+      // refresh balance + transactions
+      await loadBalance();
+      earnings.getTransactions({ limit: 40 }).then(setTxns).catch(() => {});
+      earnings.getStats().then(setStats).catch(() => {});
+    } catch (e) { setWithdrawError((e as Error).message); }
+    finally { setWithdrawing(false); }
+  };
 
   useEffect(() => {
     const params: { status?: string; type?: string; limit: number } = { limit: 40 };
@@ -117,14 +167,25 @@ export default function EarningsPage() {
                 <p className="text-6xl font-bold mt-3 mb-6">
                   ${(stats?.total_earned ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
+                {/* Available-to-withdraw line */}
+                {balance && (
+                  <p className="text-sm text-blue-100 mb-4 -mt-3">
+                    <span className="font-semibold text-white">
+                      ${balance.available.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span> available to withdraw
+                  </p>
+                )}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button onClick={() => setShowModal(true)}
-                    className="px-6 py-3 bg-white text-cobalt rounded-xl font-bold hover:bg-blue-50 transition">
-                    <i className="fa-solid fa-arrow-down mr-2"></i>Withdraw
+                  <button onClick={openWithdraw}
+                    className="px-6 py-3 bg-white text-cobalt rounded-xl font-bold hover:bg-blue-50 transition disabled:opacity-60"
+                    disabled={!!balance && balance.available <= 0}>
+                    <i className="fa-brands fa-paypal mr-2"></i>Withdraw to PayPal
                   </button>
-                  <button className="px-6 py-3 bg-white/20 backdrop-blur text-white rounded-xl font-semibold hover:bg-white/30 transition border border-white/30 text-sm">
-                    <i className="fa-solid fa-credit-card mr-2"></i>Payment Methods
-                  </button>
+                  {balance?.paypal_email && (
+                    <span className="px-4 py-2.5 bg-white/15 text-white rounded-xl text-xs font-medium border border-white/25 flex items-center gap-2">
+                      <i className="fa-brands fa-paypal"></i>{balance.paypal_email}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -276,71 +337,121 @@ export default function EarningsPage() {
 
       {/* Payout modal */}
       {showModal && (
-        <div className="sc-modal-backdrop">
-          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 440, padding: 0 }}>
-            <div className="px-7 pt-7 pb-6 border-b border-gray-100">
+        <div className="sc-modal-backdrop" onClick={() => !withdrawing && setShowModal(false)}>
+          <div className="sc-modal-panel overflow-hidden" style={{ maxWidth: 440, padding: 0 }} onClick={e => e.stopPropagation()}>
+            {/* PayPal-branded header */}
+            <div className="bg-[#003087] px-7 pt-7 pb-6 text-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center">
-                    <i className="fa-solid fa-building-columns text-cobalt"></i>
+                  <div className="w-10 h-10 bg-white/15 rounded-2xl flex items-center justify-center">
+                    <i className="fa-brands fa-paypal text-white text-lg"></i>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-gray-900">Request Payout</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Funds transferred directly to your bank</p>
+                    <h3 className="text-lg font-bold">Withdraw to PayPal</h3>
+                    <p className="text-xs text-blue-200 mt-0.5">Sent instantly to your PayPal account</p>
                   </div>
                 </div>
-                <button onClick={() => setShowModal(false)}
-                  className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition text-gray-500">
-                  <i className="fa-solid fa-xmark text-sm"></i>
-                </button>
+                {!withdrawing && (
+                  <button onClick={() => setShowModal(false)}
+                    className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center transition text-white">
+                    <i className="fa-solid fa-xmark text-sm"></i>
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="px-7 py-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3">
-                <i className="fa-solid fa-circle-info text-cobalt mt-0.5 flex-shrink-0"></i>
-                <div className="text-sm text-blue-800">
-                  <p className="font-semibold mb-1">How payouts work</p>
-                  <p className="text-xs leading-relaxed text-blue-700">
-                    Your released milestone payments accumulate here. Email us at{' '}
-                    <a href="mailto:team.spectrumstudios@gmail.com" className="font-semibold underline">
-                      team.spectrumstudios@gmail.com
-                    </a>{' '}
-                    with your bank details and the amount to withdraw. We process all payouts within 3–5 business days.
+              {withdrawError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+                  <i className="fa-solid fa-circle-exclamation mr-1.5"></i>{withdrawError}
+                </div>
+              )}
+
+              {/* Payouts not yet enabled on the platform */}
+              {balance && !balance.payouts_enabled ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                  <p className="font-semibold mb-1"><i className="fa-solid fa-clock mr-1.5"></i>PayPal payouts launching soon</p>
+                  <p className="text-xs leading-relaxed text-amber-700">
+                    Instant PayPal withdrawals are being finalised. Your balance is safe and will be withdrawable here shortly.
                   </p>
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* PayPal email */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">PayPal email</label>
+                    {editingEmail ? (
+                      <div className="flex gap-2">
+                        <input type="email" value={paypalEmail} onChange={e => setPaypalEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:bg-white transition" />
+                        <button onClick={handleSaveEmail} disabled={savingEmail || !paypalEmail.trim()}
+                          className="px-4 py-3 bg-cobalt text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition disabled:opacity-50">
+                          {savingEmail ? '…' : 'Save'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                        <span className="text-sm font-medium text-gray-800 flex items-center gap-2 min-w-0">
+                          <i className="fa-brands fa-paypal text-[#003087]"></i>
+                          <span className="truncate">{paypalEmail}</span>
+                        </span>
+                        <button onClick={() => setEditingEmail(true)} className="text-xs font-semibold text-cobalt hover:underline flex-shrink-0 ml-2">Change</button>
+                      </div>
+                    )}
+                  </div>
 
-              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Available balance</span>
-                  <span className="font-bold text-gray-900">
-                    ${(stats?.total_earned ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Processing time</span>
-                  <span className="font-semibold text-gray-700">3–5 business days</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Payout fee</span>
-                  <span className="font-semibold text-emerald-600">Free</span>
-                </div>
-              </div>
+                  {/* Amount */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
+                      <input type="number" min="0" step="0.01" value={withdrawAmount}
+                        onChange={e => setWithdrawAmount(e.target.value)}
+                        disabled={editingEmail}
+                        className="w-full pl-8 pr-20 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-xl font-bold text-gray-900 focus:outline-none focus:border-cobalt focus:bg-white transition disabled:opacity-60" />
+                      <button type="button" onClick={() => balance && setWithdrawAmount(balance.available.toFixed(2))}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-cobalt hover:underline">MAX</button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5 ml-1">
+                      Available: <span className="font-semibold text-gray-600">
+                        ${(balance?.available ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      {balance && <> · Min ${balance.min_withdrawal.toFixed(2)}</>}
+                    </p>
+                  </div>
 
-              <p className="text-xs text-gray-400 text-center">
-                Automated instant payouts via Stripe Connect are coming soon.
-              </p>
+                  <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">You&apos;ll receive</span>
+                      <span className="font-bold text-gray-900">${(Number(withdrawAmount) || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Payout fee</span>
+                      <span className="font-semibold text-emerald-600">Free</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Arrives</span>
+                      <span className="font-semibold text-gray-700">Within minutes</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="px-7 pb-7">
-              <a href="mailto:team.spectrumstudios@gmail.com?subject=Payout%20Request&body=Hi%20Spectrum%20team%2C%0A%0AI'd%20like%20to%20request%20a%20payout.%0A%0AAmount%3A%20%24%0ABank%20details%3A%20%0A%0AThanks"
-                className="block w-full py-3.5 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-sm text-center">
-                <i className="fa-solid fa-envelope mr-2"></i>Email Payout Request
-              </a>
-              <button onClick={() => setShowModal(false)}
-                className="w-full py-2.5 mt-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition">
-                Close
+              {balance?.payouts_enabled && (
+                <button onClick={handleWithdraw}
+                  disabled={withdrawing || editingEmail || !balance || balance.available <= 0 || Number(withdrawAmount) <= 0}
+                  className="w-full py-3.5 bg-[#0070ba] text-white rounded-xl font-bold text-sm hover:bg-[#003087] transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                  {withdrawing
+                    ? <><i className="fa-solid fa-spinner animate-spin"></i> Sending…</>
+                    : <><i className="fa-brands fa-paypal"></i> Withdraw ${(Number(withdrawAmount) || 0).toFixed(2)}</>}
+                </button>
+              )}
+              <button onClick={() => setShowModal(false)} disabled={withdrawing}
+                className="w-full py-2.5 mt-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition disabled:opacity-50">
+                {balance?.payouts_enabled ? 'Cancel' : 'Close'}
               </button>
             </div>
           </div>
@@ -348,11 +459,11 @@ export default function EarningsPage() {
       )}
 
       {withdrawSuccess && (
-        <div className="fixed bottom-6 right-6 z-50 bg-green-600 text-white px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-fade-in">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 bg-emerald-600 text-white px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-fade-in">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
-          Payout request received! We&apos;ll process it within 3–5 business days.
+          {withdrawSuccess}
         </div>
       )}
     </>

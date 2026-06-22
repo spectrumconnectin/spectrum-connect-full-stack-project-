@@ -62,6 +62,19 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # PayPal Payouts (creator withdrawals)
+    PAYPAL_CLIENT_ID: str = ""
+    PAYPAL_CLIENT_SECRET: str = ""
+    # Default to the sandbox host so nothing can move real money until the live
+    # host is explicitly configured. Set to https://api-m.paypal.com for live.
+    PAYPAL_API_BASE: str = "https://api-m.sandbox.paypal.com"
+    # Minimum withdrawal amount (in USD) a creator can request.
+    PAYOUT_MIN_AMOUNT: float = 10.0
+
+    def paypal_payouts_enabled(self) -> bool:
+        """Payouts are only live when both credentials are present."""
+        return bool(self.PAYPAL_CLIENT_ID and self.PAYPAL_CLIENT_SECRET)
+
     # ── Commission (v1 split 8/4) ────────────────────────────────────────
     # See app/services/commission_service.py and the spec
     # "Spectrum Connect — Commission Logic (v1, Split 8/4)" for details.

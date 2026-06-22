@@ -279,6 +279,8 @@ class User(Document):
     verification_badge: Optional[VerificationBadge] = None
     stats: Optional[UserStats] = Field(default_factory=UserStats)
     settings: Optional[UserSettings] = Field(default_factory=UserSettings)
+    # Verified PayPal email creators withdraw their earnings to (self-service payouts).
+    paypal_payout_email: Optional[str] = None
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None

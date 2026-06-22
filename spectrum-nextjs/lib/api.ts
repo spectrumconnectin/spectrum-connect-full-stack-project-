@@ -966,12 +966,44 @@ export interface EarningsStats {
   transaction_count: number;
 }
 
+export interface PayoutBalance {
+  earned: number;
+  withdrawn: number;
+  available: number;
+  currency: string;
+  min_withdrawal: number;
+  payouts_enabled: boolean;
+  paypal_email: string | null;
+}
+
+export interface WithdrawResult {
+  success: boolean;
+  transaction_id: string;
+  amount: number;
+  paypal_email: string;
+  batch_id?: string;
+  status: string;
+  message: string;
+}
+
 export const earnings = {
   getTransactions: (params?: { status?: string; type?: string; limit?: number; skip?: number }): Promise<EarningTransaction[]> =>
     request<EarningTransaction[]>(`/earnings/me${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
   getStats: (): Promise<EarningsStats> =>
     request<EarningsStats>('/earnings/stats'),
+
+  /** Withdrawable balance + saved PayPal email + whether payouts are live. */
+  getBalance: (): Promise<PayoutBalance> =>
+    request<PayoutBalance>('/earnings/balance'),
+
+  /** Save/update the creator's PayPal payout email. */
+  savePayoutMethod: (paypalEmail: string): Promise<{ success: boolean; paypal_email: string }> =>
+    request('/earnings/payout-method', { method: 'POST', body: JSON.stringify({ paypal_email: paypalEmail }) }),
+
+  /** Withdraw an amount from available balance to the saved PayPal account. */
+  withdraw: (amount: number): Promise<WithdrawResult> =>
+    request('/earnings/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }),
 
   /** Download a CSV earnings report (creator). Triggers file download. */
   downloadCreatorCSV: (): void => {

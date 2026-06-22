@@ -8,15 +8,23 @@ Uses the Transaction model (schema.py).
   - status       : pending | processing | completed | failed | refunded | cancelled
 """
 
-from fastapi import APIRouter, Depends, Query
+import re
+
+from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
 from app.models.schema import User, Transaction
 from app.auth.auth import get_current_user
+from app.core.rate_limit import rate_limiter
+from app.services import payout_service
+from app.services.audit_service import log_event
 
 router = APIRouter(prefix="/earnings", tags=["Earnings"])
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _fmt_txn(t: Transaction) -> dict:
@@ -132,6 +140,72 @@ async def get_earnings_stats(
         "monthly_breakdown": monthly_breakdown,
         "transaction_count": transaction_count,
     }
+
+
+# ── Payouts (self-service PayPal withdrawals) ───────────────────────────────
+
+class PayoutMethodUpdate(BaseModel):
+    paypal_email: str
+
+
+class WithdrawRequest(BaseModel):
+    amount: float
+
+
+@router.get("/balance", summary="Creator's withdrawable balance")
+async def get_balance(current_user: User = Depends(get_current_user)):
+    """Available balance plus the saved PayPal email and payout config state."""
+    bal = await payout_service.get_balance(current_user.id)
+    bal["paypal_email"] = current_user.paypal_payout_email
+    return bal
+
+
+@router.get("/payout-method", summary="Get saved PayPal payout email")
+async def get_payout_method(current_user: User = Depends(get_current_user)):
+    return {
+        "paypal_email": current_user.paypal_payout_email,
+        "payouts_enabled": payout_service.paypal_service.is_enabled(),
+    }
+
+
+@router.post("/payout-method", summary="Save/update PayPal payout email")
+async def set_payout_method(
+    body: PayoutMethodUpdate,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("payout_method", limit=10, window_seconds=300)),
+):
+    email = (body.paypal_email or "").strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Enter a valid PayPal email address.")
+    current_user.paypal_payout_email = email
+    await current_user.save()
+    await log_event(
+        "payout.method_updated", actor=current_user, target_type="user",
+        target_id=str(current_user.id), request=request,
+        metadata={"paypal_email": email}, severity="info",
+    )
+    return {"success": True, "paypal_email": email}
+
+
+@router.post("/withdraw", summary="Withdraw earnings to PayPal")
+async def withdraw(
+    body: WithdrawRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("payout_withdraw", limit=5, window_seconds=300)),
+):
+    """Send the requested amount from the creator's available balance to their
+    saved PayPal account. See payout_service for the full fail-safe flow."""
+    result = await payout_service.request_withdrawal(current_user, body.amount)
+    await log_event(
+        "payout.withdrawn", actor=current_user, target_type="transaction",
+        target_id=result.get("transaction_id"), request=request,
+        metadata={"amount": result.get("amount"), "paypal_email": result.get("paypal_email"),
+                  "batch_id": result.get("batch_id")},
+        severity="warning",
+    )
+    return result
 
 
 @router.get("/invoice/csv", summary="Download earnings report as CSV")
