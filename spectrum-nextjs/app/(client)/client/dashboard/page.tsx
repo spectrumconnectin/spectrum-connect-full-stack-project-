@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { dashboard, jobs as jobsApi, profile as profileApi, escrow as escrowApi, type ClientDashboardResponse, type JobPostItem } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
+import SetupJourney from '@/components/SetupJourney';
 
 const STATUS_LABEL: Record<string, string> = {
   open:               'Open',
@@ -106,6 +107,9 @@ export default function ClientDashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Setup journey — guides new users to first success ── */}
+      <SetupJourney />
 
       {/* ── New user: focused empty state ── */}
       {!hasProjects && (

@@ -1786,3 +1786,11 @@ input[type="number"] {
 @media (prefers-reduced-motion: reduce) {
   .sc-tour-in, .sc-tour-out, .sc-tour-card > div:first-of-type { animation: none !important; }
 }
+
+/* Setup-journey / empty-state entrance */
+.sc-journey-in { animation: scJourneyIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes scJourneyIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) { .sc-journey-in { animation: none; } }

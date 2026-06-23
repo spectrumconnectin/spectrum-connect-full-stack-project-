@@ -1356,6 +1356,29 @@ export interface CommissionBreakdown {
   currency: string;
 }
 
+// ── Onboarding setup journey ─────────────────────────────────────────────────
+export interface JourneyStep {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  done: boolean;
+  href: string | null;
+  cta: string | null;
+}
+export interface SetupJourney {
+  role: 'creator' | 'client';
+  steps: JourneyStep[];
+  completed_count: number;
+  total: number;
+  all_done: boolean;
+  next_key: string | null;
+}
+
+export const onboarding = {
+  getJourney: (): Promise<SetupJourney> => request<SetupJourney>('/onboarding/journey'),
+};
+
 export const commission = {
   /** Preview platform fees for a hypothetical subtotal. No auth required. */
   preview: (subtotal: number, currency = 'USD'): Promise<CommissionBreakdown> =>
