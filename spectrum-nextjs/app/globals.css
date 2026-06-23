@@ -1760,3 +1760,29 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ── Product tour ─────────────────────────────────────────────────────────── */
+/* Blurred, dimmed scrim panels that frame the spotlight target. */
+.sc-tour-scrim {
+  position: fixed;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px) saturate(115%);
+  -webkit-backdrop-filter: blur(4px) saturate(115%);
+}
+.sc-tour-card { z-index: 1; }
+.sc-tour-in  { animation: scTourIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.sc-tour-out { animation: scTourOut 0.18s ease forwards; }
+@keyframes scTourIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scTourOut { from { opacity: 1; } to { opacity: 0; } }
+.sc-tour-card > div:first-of-type { animation: scTourCardIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes scTourCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Tooltip arrow pointing at the spotlighted element. */
+.sc-tour-arrow { position: absolute; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; background: #fff; rotate: 45deg; border: 1px solid #f3f4f6; }
+.sc-tour-arrow-top    { top: -7px;    border-right: none; border-bottom: none; }
+.sc-tour-arrow-bottom { bottom: -7px; border-left: none;  border-top: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-tour-in, .sc-tour-out, .sc-tour-card > div:first-of-type { animation: none !important; }
+}

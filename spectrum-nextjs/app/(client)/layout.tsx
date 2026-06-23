@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
 import NotificationBell from '@/components/NotificationBell';
+import ProductTour from '@/components/ProductTour';
 import { profile as profileApi, auth } from '@/lib/api';
 import { usePresence } from '@/hooks/usePresence';
 
@@ -99,7 +100,7 @@ function ClientHeader() {
 
             {/* Right actions */}
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <Link href="/client/messaging"
+              <Link href="/client/messaging" data-tour="messages"
                 className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
                   pathname === '/client/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                 }`} title="Messages">
@@ -108,7 +109,7 @@ function ClientHeader() {
                 </svg>
               </Link>
 
-              <NotificationBell />
+              <span data-tour="bell"><NotificationBell /></span>
 
               {/* Avatar + profile dropdown */}
               <div className="relative">
@@ -141,6 +142,10 @@ function ClientHeader() {
                     <button onClick={() => { setMenuOpen(false); window.location.href = '/client/profile#settings'; }}
                       className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                       <i className="fa-solid fa-gear w-5 text-gray-400 mr-2.5" />Settings
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); window.dispatchEvent(new Event('sc:start-tour')); }}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                      <i className="fa-solid fa-compass w-5 text-gray-400 mr-2.5" />Take a tour
                     </button>
                     <div className="border-t border-gray-100 my-1" />
                     <button onClick={() => { auth.logout(); window.location.href = '/login'; }}
@@ -303,6 +308,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       </main>
       <ClientFooter />
       <ClientBottomNav />
+      <ProductTour role="client" />
     </div>
   );
 }

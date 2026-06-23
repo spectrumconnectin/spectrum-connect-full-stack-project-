@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import PageTransition from '@/components/PageTransition';
 import NotificationBell from '@/components/NotificationBell';
+import ProductTour from '@/components/ProductTour';
 import { profile as profileApi, auth, tokenStore } from '@/lib/api';
 import { usePresence } from '@/hooks/usePresence';
 
@@ -96,7 +97,7 @@ function CreatorHeader() {
 
             {/* Right actions */}
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <div className="relative">
+              <div className="relative" data-tour="messages">
                 <Link href="/creator/messaging"
                   className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
                     pathname === '/creator/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
@@ -108,7 +109,7 @@ function CreatorHeader() {
                 <span className="absolute top-1 right-1 w-2 h-2 bg-cobalt rounded-full border-2 border-white pointer-events-none" />
               </div>
 
-              <NotificationBell />
+              <span data-tour="bell"><NotificationBell /></span>
 
               <div className="relative">
                 <button onClick={() => setMenuOpen(o => !o)} className="flex items-center focus:outline-none group">
@@ -141,6 +142,10 @@ function CreatorHeader() {
                     <button onClick={() => { setMenuOpen(false); window.location.href = '/creator/profile#settings'; }}
                       className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
                       <i className="fa-solid fa-gear w-5 text-gray-400 mr-2.5" />Settings
+                    </button>
+                    <button onClick={() => { setMenuOpen(false); window.dispatchEvent(new Event('sc:start-tour')); }}
+                      className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                      <i className="fa-solid fa-compass w-5 text-gray-400 mr-2.5" />Take a tour
                     </button>
                     <div className="border-t border-gray-100 my-1" />
                     <button onClick={() => { auth.logout(); window.location.href = '/login'; }}
@@ -301,6 +306,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
       </main>
       <CreatorFooter />
       <CreatorBottomNav />
+      <ProductTour role="creator" />
     </div>
   );
 }
