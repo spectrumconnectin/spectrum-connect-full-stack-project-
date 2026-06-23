@@ -150,14 +150,14 @@ class JobPostCreate(BaseModel):
 
     @validator('budget', always=True)
     def budget_minimum(cls, v):
-        """Enforce $5 minimum on fixed budgets."""
+        """Enforce $2 minimum on fixed budgets."""
         if v is None:
             return v
         min_val = v.min or 0
         max_val = v.max or 0
         effective = max_val or min_val
-        if effective > 0 and effective < 5:
-            raise ValueError('Projects must have a minimum budget of $5.')
+        if effective > 0 and effective < 2:
+            raise ValueError('Projects must have a minimum budget of $2.')
         return v
 
     # Location & event details (required for in-person / on-site work)

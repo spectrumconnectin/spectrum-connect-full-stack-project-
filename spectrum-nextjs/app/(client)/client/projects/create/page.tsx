@@ -167,7 +167,7 @@ const SKILLS_SUGGESTIONS = [
 ];
 
 const QUICK_BUDGETS = [5, 25, 50, 100, 250, 500, 1000, 2500, 5000];
-const MIN_BUDGET = 5;
+const MIN_BUDGET = 2;
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$',   label: 'USD — US Dollar' },
@@ -281,7 +281,7 @@ export default function CreateProjectPage() {
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [delivInput, setDelivInput]     = useState('');
 
-  // ── Step 3: Budget (single fixed price, min $5) ─────────────────────────
+  // ── Step 3: Budget (single fixed price, min $2) ─────────────────────────
   const [budget, setBudget] = useState('');
   const [currency, setCurrency] = useState('USD');
 

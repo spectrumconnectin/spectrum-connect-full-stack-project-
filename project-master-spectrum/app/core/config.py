@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # host is explicitly configured. Set to https://api-m.paypal.com for live.
     PAYPAL_API_BASE: str = "https://api-m.sandbox.paypal.com"
     # Minimum withdrawal amount (in USD) a creator can request.
-    PAYOUT_MIN_AMOUNT: float = 10.0
+    PAYOUT_MIN_AMOUNT: float = 1.0
 
     def paypal_payouts_enabled(self) -> bool:
         """Payouts are only live when both credentials are present."""
