@@ -228,11 +228,15 @@ async def connect_onboard(
     from app.services import stripe_connect_service
     if not stripe_connect_service.is_enabled():
         raise HTTPException(status_code=503, detail="Bank payouts are not configured yet.")
-    account_id = await stripe_connect_service.create_or_get_account(current_user)
     try:
+        account_id = await stripe_connect_service.create_or_get_account(current_user)
         url = stripe_connect_service.create_account_link(account_id)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Could not start bank onboarding: {e}")
+        # Most common cause: the platform hasn't signed up for Stripe Connect yet.
+        msg = str(getattr(e, "user_message", None) or e)
+        if "sign" in msg.lower() and "connect" in msg.lower():
+            raise HTTPException(status_code=503, detail="Bank payouts aren't enabled yet — coming soon.")
+        raise HTTPException(status_code=502, detail=f"Could not start bank onboarding: {msg}")
     await log_event(
         "payout.connect_started", actor=current_user, target_type="user",
         target_id=str(current_user.id), request=request,
