@@ -972,16 +972,27 @@ export interface PayoutBalance {
   available: number;
   currency: string;
   min_withdrawal: number;
-  payouts_enabled: boolean;
+  payouts_enabled: boolean;        // PayPal configured platform-wide
   paypal_email: string | null;
+  stripe_enabled: boolean;         // Stripe Connect configured platform-wide
+  stripe_connected: boolean;       // this creator has a connected account
+  stripe_payouts_enabled: boolean; // their account can receive payouts
+}
+
+export interface ConnectStatus {
+  connected: boolean;
+  payouts_enabled: boolean;
+  details_submitted?: boolean;
+  needs_onboarding: boolean;
 }
 
 export interface WithdrawResult {
   success: boolean;
   transaction_id: string;
   amount: number;
-  paypal_email: string;
-  batch_id?: string;
+  method?: 'paypal' | 'stripe';
+  destination?: string;
+  external_id?: string;
   status: string;
   message: string;
 }
@@ -1001,9 +1012,17 @@ export const earnings = {
   savePayoutMethod: (paypalEmail: string): Promise<{ success: boolean; paypal_email: string }> =>
     request('/earnings/payout-method', { method: 'POST', body: JSON.stringify({ paypal_email: paypalEmail }) }),
 
-  /** Withdraw an amount from available balance to the saved PayPal account. */
-  withdraw: (amount: number): Promise<WithdrawResult> =>
-    request('/earnings/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }),
+  /** Withdraw from available balance via 'paypal' or 'stripe' (bank). */
+  withdraw: (amount: number, method: 'paypal' | 'stripe' = 'paypal'): Promise<WithdrawResult> =>
+    request('/earnings/withdraw', { method: 'POST', body: JSON.stringify({ amount, method }) }),
+
+  /** Start/continue Stripe bank onboarding — returns a hosted URL to redirect to. */
+  connectOnboard: (): Promise<{ url: string; account_id: string }> =>
+    request('/earnings/connect/onboard', { method: 'POST' }),
+
+  /** Live status of the creator's Stripe connected account. */
+  connectStatus: (): Promise<ConnectStatus> =>
+    request('/earnings/connect/status'),
 
   /** Download a CSV earnings report (creator). Triggers file download. */
   downloadCreatorCSV: (): void => {

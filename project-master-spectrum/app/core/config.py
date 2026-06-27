@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     PAYPAL_API_BASE: str = "https://api-m.sandbox.paypal.com"
     # Minimum withdrawal amount (in USD) a creator can request.
     PAYOUT_MIN_AMOUNT: float = 1.0
+    # Currency used for Stripe Connect transfers to creators. Must be a currency
+    # the platform Stripe balance settles in (the balance is EUR today). Override
+    # via env if you change your Stripe settlement currency.
+    STRIPE_PAYOUT_CURRENCY: str = "usd"
 
     def paypal_payouts_enabled(self) -> bool:
         """Payouts are only live when both credentials are present."""

@@ -281,6 +281,10 @@ class User(Document):
     settings: Optional[UserSettings] = Field(default_factory=UserSettings)
     # Verified PayPal email creators withdraw their earnings to (self-service payouts).
     paypal_payout_email: Optional[str] = None
+    # Stripe Connect (Express) account id for bank cash-outs, paid from the
+    # platform's Stripe balance. Set once the creator completes Stripe onboarding.
+    stripe_account_id: Optional[str] = None
+    stripe_payouts_enabled: bool = False   # cached from the connected account's capabilities
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None

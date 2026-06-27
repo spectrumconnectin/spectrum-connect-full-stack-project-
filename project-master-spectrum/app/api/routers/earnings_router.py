@@ -150,13 +150,19 @@ class PayoutMethodUpdate(BaseModel):
 
 class WithdrawRequest(BaseModel):
     amount: float
+    method: str = "paypal"   # "paypal" | "stripe"
 
 
 @router.get("/balance", summary="Creator's withdrawable balance")
 async def get_balance(current_user: User = Depends(get_current_user)):
-    """Available balance plus the saved PayPal email and payout config state."""
+    """Available balance plus saved destinations and which payout rails are live."""
+    from app.services import stripe_connect_service
     bal = await payout_service.get_balance(current_user.id)
     bal["paypal_email"] = current_user.paypal_payout_email
+    # Stripe bank (Connect) state for the method picker.
+    bal["stripe_enabled"] = stripe_connect_service.is_enabled()
+    bal["stripe_connected"] = bool(getattr(current_user, "stripe_account_id", None))
+    bal["stripe_payouts_enabled"] = bool(getattr(current_user, "stripe_payouts_enabled", False))
     return bal
 
 
@@ -188,7 +194,7 @@ async def set_payout_method(
     return {"success": True, "paypal_email": email}
 
 
-@router.post("/withdraw", summary="Withdraw earnings to PayPal")
+@router.post("/withdraw", summary="Withdraw earnings (PayPal or bank via Stripe)")
 async def withdraw(
     body: WithdrawRequest,
     request: Request,
@@ -196,16 +202,57 @@ async def withdraw(
     _rl: None = Depends(rate_limiter("payout_withdraw", limit=5, window_seconds=300)),
 ):
     """Send the requested amount from the creator's available balance to their
-    saved PayPal account. See payout_service for the full fail-safe flow."""
-    result = await payout_service.request_withdrawal(current_user, body.amount)
+    chosen destination — PayPal, or their bank via Stripe Connect (paid from the
+    platform's Stripe balance). See payout_service for the full fail-safe flow."""
+    result = await payout_service.request_withdrawal(current_user, body.amount, body.method)
     await log_event(
         "payout.withdrawn", actor=current_user, target_type="transaction",
         target_id=result.get("transaction_id"), request=request,
-        metadata={"amount": result.get("amount"), "paypal_email": result.get("paypal_email"),
-                  "batch_id": result.get("batch_id")},
+        metadata={"amount": result.get("amount"), "method": result.get("method"),
+                  "destination": result.get("destination"), "external_id": result.get("external_id")},
         severity="warning",
     )
     return result
+
+
+# ── Stripe Connect (bank cash-out) ──────────────────────────────────────────
+
+@router.post("/connect/onboard", summary="Start/continue Stripe bank onboarding")
+async def connect_onboard(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("connect_onboard", limit=10, window_seconds=300)),
+):
+    """Create (or reuse) the creator's Stripe Express account and return a hosted
+    onboarding URL where they add their bank + identity details."""
+    from app.services import stripe_connect_service
+    if not stripe_connect_service.is_enabled():
+        raise HTTPException(status_code=503, detail="Bank payouts are not configured yet.")
+    account_id = await stripe_connect_service.create_or_get_account(current_user)
+    try:
+        url = stripe_connect_service.create_account_link(account_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not start bank onboarding: {e}")
+    await log_event(
+        "payout.connect_started", actor=current_user, target_type="user",
+        target_id=str(current_user.id), request=request,
+        metadata={"account_id": account_id}, severity="info",
+    )
+    return {"url": url, "account_id": account_id}
+
+
+@router.get("/connect/status", summary="Stripe bank connection status")
+async def connect_status(current_user: User = Depends(get_current_user)):
+    """Live readiness of the creator's connected account; caches payouts_enabled."""
+    from app.services import stripe_connect_service
+    if not getattr(current_user, "stripe_account_id", None):
+        return {"connected": False, "payouts_enabled": False, "needs_onboarding": True}
+    status = stripe_connect_service.get_account_status(current_user.stripe_account_id)
+    # Cache the flag so the balance endpoint and withdraw guard are fast.
+    if current_user.stripe_payouts_enabled != status["payouts_enabled"]:
+        current_user.stripe_payouts_enabled = status["payouts_enabled"]
+        await current_user.save()
+    return {"connected": True, **status}
 
 
 @router.get("/invoice/csv", summary="Download earnings report as CSV")
