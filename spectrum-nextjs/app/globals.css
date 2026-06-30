@@ -1804,6 +1804,9 @@ input[type="number"] {
   color: #1f2937;
   letter-spacing: -0.003em;
   -webkit-font-smoothing: antialiased;
+  /* Stop long URLs/words from forcing horizontal scroll on phones. */
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .blog-prose > * + * { margin-top: 1.5em; }
 .blog-prose h2 {

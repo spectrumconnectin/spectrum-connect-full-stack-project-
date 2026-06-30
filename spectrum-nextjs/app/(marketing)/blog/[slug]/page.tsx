@@ -97,7 +97,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
       <article>
         {/* Header */}
-        <header className="max-w-[720px] mx-auto px-6 pt-10 sm:pt-14">
+        <header className="max-w-[720px] mx-auto px-5 sm:px-6 pt-10 sm:pt-14">
           <Link href="/blog" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-400 hover:text-cobalt transition mb-6">
             <i className="fa-solid fa-arrow-left" /> Back to Blog
           </Link>
@@ -127,14 +127,14 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
         {/* Cover */}
         {post.cover_image && (
-          <div className="max-w-[860px] mx-auto px-6 mt-8">
+          <div className="max-w-[860px] mx-auto px-5 sm:px-6 mt-8">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={post.cover_image} alt={post.title} className="w-full rounded-2xl border border-gray-100 shadow-[0_10px_40px_-12px_rgba(15,23,42,0.18)] object-cover" style={{ maxHeight: 460 }} />
           </div>
         )}
 
         {/* Body */}
-        <div className="max-w-[720px] mx-auto px-6 pt-10 sm:pt-12 pb-12">
+        <div className="max-w-[720px] mx-auto px-5 sm:px-6 pt-10 sm:pt-12 pb-12">
           <div className="blog-prose" dangerouslySetInnerHTML={{ __html: post.content }} />
 
           <hr className="my-10 border-gray-100" />
@@ -154,7 +154,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
         {/* Related */}
         {related.length > 0 && (
           <section className="bg-gray-50/70 border-t border-gray-100">
-            <div className="max-w-[1000px] mx-auto px-6 py-14">
+            <div className="max-w-[1000px] mx-auto px-5 sm:px-6 py-14">
               <h2 className="text-lg font-extrabold text-gray-900 mb-6">Keep reading</h2>
               <div className="grid sm:grid-cols-3 gap-5">
                 {related.map(p => (
@@ -174,7 +174,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
         )}
 
         {/* CTA */}
-        <div className="max-w-[720px] mx-auto px-6 py-14">
+        <div className="max-w-[720px] mx-auto px-5 sm:px-6 py-14">
           <div className="rounded-3xl text-center p-9 sm:p-10 border border-blue-100" style={{ background: 'linear-gradient(135deg,#eef4ff,#e0eaff)' }}>
             <h3 className="text-2xl font-extrabold text-gray-900 mb-2">Ready to put this into practice?</h3>
             <p className="text-gray-500 mb-6">Join the creators and clients building great work on Spectrum Connect.</p>

@@ -110,7 +110,7 @@ export default async function BlogPage({ searchParams }: { searchParams: { categ
         </div>
 
         {/* Category tabs */}
-        <nav className="mt-8 border-b border-gray-200 flex items-center gap-7 overflow-x-auto no-scrollbar">
+        <nav className="mt-8 border-b border-gray-200 flex items-center gap-5 sm:gap-7 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
           {['All', ...CATEGORIES].map(cat => {
             const isAll = cat === 'All';
             const active = isAll ? !activeCat : activeCat.toLowerCase() === cat.toLowerCase();
@@ -146,7 +146,7 @@ export default async function BlogPage({ searchParams }: { searchParams: { categ
               {featured && (
                 <Link href={`/blog/${featured.slug}`} className="group block rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                   <div className="grid sm:grid-cols-2">
-                    <div className="relative min-h-[240px] bg-gradient-to-br from-cobalt to-blue-500"
+                    <div className="relative h-48 sm:h-auto sm:min-h-[240px] bg-gradient-to-br from-cobalt to-blue-500"
                       style={featured.cover_image ? { backgroundImage: `url(${featured.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
                     <div className="p-6 sm:p-7 flex flex-col">
                       <div className="flex items-center gap-3 mb-3">
@@ -175,7 +175,7 @@ export default async function BlogPage({ searchParams }: { searchParams: { categ
                   <div className="divide-y divide-gray-100 border-y border-gray-100">
                     {rest.map(post => (
                       <Link key={post.slug} href={`/blog/${post.slug}`} className="group flex gap-5 py-5 px-3 -mx-3 rounded-2xl items-start hover:bg-gray-50/70 transition-colors">
-                        <div className="hidden sm:block w-28 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-cobalt to-blue-500"
+                        <div className="w-24 h-24 sm:w-28 sm:h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-cobalt to-blue-500"
                           style={post.cover_image ? { backgroundImage: `url(${post.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1.5">

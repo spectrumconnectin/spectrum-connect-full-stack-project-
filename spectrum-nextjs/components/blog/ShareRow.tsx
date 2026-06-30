@@ -13,7 +13,9 @@ export default function ShareRow({ url, title }: { url: string; title: string })
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ }
   };
 
-  const btn = 'w-9 h-9 rounded-full border border-gray-200 text-gray-500 hover:text-cobalt hover:border-cobalt flex items-center justify-center transition active:scale-95';
+  // 44px on touch screens (keeps the circle round against the global 44px
+  // min touch-target rule), tighter on desktop.
+  const btn = 'w-11 h-11 sm:w-9 sm:h-9 rounded-full border border-gray-200 text-gray-500 hover:text-cobalt hover:border-cobalt flex items-center justify-center transition active:scale-95';
 
   return (
     <div className="flex items-center gap-2">
