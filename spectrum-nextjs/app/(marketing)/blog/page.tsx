@@ -18,7 +18,10 @@ export const metadata: Metadata = {
     title: 'Spectrum Connect Blog — Creative Career Insights',
     description: 'Practical guides on pricing, contracts, escrow, and portfolios.',
   },
-  alternates: { canonical: 'https://spectrumconect.com/blog' },
+  alternates: {
+    canonical: 'https://spectrumconect.com/blog',
+    types: { 'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Spectrum Connect Blog' }] },
+  },
 };
 
 // Revalidate the list every 60s so new posts appear quickly without a redeploy.
@@ -65,8 +68,28 @@ export default async function BlogPage() {
   const featured = posts.find(p => p.is_featured) || posts[0];
   const rest = posts.filter(p => p.slug !== featured?.slug);
 
+  // Blog + ItemList structured data — helps Google build a rich blog listing.
+  const blogJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: 'Spectrum Connect Blog',
+    description: 'Guides, stories, and advice for creators and the clients who work with them.',
+    url: 'https://spectrumconect.com/blog',
+    publisher: { '@type': 'Organization', name: 'Spectrum Connect', url: 'https://spectrumconect.com' },
+    blogPost: posts.slice(0, 20).map(p => ({
+      '@type': 'BlogPosting',
+      headline: p.title,
+      description: p.excerpt,
+      url: `https://spectrumconect.com/blog/${p.slug}`,
+      image: p.cover_image || undefined,
+      datePublished: p.published_at || p.created_at,
+      author: { '@type': 'Person', name: p.author?.name || 'Spectrum Connect' },
+    })),
+  };
+
   return (
     <div>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }} />
       <Nav />
 
       {/* Hero */}

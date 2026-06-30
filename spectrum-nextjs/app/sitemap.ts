@@ -1,18 +1,12 @@
 import { MetadataRoute } from 'next';
+import { getPublishedPosts } from '@/lib/blog';
 
 const BASE = 'https://spectrumconect.com';
 
-// All known blog post slugs
-const blogSlugs = [
-  'how-to-price-your-creative-work',
-  'building-a-winning-creative-brief',
-  'escrow-payments-explained',
-  'top-creator-portfolio-tips',
-  'ai-smart-connect-explained',
-  'creative-contracts-guide',
-];
+// Regenerate hourly so newly-published posts get indexed without a redeploy.
+export const revalidate = 3600;
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticPages: MetadataRoute.Sitemap = [
@@ -108,9 +102,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 
-  const blogPages: MetadataRoute.Sitemap = blogSlugs.map((slug) => ({
-    url: `${BASE}/blog/${slug}`,
-    lastModified: now,
+  // Real published posts, fetched live from the blog API.
+  const { posts } = await getPublishedPosts(200);
+  const blogPages: MetadataRoute.Sitemap = posts.map((p) => ({
+    url: `${BASE}/blog/${p.slug}`,
+    lastModified: p.published_at ? new Date(p.published_at) : (p.created_at ? new Date(p.created_at) : now),
     changeFrequency: 'monthly' as const,
     priority: 0.7,
   }));
