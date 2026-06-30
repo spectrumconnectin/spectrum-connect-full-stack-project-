@@ -2,151 +2,262 @@ import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getPublishedPosts, formatPostDate, categoryClass, type BlogListItem } from '@/lib/blog';
+import DigestSignup from '@/components/blog/DigestSignup';
+import { getPublishedPosts, formatPostDate, type BlogListItem } from '@/lib/blog';
 
 export const metadata: Metadata = {
-  title: 'Blog — Insights for Creative Professionals & Clients',
-  description: 'Practical guides on freelance pricing, creative contracts, escrow payments, portfolio tips, and AI-powered matching — from the Spectrum Connect team.',
+  title: 'Blog & Insights — Ideas for Creative Professionals',
+  description: 'Guides, stories, and advice for creators and the clients who work with them — freelancing, portfolios, escrow payments, client management, and more.',
   openGraph: {
-    title: 'Spectrum Connect Blog — Freelance & Creative Marketplace Insights',
-    description: 'Expert advice on freelance pricing, creative briefs, escrow, portfolio tips, and building a sustainable creative career.',
+    title: 'Spectrum Connect Blog & Insights',
+    description: 'Guides, stories, and advice for creators and the clients who work with them.',
     url: 'https://spectrumconect.com/blog',
     type: 'website',
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Spectrum Connect Blog — Creative Career Insights',
-    description: 'Practical guides on pricing, contracts, escrow, and portfolios.',
-  },
+  twitter: { card: 'summary_large_image', title: 'Spectrum Connect Blog & Insights', description: 'Ideas, guides, and stories for creative professionals.' },
   alternates: {
     canonical: 'https://spectrumconect.com/blog',
     types: { 'application/rss+xml': [{ url: '/blog/rss.xml', title: 'Spectrum Connect Blog' }] },
   },
 };
 
-// Revalidate the list every 60s so new posts appear quickly without a redeploy.
 export const revalidate = 60;
 
-function CoverCard({ post, featured }: { post: BlogListItem; featured?: boolean }) {
-  const meta = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: featured ? 13 : 12, color: '#9ca3af', marginTop: featured ? 0 : 'auto', flexWrap: 'wrap' }}>
-      <span style={{ fontWeight: 600, color: '#374151' }}>{post.author?.name || 'Spectrum Connect'}</span>
-      <span>·</span><span>{formatPostDate(post.published_at || post.created_at)}</span>
-      {post.stats?.read_time_minutes ? <><span>·</span><span>{post.stats.read_time_minutes} min read</span></> : null}
-    </div>
-  );
+// Editorial category set shown as filter tabs + topic chips.
+const CATEGORIES = [
+  'Freelancing', 'Creator Economy', 'Portfolio Tips', 'Client Management',
+  'Escrow & Payments', 'Productivity', 'Remote Work', 'Industry Insights',
+];
+const TOPICS = [...CATEGORIES, 'ETF / Trust System'];
+
+function Avatar({ name, url, size = 28 }: { name?: string; url?: string; size?: number }) {
+  const s = { width: size, height: size };
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={name || ''} style={s} className="rounded-full object-cover border border-gray-200 flex-shrink-0" />;
+  }
   return (
-    <Link href={`/blog/${post.slug}`} className="group"
-      style={{ textDecoration: 'none', borderRadius: featured ? 24 : 20, overflow: 'hidden', border: '1px solid #e5e7eb', background: '#fff',
-        display: featured ? 'block' : 'flex', flexDirection: 'column', boxShadow: featured ? '0 4px 24px rgba(0,0,0,0.06)' : '0 2px 12px rgba(0,0,0,0.04)' }}>
-      <div style={featured ? { display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 300 } : undefined}>
-        {/* Cover */}
-        <div style={{ height: featured ? 'auto' : 160, minHeight: featured ? 300 : 160, background: 'linear-gradient(135deg,#195ad7,#4178e7)',
-          backgroundImage: post.cover_image ? `url(${post.cover_image})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {!post.cover_image && <i className="fa-solid fa-pen-nib" style={{ fontSize: featured ? 64 : 40, color: 'rgba(255,255,255,0.3)' }} />}
-        </div>
-        {/* Body */}
-        <div style={{ padding: featured ? '40px 44px' : '24px 24px 20px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: featured ? 'center' : undefined }}>
-          {post.category && (
-            <div style={{ marginBottom: featured ? 12 : 10 }}>
-              <span className={categoryClass(post.category)} style={{ fontSize: featured ? 12 : 11, fontWeight: 700, padding: '4px 12px', borderRadius: 20 }}>{post.category}</span>
-            </div>
-          )}
-          <h3 style={{ fontSize: featured ? 'clamp(1.2rem,2.5vw,1.8rem)' : 17, fontWeight: featured ? 800 : 700, color: '#111827', lineHeight: 1.28, marginBottom: featured ? 12 : 8, flex: featured ? undefined : 1 }}>{post.title}</h3>
-          <p style={{ fontSize: featured ? 15 : 14, color: '#6b7280', lineHeight: 1.65, marginBottom: featured ? 20 : 16 }}>{post.excerpt}</p>
-          {meta}
-        </div>
-      </div>
-    </Link>
+    <div style={s} className="rounded-full bg-blue-100 text-cobalt font-bold flex items-center justify-center flex-shrink-0" >
+      <span style={{ fontSize: size * 0.4 }}>{(name || '?')[0]?.toUpperCase()}</span>
+    </div>
   );
 }
 
-export default async function BlogPage() {
-  const { posts } = await getPublishedPosts(50);
-  const categories = ['All', ...Array.from(new Set(posts.map(p => p.category).filter(Boolean)))] as string[];
+function MetaRow({ post, className = '' }: { post: BlogListItem; className?: string }) {
+  return (
+    <div className={`flex items-center gap-2.5 ${className}`}>
+      <Avatar name={post.author?.name} url={post.author?.avatar} />
+      <span className="text-sm font-semibold text-gray-700">{post.author?.name || 'Spectrum Connect'}</span>
+      <span className="text-gray-300">·</span>
+      <span className="text-sm text-gray-400">{formatPostDate(post.published_at || post.created_at)}</span>
+    </div>
+  );
+}
+
+export default async function BlogPage({ searchParams }: { searchParams: { category?: string } }) {
+  const { posts: allPosts } = await getPublishedPosts(100);
+  const activeCat = searchParams?.category || '';
+  const posts = activeCat
+    ? allPosts.filter(p => (p.category || '').toLowerCase() === activeCat.toLowerCase())
+    : allPosts;
+
   const featured = posts.find(p => p.is_featured) || posts[0];
   const rest = posts.filter(p => p.slug !== featured?.slug);
 
-  // Blog + ItemList structured data — helps Google build a rich blog listing.
+  // Sidebar: trending (most-viewed, fallback recent), and authors derived from posts.
+  const trending = [...allPosts]
+    .sort((a, b) => (b.stats?.views ?? 0) - (a.stats?.views ?? 0))
+    .slice(0, 3);
+  const authorMap = new Map<string, { name: string; bio?: string; avatar?: string; count: number }>();
+  for (const p of allPosts) {
+    const n = p.author?.name; if (!n) continue;
+    const cur = authorMap.get(n) || { name: n, bio: p.author?.bio, avatar: p.author?.avatar, count: 0 };
+    cur.count++; authorMap.set(n, cur);
+  }
+  const authors = Array.from(authorMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
+
   const blogJsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Blog',
-    name: 'Spectrum Connect Blog',
+    '@context': 'https://schema.org', '@type': 'Blog',
+    name: 'Spectrum Connect Blog', url: 'https://spectrumconect.com/blog',
     description: 'Guides, stories, and advice for creators and the clients who work with them.',
-    url: 'https://spectrumconect.com/blog',
     publisher: { '@type': 'Organization', name: 'Spectrum Connect', url: 'https://spectrumconect.com' },
-    blogPost: posts.slice(0, 20).map(p => ({
-      '@type': 'BlogPosting',
-      headline: p.title,
-      description: p.excerpt,
-      url: `https://spectrumconect.com/blog/${p.slug}`,
-      image: p.cover_image || undefined,
+    blogPost: allPosts.slice(0, 20).map(p => ({
+      '@type': 'BlogPosting', headline: p.title, description: p.excerpt,
+      url: `https://spectrumconect.com/blog/${p.slug}`, image: p.cover_image || undefined,
       datePublished: p.published_at || p.created_at,
       author: { '@type': 'Person', name: p.author?.name || 'Spectrum Connect' },
     })),
   };
 
   return (
-    <div>
+    <div className="bg-white">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(blogJsonLd) }} />
       <Nav />
 
-      {/* Hero */}
-      <section style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e3a6e 100%)', padding: '72px 24px 56px', textAlign: 'center' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <div style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '6px 16px', fontSize: 13, fontWeight: 700, color: '#93c5fd', letterSpacing: '0.08em', marginBottom: 20 }}>
-            SPECTRUM BLOG
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-bold tracking-widest text-gray-400 uppercase mb-2">
+              <i className="fa-solid fa-newspaper text-cobalt" /> Spectrum Connect <span className="text-gray-300">·</span> Blog
+            </p>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900">Blog &amp; Insights</h1>
+            <p className="text-gray-500 mt-2">Ideas, guides, and stories for creative professionals.</p>
           </div>
-          <h1 style={{ fontSize: 'clamp(2rem,5vw,3rem)', fontWeight: 800, color: '#fff', lineHeight: 1.15, marginBottom: 16 }}>
-            Insights for the creative economy
-          </h1>
-          <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 32 }}>
-            Guides, stories, and advice for creators and the clients who work with them.
-          </p>
-          {posts.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-              {categories.map(c => (
-                <span key={c} style={{ padding: '6px 14px', borderRadius: 20, background: c === 'All' ? '#195ad7' : 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 13, fontWeight: 600, border: '1px solid rgba(255,255,255,0.15)' }}>
-                  {c}
-                </span>
-              ))}
-            </div>
-          )}
+          <a href="#digest" className="inline-flex items-center gap-2 bg-cobalt text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition shadow-sm">
+            <i className="fa-regular fa-envelope" /> Subscribe
+          </a>
         </div>
-      </section>
 
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '56px 24px' }}>
+        {/* Category tabs */}
+        <nav className="mt-8 border-b border-gray-200 flex items-center gap-7 overflow-x-auto no-scrollbar">
+          {['All', ...CATEGORIES].map(cat => {
+            const isAll = cat === 'All';
+            const active = isAll ? !activeCat : activeCat.toLowerCase() === cat.toLowerCase();
+            const href = isAll ? '/blog' : `/blog?category=${encodeURIComponent(cat)}`;
+            return (
+              <Link key={cat} href={href}
+                className={`relative whitespace-nowrap pb-3 text-sm font-semibold transition-colors ${active ? 'text-cobalt' : 'text-gray-500 hover:text-gray-800'}`}>
+                {cat}
+                {active && <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-cobalt rounded-full" />}
+              </Link>
+            );
+          })}
+        </nav>
+
         {posts.length === 0 ? (
-          /* Empty state */
-          <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <div style={{ width: 72, height: 72, borderRadius: 20, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-              <i className="fa-solid fa-feather-pointed" style={{ fontSize: 30, color: '#195ad7' }} />
+          <div className="text-center py-24">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-5">
+              <i className="fa-solid fa-feather-pointed text-cobalt text-2xl" />
             </div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#111827', marginBottom: 8 }}>Stories are on the way</h2>
-            <p style={{ fontSize: 15, color: '#6b7280', maxWidth: 420, margin: '0 auto' }}>
-              We&apos;re writing our first posts on pricing, portfolios, escrow, and building a creative career. Check back soon.
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              {activeCat ? `No posts in “${activeCat}” yet` : 'Stories are on the way'}
+            </h2>
+            <p className="text-gray-500 max-w-md mx-auto">
+              {activeCat ? <>Try another topic or <Link href="/blog" className="text-cobalt font-semibold hover:underline">view all posts</Link>.</>
+                : 'We’re writing our first posts on pricing, portfolios, escrow, and building a creative career. Check back soon.'}
             </p>
           </div>
         ) : (
-          <>
-            {featured && (
-              <div style={{ marginBottom: 56 }}>
-                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24 }}>Featured</h2>
-                <CoverCard post={featured} featured />
-              </div>
-            )}
-            {rest.length > 0 && (
-              <>
-                <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24 }}>Latest posts</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 24 }}>
-                  {rest.map(post => <CoverCard key={post.slug} post={post} />)}
+          <div className="mt-8 grid lg:grid-cols-3 gap-8">
+            {/* Main column */}
+            <div className="lg:col-span-2 space-y-10">
+              {/* Featured */}
+              {featured && (
+                <Link href={`/blog/${featured.slug}`} className="group block rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="grid sm:grid-cols-2">
+                    <div className="relative min-h-[240px] bg-gradient-to-br from-cobalt to-blue-500"
+                      style={featured.cover_image ? { backgroundImage: `url(${featured.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
+                    <div className="p-6 sm:p-7 flex flex-col">
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-cobalt bg-blue-50 px-2.5 py-1 rounded-lg"><i className="fa-solid fa-star text-[10px]" /> Featured</span>
+                        {featured.category && <span className="text-xs font-bold tracking-wide text-gray-400 uppercase">{featured.category}</span>}
+                      </div>
+                      <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-snug group-hover:text-cobalt transition-colors">{featured.title}</h2>
+                      <p className="text-gray-500 mt-3 leading-relaxed line-clamp-3">{featured.excerpt}</p>
+                      <div className="mt-auto pt-6 flex items-center justify-between">
+                        <MetaRow post={featured} />
+                        <span className="flex items-center gap-3 text-gray-400 text-sm">
+                          {featured.stats?.read_time_minutes ? <span className="flex items-center gap-1.5"><i className="fa-regular fa-clock" />{featured.stats.read_time_minutes} min</span> : null}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Latest */}
+              {rest.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-lg font-extrabold text-gray-900">Latest Stories</h2>
+                  </div>
+                  <div className="divide-y divide-gray-100 border-y border-gray-100">
+                    {rest.map(post => (
+                      <Link key={post.slug} href={`/blog/${post.slug}`} className="group flex gap-5 py-5 items-start">
+                        <div className="hidden sm:block w-28 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-cobalt to-blue-500"
+                          style={post.cover_image ? { backgroundImage: `url(${post.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            {post.category && <span className="text-xs font-bold tracking-wide text-cobalt uppercase">{post.category}</span>}
+                            {post.stats?.read_time_minutes ? <><span className="text-gray-300 text-xs">·</span><span className="text-xs text-gray-400 flex items-center gap-1"><i className="fa-regular fa-clock" />{post.stats.read_time_minutes} min</span></> : null}
+                          </div>
+                          <h3 className="font-bold text-gray-900 leading-snug group-hover:text-cobalt transition-colors">{post.title}</h3>
+                          <p className="text-sm text-gray-500 mt-1 leading-relaxed line-clamp-2">{post.excerpt}</p>
+                          <MetaRow post={post} className="mt-3" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </>
-            )}
-          </>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <aside className="space-y-6">
+              {/* Trending */}
+              {trending.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 p-5">
+                  <p className="flex items-center gap-2 text-xs font-bold tracking-widest text-gray-400 uppercase mb-4"><i className="fa-solid fa-arrow-trend-up text-cobalt" /> Trending now</p>
+                  <ol className="space-y-4">
+                    {trending.map((p, i) => (
+                      <li key={p.slug}>
+                        <Link href={`/blog/${p.slug}`} className="group flex gap-3 items-start">
+                          <span className={`text-lg font-extrabold tabular-nums ${i === 0 ? 'text-cobalt' : 'text-gray-300'}`}>{String(i + 1).padStart(2, '0')}</span>
+                          <span className="text-sm font-semibold text-gray-800 leading-snug group-hover:text-cobalt transition-colors">{p.title}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {/* Browse topics */}
+              <div className="rounded-2xl border border-gray-200 p-5">
+                <p className="flex items-center gap-2 text-xs font-bold tracking-widest text-gray-400 uppercase mb-4"><i className="fa-solid fa-tags text-cobalt" /> Browse topics</p>
+                <div className="flex flex-wrap gap-2">
+                  {TOPICS.map(t => (
+                    <Link key={t} href={`/blog?category=${encodeURIComponent(t)}`}
+                      className="text-xs font-semibold text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg hover:border-cobalt hover:text-cobalt transition">{t}</Link>
+                  ))}
+                </div>
+              </div>
+
+              {/* Digest */}
+              <DigestSignup />
+
+              {/* Featured authors */}
+              {authors.length > 0 && (
+                <div className="rounded-2xl border border-gray-200 p-5">
+                  <p className="flex items-center gap-2 text-xs font-bold tracking-widest text-gray-400 uppercase mb-4"><i className="fa-solid fa-feather text-cobalt" /> Featured authors</p>
+                  <div className="space-y-4">
+                    {authors.map(a => (
+                      <div key={a.name} className="flex items-center gap-3">
+                        <Avatar name={a.name} url={a.avatar} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-gray-900 truncate">{a.name}</p>
+                          {a.bio && <p className="text-xs text-gray-400 truncate">{a.bio}</p>}
+                        </div>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{a.count} post{a.count !== 1 ? 's' : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collaborate CTA */}
+              <div className="rounded-2xl border border-gray-200 p-6 text-center">
+                <i className="fa-solid fa-share-nodes text-cobalt text-xl" />
+                <p className="font-bold text-gray-900 mt-2">Ready to collaborate?</p>
+                <p className="text-sm text-gray-500 mt-1 mb-4">Find creators and start your next project on Spectrum Connect.</p>
+                <Link href="/signup" className="inline-flex items-center gap-2 bg-cobalt text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 active:scale-[0.98] transition">
+                  Go to Platform
+                </Link>
+              </div>
+            </aside>
+          </div>
         )}
-      </div>
+      </main>
 
       <Footer />
     </div>
