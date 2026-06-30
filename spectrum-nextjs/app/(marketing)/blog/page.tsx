@@ -174,7 +174,7 @@ export default async function BlogPage({ searchParams }: { searchParams: { categ
                   </div>
                   <div className="divide-y divide-gray-100 border-y border-gray-100">
                     {rest.map(post => (
-                      <Link key={post.slug} href={`/blog/${post.slug}`} className="group flex gap-5 py-5 items-start">
+                      <Link key={post.slug} href={`/blog/${post.slug}`} className="group flex gap-5 py-5 px-3 -mx-3 rounded-2xl items-start hover:bg-gray-50/70 transition-colors">
                         <div className="hidden sm:block w-28 h-20 rounded-xl flex-shrink-0 bg-gradient-to-br from-cobalt to-blue-500"
                           style={post.cover_image ? { backgroundImage: `url(${post.cover_image})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined} />
                         <div className="min-w-0 flex-1">
