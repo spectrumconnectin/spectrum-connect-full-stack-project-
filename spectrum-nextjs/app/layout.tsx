@@ -88,7 +88,10 @@ export const metadata: Metadata = {
     canonical: BASE_URL,
   },
   verification: {
-    google: "XR80nGBlQlsK6W0ImCuz448NXGFBHc_SBpnN0UrEHyw",
+    google: [
+      "XR80nGBlQlsK6W0ImCuz448NXGFBHc_SBpnN0UrEHyw",
+      "xuVnAQsqStoXNaAhFB_IFXriPsdjQ3SJiHfkPWsb0hI",
+    ],
   },
 };
 
