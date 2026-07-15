@@ -19,7 +19,7 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
     from_email = str(settings.FROM_EMAIL)
 
     if not smtp_user or not smtp_pass or not from_email:
-        logger.info("[email] BREVO credentials not set — skipping send to {to_email}")
+        logger.info("[email] BREVO credentials not set — skipping send to %s", to_email)
         return False
     try:
         msg = MIMEMultipart("alternative")
@@ -34,10 +34,10 @@ async def send_email(to_email: str, subject: str, html_content: str) -> bool:
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
 
-        logger.info("[email] Sent '{subject}' to {to_email}")
+        logger.info("[email] Sent '%s' to %s", subject, to_email)
         return True
     except Exception as e:
-        logger.error("[email] SMTP error sending to {to_email}: %s", e)
+        logger.error("[email] SMTP error sending to %s: %s", to_email, e)
         return False
 
 

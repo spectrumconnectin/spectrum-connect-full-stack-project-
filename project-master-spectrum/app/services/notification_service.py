@@ -105,9 +105,20 @@ async def send(
             actor_name=actor_name,
             actor_image=actor_image,
             is_read=False,
-            channels=NotificationChannels(in_app=True),
+            channels=NotificationChannels(in_app=True, push=True),
         )
         await notif.insert()
+
+        # Also deliver to the browser (best-effort; only reaches users who
+        # enabled browser notifications — send_to_user no-ops otherwise).
+        try:
+            from app.services import push_service
+            await push_service.send_to_user(
+                uid, title=title, body=message,
+                url=action_url or "/", tag=type,
+            )
+        except Exception:
+            pass
     except Exception as exc:
         logger.warning("Notification insert failed: %s", exc)
 

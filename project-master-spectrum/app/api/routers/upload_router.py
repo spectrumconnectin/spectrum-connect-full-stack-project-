@@ -26,6 +26,12 @@ _ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "i
 _ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
 _ALLOWED_IMAGE_EXTS  = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
 _ALLOWED_VIDEO_EXTS  = {".mp4", ".webm", ".mov", ".avi"}
+_ALLOWED_DOC_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+_ALLOWED_DOC_EXTS = {".pdf", ".doc", ".docx"}
 
 # ── Magic-byte signatures for common types ────────────────────────────────────
 # Each entry: (content_type, byte_offset, expected_bytes | None for multi-sig)
@@ -47,6 +53,12 @@ _MAGIC: list[tuple[str, int, bytes]] = [
     ("video/webm",    0, b"\x1aE\xdf\xa3"),
     # AVI  — RIFF....AVI
     ("video/x-msvideo", 0, b"RIFF"),
+    # PDF — starts with %PDF
+    ("application/pdf", 0, b"%PDF"),
+    # Legacy .doc — OLE compound file header
+    ("application/msword", 0, b"\xd0\xcf\x11\xe0"),
+    # .docx — ZIP container (PK..)
+    ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", 0, b"PK\x03\x04"),
 ]
 
 _SVG_STARTERS = (b"<svg", b"<?xml", b"\xef\xbb\xbf<")  # UTF-8 BOM + XML
@@ -240,3 +252,34 @@ async def upload_videos(
             raise HTTPException(500, "Upload failed. Please try again.")
         results.append({"url": url})
     return results
+
+
+@router.post("/documents", summary="Upload documents (PDF / Word)")
+async def upload_documents(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limiter("upload_docs_ip", limit=10, window_seconds=300)),
+):
+    """Upload a case-study document (PDF/DOC/DOCX) for portfolio projects.
+    Served with Content-Disposition: attachment (set in _upload_to_s3 for
+    non-image types) so browsers download rather than render it inline.
+    """
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(400, "File exceeds 10 MB limit")
+    if not file.content_type or file.content_type not in _ALLOWED_DOC_TYPES:
+        raise HTTPException(400, f"Unsupported document type: {file.content_type}")
+    # Strict signature check — documents must actually start with a known magic
+    # header (%PDF, OLE, or ZIP/docx). The shared _check_magic is intentionally
+    # lenient for images; for uploaded documents we require a real match.
+    _DOC_SIGS = (b"%PDF", b"\xd0\xcf\x11\xe0", b"PK\x03\x04")
+    if not any(content.startswith(sig) for sig in _DOC_SIGS):
+        raise HTTPException(400, "File content does not match its declared type")
+    _check_user_quota(str(current_user.id), len(content))
+    ext = _safe_ext(file.filename, _ALLOWED_DOC_EXTS, ".pdf")
+    try:
+        url = _upload_to_s3(content, "documents", ext, file.content_type)
+    except (BotoCoreError, ClientError):
+        logger.exception("S3 document upload failed")
+        raise HTTPException(500, "Upload failed. Please try again.")
+    return {"url": url}

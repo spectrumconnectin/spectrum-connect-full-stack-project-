@@ -79,6 +79,18 @@ class Settings(BaseSettings):
         """Payouts are only live when both credentials are present."""
         return bool(self.PAYPAL_CLIENT_ID and self.PAYPAL_CLIENT_SECRET)
 
+    # ── Web Push (browser notifications) ─────────────────────────────────
+    # VAPID keypair for Web Push. Generate once and set via env:
+    #   VAPID_PUBLIC_KEY  — URL-safe base64 application server key (shared with browsers)
+    #   VAPID_PRIVATE_KEY — URL-safe base64 private key (secret, backend only)
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:team.spectrumstudios@gmail.com"
+
+    def web_push_enabled(self) -> bool:
+        """Push is only active when both VAPID keys are configured."""
+        return bool(self.VAPID_PUBLIC_KEY and self.VAPID_PRIVATE_KEY)
+
     # ── Commission (v1 split 8/4) ────────────────────────────────────────
     # See app/services/commission_service.py and the spec
     # "Spectrum Connect — Commission Logic (v1, Split 8/4)" for details.

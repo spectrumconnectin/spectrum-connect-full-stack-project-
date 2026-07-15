@@ -48,4 +48,12 @@ class TalentService:
         if skill:
             query["profile.skills.name"] = {"$regex": _safe_regex(skill), "$options": "i"}
 
-        return await User.find(query).limit(limit).to_list()
+        # Rank discovery by rating (best first), then most-recently active. This
+        # surfaces complete, high-rated profiles instead of raw insertion order
+        # (which buried strong profiles behind old/empty test accounts).
+        return (
+            await User.find(query)
+            .sort([("profile.rating", -1), ("last_active", -1)])
+            .limit(limit)
+            .to_list()
+        )

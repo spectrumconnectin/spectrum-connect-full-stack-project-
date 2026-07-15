@@ -2,6 +2,8 @@
 Job Post Service Layer
 Business logic for job posting management
 """
+import asyncio
+import logging
 from datetime import datetime
 from typing import List, Optional
 from fastapi import HTTPException, status
@@ -14,6 +16,9 @@ from app.api.schemas.job_schemas import (
     JobPostStatusUpdate,
     JobPostSearchFilters,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class JobService:
@@ -114,6 +119,9 @@ class JobService:
                 # Auditing must never block the request path.
                 pass
 
+        # Notify creators if the project was posted directly as open+public.
+        JobService.schedule_new_project_notifications(job_post)
+
         return job_post
 
     @staticmethod
@@ -158,7 +166,80 @@ class JobService:
         if status_value == "open":
             job.published_at = datetime.utcnow()
         await job.save()
+        JobService.schedule_new_project_notifications(job)
         return job
+
+    # ── New-project notifications ─────────────────────────────────────────────
+    @staticmethod
+    def schedule_new_project_notifications(job: JobPost) -> None:
+        """Fire the creator broadcast in the background so it never slows the
+        request. Safe to call from multiple posting paths — the broadcast itself
+        dedupes via job.creators_notified."""
+        try:
+            if (job.status or "") == "open" and (getattr(job, "visibility", "public") or "public") == "public" \
+                    and not getattr(job, "creators_notified", False):
+                asyncio.create_task(JobService.notify_creators_of_new_project(job))
+        except Exception as exc:
+            logger.warning("schedule_new_project_notifications failed: %s", exc)
+
+    @staticmethod
+    async def notify_creators_of_new_project(job: JobPost) -> None:
+        """Notify every creator who enabled browser notifications that a new
+        public project was posted. Delivers an in-app notification + a browser
+        push (via NotificationService.send). Best-effort; never raises."""
+        try:
+            if getattr(job, "creators_notified", False):
+                return
+            if (getattr(job, "visibility", "public") or "public") != "public":
+                return
+            if (job.status or "") != "open":
+                return
+
+            from app.models.schema import PushSubscription
+            from app.services import notification_service
+
+            # Opted-in creators = crew/both users with a live push subscription.
+            subs = await PushSubscription.find(
+                {"account_type": {"$in": ["crew", "both"]}}
+            ).to_list()
+
+            seen: set[str] = set()
+            recipients: list = []
+            poster_id = str(job.client_id)
+            for s in subs:
+                sid = str(s.user_id)
+                if sid == poster_id or sid in seen:
+                    continue
+                seen.add(sid)
+                recipients.append(s.user_id)
+
+            if not recipients:
+                # Still mark done so we don't rescan on every edit.
+                job.creators_notified = True
+                await job.save()
+                return
+
+            role = job.role or job.department or "creative work"
+            title = "🆕 New project posted"
+            message = f"{(job.title or 'A new project')[:90]} — {role}. Tap to view and apply."
+            url = f"/creator/find-projects?job={job.id}"
+
+            for cid in recipients:
+                await notification_service.send(
+                    user_id=str(cid),
+                    type="order",
+                    category="info",
+                    title=title,
+                    message=message,
+                    action_url=url,
+                    action_text="View project",
+                )
+
+            job.creators_notified = True
+            await job.save()
+            logger.info("Notified %d creators of new project %s", len(recipients), job.id)
+        except Exception as exc:
+            logger.warning("notify_creators_of_new_project failed: %s", exc)
 
     @staticmethod
     async def search_jobs(filters: JobPostSearchFilters) -> dict:
@@ -398,6 +479,8 @@ class JobService:
             job.closed_at = datetime.utcnow()
 
         await job.save()
+        # Notify creators when a project transitions to open (draft → published).
+        JobService.schedule_new_project_notifications(job)
         return job
 
     @staticmethod

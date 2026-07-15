@@ -71,17 +71,21 @@ async def get_posts(
 
 
 @router.get("/posts/{slug}")
-async def get_post(slug: str) -> Dict[str, Any]:
+async def get_post(
+    slug: str,
+    count: bool = Query(True, description="Set false to read without counting a view (used by cached SSR fetches)."),
+) -> Dict[str, Any]:
     """
-    Get single blog post by slug
+    Get single blog post by slug.
 
-    Automatically increments view count
+    Views are counted per real reader via POST /posts/{slug}/view instead of
+    on this (cached) read, so pass ?count=false from server-rendered fetches.
 
     Returns:
     - Full post data with content, author, stats, comments count
     """
     try:
-        post = await BlogService.get_post_by_slug(slug, increment_views=True)
+        post = await BlogService.get_post_by_slug(slug, increment_views=count)
 
         if not post:
             raise HTTPException(
@@ -98,6 +102,27 @@ async def get_post(slug: str) -> Dict[str, Any]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch post: {str(e)}"
         )
+
+
+@router.post("/posts/{slug}/view")
+async def count_view(slug: str) -> Dict[str, Any]:
+    """Record one view for a post (atomic $inc) and return the new total.
+    Called client-side by the article page — deduped per reader on the client."""
+    from pymongo import ReturnDocument
+    from app.models.blog import BlogPost
+    try:
+        doc = await BlogPost.get_motor_collection().find_one_and_update(
+            {"slug": slug, "status": "published"},
+            {"$inc": {"stats.views": 1}},
+            projection={"stats.views": 1},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not doc:
+            return {"ok": False, "views": 0}
+        return {"ok": True, "views": (doc.get("stats") or {}).get("views", 0)}
+    except Exception:
+        # View tracking must never surface an error to the reader.
+        return {"ok": False, "views": 0}
 
 
 @router.post("/posts")

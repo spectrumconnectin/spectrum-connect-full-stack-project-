@@ -177,6 +177,9 @@ class ProfileUpdate(BaseModel):
     hourly_rate_max: Optional[float] = None
     availability_status: Optional[str] = Field(None, description="available, busy, not_available")
     availability_label: Optional[str] = None  # Human-readable onboarding label
+    # Portfolio Builder
+    portfolio_template: Optional[str] = Field(None, description="visual, motion, minimal")
+    portfolio_published: Optional[bool] = None
 
 class ProfileRead(BaseModel):
     first_name: Optional[str] = None
@@ -199,6 +202,9 @@ class ProfileRead(BaseModel):
     experience: Optional[List[ExperienceRead]] = None
     education: Optional[List[EducationRead]] = None
     certifications: Optional[List[CertificationRead]] = None
+    # Portfolio Builder
+    portfolio_template: Optional[str] = None
+    portfolio_published: Optional[bool] = None
 
 
 # ============================================================================

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 from beanie import Document, PydanticObjectId
@@ -117,6 +117,56 @@ class PortfolioItemEmbed(BaseModel):
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+
+# ── Portfolio Builder (rich multi-media projects; supersedes PortfolioItemEmbed
+#    for new work — the old model/endpoints stay for backward compatibility) ────
+
+class ProjectMedia(BaseModel):
+    """One media item attached to a PortfolioProject. A project can have many."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    type: str                        # "image" | "video" | "file" | "link"
+    media_type: str                  # jpg|png|webp|gif · youtube|vimeo|mp4 · pdf|doc|docx · external
+    url: str                         # S3 URL, YouTube/Vimeo link, or external link
+    thumbnail: Optional[str] = None  # optional cover/poster image
+    caption: Optional[str] = None
+    order: int = 0                   # display order within the project
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ContentBlock(BaseModel):
+    """One ordered block in a project's rich case-study body. A project with no
+    blocks falls back to the legacy description+media-grid rendering — blocks
+    are additive, not a migration."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    type: str                                    # "text" | "image" | "video" | "before_after" | "quote"
+    text: Optional[str] = None                   # text / quote body
+    attribution: Optional[str] = None            # quote only
+    media_id: Optional[str] = None                # image / video — references project.media[].id
+    before_media_id: Optional[str] = None        # before_after
+    after_media_id: Optional[str] = None         # before_after
+    order: int = 0
+
+
+class PortfolioProject(BaseModel):
+    """A rich portfolio 'case study' — the Portfolio Builder's work-showcase unit.
+    Multiple media items per project (vs. the old one-item-per-entry model)."""
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    slug: Optional[str] = None                  # clean per-project URL segment, scoped to owner
+    title: str
+    description: Optional[str] = None           # long-form case-study text (legacy/simple view)
+    category: Optional[str] = None              # e.g. "Video Editing", "Graphic Design"
+    client: Optional[str] = None                # optional client/brand name
+    completion_date: Optional[datetime] = None
+    external_link: Optional[str] = None         # live site / external case-study link
+    media: List[ProjectMedia] = Field(default_factory=list)
+    content_blocks: List[ContentBlock] = Field(default_factory=list)  # rich case-study body
+    cover_media_id: Optional[str] = None        # which media.id is the card thumbnail
+    is_featured: bool = False
+    order: int = 0                              # user-controlled ordering across projects
+    view_count: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
 # ── Profile ───────────────────────────────────────────────────────────────────
 
 class Profile(BaseModel):
@@ -142,8 +192,19 @@ class Profile(BaseModel):
     hourly_rate_max: Optional[float] = None
     rating: Optional[float] = None
     review_count: Optional[int] = None
-    # Portfolio items — up to 2 videos + 3 images
+    # Portfolio items — up to 2 videos + 3 images (legacy; see portfolio_projects)
     portfolio_items: Optional[List[PortfolioItemEmbed]] = Field(default_factory=list)
+    # Portfolio Builder — rich multi-media projects + public page settings
+    portfolio_projects: Optional[List[PortfolioProject]] = Field(default_factory=list)
+    portfolio_template: str = "visual"    # "visual" | "motion" | "minimal" | "editorial" | "grid"
+    portfolio_published: bool = True      # public /portfolio/{slug} on/off
+    portfolio_slug: Optional[str] = None  # clean public handle (never the email)
+    # Analytics — bounded, lightweight (no time-series collection)
+    portfolio_total_views: int = 0
+    portfolio_daily_views: Dict[str, int] = Field(default_factory=dict)  # "YYYY-MM-DD" -> count, pruned to last 30 days
+    # Sharing controls
+    portfolio_access: str = "public"                    # "public" | "password"
+    portfolio_passcode_hash: Optional[str] = None
 
     # Convenience property for frontend (alias for profile_picture)
     @property
@@ -319,6 +380,7 @@ class User(Document):
             "last_active",
             "deleted_at",             # fast filter for soft-deleted users
             "profile.skills.name",    # skill search (regex on this field)
+            "profile.portfolio_slug", # public portfolio handle lookup
             "profile.location.city",  # location filter
             "profile.rating",         # sort by rating
             [("account_type", 1), ("is_verified", 1), ("last_active", -1)],  # compound: crew + verified + active
@@ -588,6 +650,7 @@ class JobPost(Document):
     status: str = "draft" # draft, open, in_progress, completed, cancelled, closed
     proposal_count: int = 0
     view_count: int = 0
+    creators_notified: bool = False  # True once creators were push-notified (dedupe)
     hired_crew: Optional[List[PydanticObjectId]] = None
     workspace: Optional[JobPostWorkspace] = None
     cover_image: Optional[str] = None  # hero/thumbnail for dashboards
@@ -1184,6 +1247,29 @@ class Notification(Document):
             [("user_id", 1), ("_id", -1)],
             # Unread-count badge query: filter by user_id + is_read.
             [("user_id", 1), ("is_read", 1)],
+        ]
+
+
+class PushSubscription(Document):
+    """A browser Web Push subscription. One user can have several (one per
+    browser/device). Created when a user enables browser notifications."""
+    user_id: PydanticObjectId
+    endpoint: str                      # push service URL (unique per browser)
+    p256dh: str                        # client public key (from subscription.keys)
+    auth: str                          # client auth secret (from subscription.keys)
+    account_type: Optional[str] = None # cached so we can query creators without a join
+    user_agent: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None
+
+    class Settings:
+        name = "push_subscriptions"
+        indexes = [
+            "user_id",
+            "endpoint",
+            "account_type",
+            # De-dupe: one row per (user, endpoint).
+            [("user_id", 1), ("endpoint", 1)],
         ]
 
 # ============================================================================

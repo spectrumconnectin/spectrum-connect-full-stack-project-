@@ -59,7 +59,8 @@ async def get_journey(current_user: User = Depends(get_current_user)) -> Dict[st
     }]
 
     if is_creator:
-        portfolio_count = len((current_user.profile.portfolio_items or []) if current_user.profile else [])
+        portfolio_count = len((current_user.profile.portfolio_items or []) if current_user.profile else []) + \
+            len((current_user.profile.portfolio_projects or []) if current_user.profile else [])
         applications = await Application.find(Application.crew_id == uid).count()
         etf_on = await _etf_activated(uid)
 
@@ -74,7 +75,7 @@ async def get_journey(current_user: User = Depends(get_current_user)) -> Dict[st
                 "key": "portfolio", "title": "Show your work",
                 "subtitle": "Upload a few best pieces — portfolios win 5× more hires.",
                 "icon": "fa-images", "done": portfolio_count >= 1,
-                "href": "/creator/profile", "cta": "Add portfolio",
+                "href": "/creator/profile#portfolio", "cta": "Add portfolio",
             },
             {
                 "key": "etf", "title": "Build trust",
