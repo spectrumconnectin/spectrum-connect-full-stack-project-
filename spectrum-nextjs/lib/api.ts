@@ -69,7 +69,7 @@ async function request<T>(
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
-    if (res.status === 401) {
+    if (auth && res.status === 401) {
       tokenStore.clear();
       // Redirect to login on the client side (skip during SSR)
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
@@ -144,6 +144,9 @@ export interface MeResponse {
     hourly_rate_max?: number;
     rating?: number;
     review_count?: number;
+    portfolio_template?: string;
+    portfolio_published?: boolean;
+    portfolio_access?: 'public' | 'password';
   };
   settings?: {
     email_notifications?: boolean;
@@ -245,6 +248,9 @@ export interface ProfileUpdate {
   hourly_rate_max?: number;
   availability_status?: string;
   availability_label?: string;
+  portfolio_template?: string;
+  portfolio_published?: boolean;
+  portfolio_access?: 'public' | 'password';
 }
 
 export interface ExperienceCreate {
@@ -306,6 +312,23 @@ export interface NotificationItem {
   is_read: boolean;
   created_at?: string;
 }
+
+export const push = {
+  publicKey: (): Promise<{ enabled: boolean; public_key: string }> =>
+    request('/push/public-key', {}, false),
+  subscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<{ ok: boolean; enabled: boolean }> =>
+    request('/push/subscribe', { method: 'POST', body: JSON.stringify(sub) }),
+  unsubscribe: (endpoint: string): Promise<{ ok: boolean }> =>
+    request('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) }),
+  test: (): Promise<{ ok: boolean; delivered: number }> =>
+    request('/push/test', { method: 'POST' }),
+};
+
+export const blogPublic = {
+  // Records one view (public, no auth). Best-effort — errors are swallowed.
+  countView: (slug: string): Promise<{ ok: boolean; views: number }> =>
+    request(`/blog/posts/${encodeURIComponent(slug)}/view`, { method: 'POST' }, false),
+};
 
 export const notifications = {
   getAll: (limit = 20): Promise<{ notifications: NotificationItem[]; unread_count: number }> =>
@@ -1462,6 +1485,215 @@ export const portfolio = {
 
   deleteItem: (itemId: string): Promise<void> =>
     request<void>(`/portfolio/items/${itemId}`, { method: 'DELETE' }),
+};
+
+// ── Portfolio Builder (rich multi-media projects + public page) ───────────────
+
+export interface ProjectMedia {
+  id: string;
+  type: 'image' | 'video' | 'file' | 'link';
+  media_type: string;
+  url: string;
+  thumbnail?: string;
+  caption?: string;
+  order: number;
+  created_at: string;
+}
+
+export type ContentBlockType = 'text' | 'image' | 'video' | 'before_after' | 'quote';
+
+export interface ContentBlock {
+  id: string;
+  type: ContentBlockType;
+  text?: string;
+  attribution?: string;
+  media_id?: string;
+  before_media_id?: string;
+  after_media_id?: string;
+  order: number;
+}
+
+export interface ContentBlockCreate {
+  type: ContentBlockType;
+  text?: string;
+  attribution?: string;
+  media_id?: string;
+  before_media_id?: string;
+  after_media_id?: string;
+}
+
+export interface PortfolioProject {
+  id: string;
+  slug?: string;
+  title: string;
+  description?: string;
+  category?: string;
+  client?: string;
+  completion_date?: string;
+  external_link?: string;
+  media: ProjectMedia[];
+  content_blocks: ContentBlock[];
+  cover_media_id?: string;
+  is_featured: boolean;
+  order: number;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioProjectCreate {
+  title: string;
+  slug?: string;
+  description?: string;
+  category?: string;
+  client?: string;
+  completion_date?: string;
+  external_link?: string;
+  is_featured?: boolean;
+  media?: { url: string; caption?: string; thumbnail?: string }[];
+  content_blocks?: ContentBlockCreate[];
+}
+
+export interface QualityScore {
+  score: number;
+  breakdown: Record<string, number>;
+  suggestions: string[];
+}
+
+export interface PublicPortfolio {
+  published: boolean;
+  locked?: boolean;
+  user?: { id: string; username: string; is_verified: boolean; spectrum_tier?: string };
+  profile?: {
+    display_name?: string; profile_picture?: string; cover_image?: string;
+    bio?: string; tagline?: string; headline?: string;
+    location?: { city?: string; country?: string };
+    website?: string; social_links?: Record<string, string | null>;
+    skills?: { name: string; level?: string; years_of_experience?: number }[];
+    hourly_rate_min?: number; hourly_rate_max?: number;
+    rating?: number; review_count?: number;
+    portfolio_template?: string;
+    portfolio_slug?: string;
+    handle?: string;
+  };
+  experience?: Record<string, unknown>[];
+  education?: Record<string, unknown>[];
+  certifications?: Record<string, unknown>[];
+  projects?: PortfolioProject[];
+  reviews?: { reviews: { overall: number; review: string; reviewed_at?: string; tags?: string[] }[]; total: number; average?: number };
+  quality_score?: QualityScore;
+}
+
+export interface PublicProject {
+  published: boolean;
+  locked?: boolean;
+  owner?: { id: string; username: string; handle: string; display_name: string; profile_picture?: string; portfolio_template: string };
+  project?: PortfolioProject;
+}
+
+export interface PortfolioAnalytics {
+  total_views: number;
+  this_week_views: number;
+  top_projects: { title: string; slug?: string; view_count: number }[];
+}
+
+/** Next may hand route params already URL-encoded (e.g. an email-based
+ * username → "name%40gmail.com"). Decode first so we never double-encode
+ * (%40 → %2540) and 404 the lookup. decodeURIComponent is a no-op on an
+ * already-decoded value. */
+function decodeParam(v: string): string {
+  try { return decodeURIComponent(v); } catch { return v; }
+}
+
+export const portfolioBuilder = {
+  getMyProjects: (): Promise<{ projects: PortfolioProject[]; max_projects: number }> =>
+    request('/portfolio-builder/projects/me'),
+
+  createProject: (data: PortfolioProjectCreate): Promise<PortfolioProject> =>
+    request('/portfolio-builder/projects', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateProject: (id: string, data: Partial<PortfolioProjectCreate> & { cover_media_id?: string }): Promise<PortfolioProject> =>
+    request(`/portfolio-builder/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  deleteProject: (id: string): Promise<void> =>
+    request(`/portfolio-builder/projects/${id}`, { method: 'DELETE' }),
+
+  reorderProjects: (project_ids: string[]): Promise<{ projects: PortfolioProject[] }> =>
+    request('/portfolio-builder/projects/reorder', { method: 'PUT', body: JSON.stringify({ project_ids }) }),
+
+  addMedia: (projectId: string, data: { url: string; caption?: string; thumbnail?: string }): Promise<ProjectMedia> =>
+    request(`/portfolio-builder/projects/${projectId}/media`, { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteMedia: (projectId: string, mediaId: string): Promise<void> =>
+    request(`/portfolio-builder/projects/${projectId}/media/${mediaId}`, { method: 'DELETE' }),
+
+  reorderMedia: (projectId: string, media_ids: string[]): Promise<{ media: ProjectMedia[] }> =>
+    request(`/portfolio-builder/projects/${projectId}/media/reorder`, { method: 'PUT', body: JSON.stringify({ media_ids }) }),
+
+  getPublic: (username: string, accessToken?: string): Promise<PublicPortfolio> =>
+    request(`/portfolio-builder/public/${encodeURIComponent(decodeParam(username))}`, {
+      headers: accessToken ? { 'X-Portfolio-Access': accessToken } : undefined,
+    }, false),
+
+  getPublicProject: (username: string, slug: string, accessToken?: string): Promise<PublicProject> =>
+    request(`/portfolio-builder/public/${encodeURIComponent(decodeParam(username))}/projects/${encodeURIComponent(decodeParam(slug))}`, {
+      headers: accessToken ? { 'X-Portfolio-Access': accessToken } : undefined,
+    }, false),
+
+  recordView: (username: string, projectSlug?: string): Promise<{ ok: boolean }> =>
+    request(`/portfolio-builder/public/${encodeURIComponent(decodeParam(username))}/view`, {
+      method: 'POST', body: JSON.stringify({ project_slug: projectSlug || null }),
+    }, false),
+
+  getAnalytics: (): Promise<PortfolioAnalytics> =>
+    request('/portfolio-builder/analytics'),
+
+  setPasscode: (access: 'public' | 'password', passcode?: string): Promise<{ access: string }> =>
+    request('/portfolio-builder/passcode', { method: 'POST', body: JSON.stringify({ access, passcode }) }),
+
+  unlockPortfolio: (username: string, passcode: string): Promise<{ token: string }> =>
+    request(`/portfolio-builder/public/${encodeURIComponent(decodeParam(username))}/unlock`, {
+      method: 'POST', body: JSON.stringify({ passcode }),
+    }, false),
+
+  getQualityScore: (): Promise<QualityScore> =>
+    request('/portfolio-builder/quality-score'),
+
+  checkSlug: (slug: string): Promise<{ slug: string; available: boolean; reason?: string | null }> =>
+    request(`/portfolio-builder/slug/check?slug=${encodeURIComponent(slug)}`),
+
+  setSlug: (slug: string): Promise<{ slug: string }> =>
+    request('/portfolio-builder/slug', { method: 'POST', body: JSON.stringify({ slug }) }),
+
+  assistBio: (data: { current_text?: string; role?: string; years_experience?: number; skills?: string[] }): Promise<{ suggestions: string[] }> =>
+    request('/portfolio-builder/assist/bio', { method: 'POST', body: JSON.stringify(data) }),
+
+  assistProjectDescription: (data: { current_text?: string; project_title?: string; category?: string; client?: string }): Promise<{ suggestions: string[] }> =>
+    request('/portfolio-builder/assist/project-description', { method: 'POST', body: JSON.stringify(data) }),
+
+  assistProjectTitle: (data: { current_text?: string; category?: string }): Promise<{ suggestions: string[] }> =>
+    request('/portfolio-builder/assist/project-title', { method: 'POST', body: JSON.stringify(data) }),
+
+  assistSkillsSummary: (data: { skills?: string[]; role?: string }): Promise<{ suggestions: string[] }> =>
+    request('/portfolio-builder/assist/skills-summary', { method: 'POST', body: JSON.stringify(data) }),
+
+  uploadImages: async (files: File[]): Promise<{ url: string }[]> => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    return request('/upload/images', { method: 'POST', body: form });
+  },
+
+  uploadDocument: async (file: File): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    return request('/upload/documents', { method: 'POST', body: form });
+  },
+
+  uploadVideos: async (files: File[]): Promise<{ url: string }[]> => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    return request('/upload/videos', { method: 'POST', body: form });
+  },
 };
 
 // ── ETF Points (Earn Trust Framework) ────────────────────────────────────────

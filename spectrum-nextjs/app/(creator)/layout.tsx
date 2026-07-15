@@ -14,16 +14,17 @@ const navLinks = [
   { href: '/creator/find-projects',label: 'Find Projects', icon: 'fa-search' },
   { href: '/creator/smart-connect',label: 'Smart Connect', icon: 'fa-bolt' },
   { href: '/creator/projects',     label: 'My Work',       icon: 'fa-briefcase' },
+  { href: '/creator/profile#portfolio', label: 'Portfolio', icon: 'fa-images' },
   { href: '/creator/disputes',     label: 'Disputes',      icon: 'fa-scale-balanced' },
   { href: '/creator/ai-assistant', label: 'Miya',          icon: 'fa-sparkles', isMiya: true },
 ];
 
 const bottomNav = [
-  { href: '/creator/dashboard',    label: 'Home',    icon: 'fa-house' },
-  { href: '/creator/find-projects',label: 'Discover',icon: 'fa-search' },
-  { href: '/creator/smart-connect',label: 'Match',   icon: 'fa-bolt', primary: true },
-  { href: '/creator/projects',     label: 'My Work', icon: 'fa-briefcase' },
-  { href: '/creator/messaging',    label: 'Messages',icon: 'fa-comment' },
+  { href: '/creator/dashboard',    label: 'Home',     icon: 'fa-house' },
+  { href: '/creator/profile#portfolio', label: 'Portfolio', icon: 'fa-images' },
+  { href: '/creator/smart-connect',label: 'Match',    icon: 'fa-bolt', primary: true },
+  { href: '/creator/projects',     label: 'My Work',  icon: 'fa-briefcase' },
+  { href: '/creator/messaging',    label: 'Messages', icon: 'fa-comment' },
 ];
 
 function CreatorHeader() {
@@ -32,6 +33,7 @@ function CreatorHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState('Creator');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [hash, setHash] = useState('');
 
   useEffect(() => {
     profileApi.getMe().then(u => {
@@ -45,8 +47,20 @@ function CreatorHeader() {
 
   useEffect(() => { setDrawerOpen(false); setMenuOpen(false); }, [pathname]);
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/creator/dashboard' && pathname.startsWith(href + '/'));
+  // Track the URL fragment so hash-based nav items (e.g. the Portfolio tab) can highlight correctly.
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [pathname]);
+
+  const isActive = (href: string) => {
+    const [path, fragment] = href.split('#');
+    const pathMatches = pathname === path || (path !== '/creator/dashboard' && pathname.startsWith(path + '/'));
+    if (!pathMatches) return false;
+    return fragment ? hash === `#${fragment}` : true;
+  };
 
   return (
     <>
@@ -129,6 +143,7 @@ function CreatorHeader() {
                     </div>
                     {[
                       { href: '/creator/profile',  icon: 'fa-user', label: 'My Profile' },
+                      { href: '/creator/profile#portfolio', icon: 'fa-images', label: 'My Portfolio' },
                       { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings' },
                       { href: '/creator/services', icon: 'fa-store', label: 'My Services' },
                       { href: '/creator/etf',      icon: 'fa-medal', label: 'ETF — Earn Trust' },
@@ -215,10 +230,22 @@ function CreatorHeader() {
 
 function CreatorBottomNav() {
   const pathname = usePathname();
+  const [hash, setHash] = useState('');
+
+  // Track the URL fragment so hash-based tabs (e.g. Portfolio) highlight correctly.
+  useEffect(() => {
+    const syncHash = () => setHash(window.location.hash);
+    syncHash();
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, [pathname]);
+
   return (
     <nav className="sc-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/70 flex items-center safe-bottom">
       {bottomNav.map(({ href, label, icon, primary }) => {
-        const active = pathname === href || (href !== '/creator/dashboard' && pathname.startsWith(href + '/'));
+        const [path, fragment] = href.split('#');
+        const pathMatches = pathname === path || (path !== '/creator/dashboard' && pathname.startsWith(path + '/'));
+        const active = pathMatches && (fragment ? hash === `#${fragment}` : true);
         return (
           <Link key={href} href={href}
             className={`sc-press flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${
@@ -261,6 +288,7 @@ function CreatorFooter() {
               <li><Link href="/creator/find-projects" className="hover:text-cobalt transition">Find Projects</Link></li>
               <li><Link href="/creator/smart-connect" className="hover:text-cobalt transition">Smart Connect</Link></li>
               <li><Link href="/creator/projects" className="hover:text-cobalt transition">My Work</Link></li>
+              <li><Link href="/creator/profile#portfolio" className="hover:text-cobalt transition">My Portfolio</Link></li>
             </ul>
           </div>
           <div>

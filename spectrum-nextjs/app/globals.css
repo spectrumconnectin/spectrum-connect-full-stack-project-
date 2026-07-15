@@ -1020,6 +1020,7 @@ header nav a.active::after {
 .mk-stagger.in > *:nth-child(4) { transition-delay: 270ms; }
 .mk-stagger.in > *:nth-child(5) { transition-delay: 360ms; }
 .mk-stagger.in > *:nth-child(6) { transition-delay: 450ms; }
+.mk-stagger.in > *:nth-child(7) { transition-delay: 540ms; }
 .mk-stagger.in > * {
   opacity: 1;
   transform: translateY(0);
@@ -1859,4 +1860,13 @@ input[type="number"] {
   .blog-prose h2 { font-size: 24px; }
   .blog-prose h3 { font-size: 20px; }
   .blog-prose blockquote { font-size: 19px; }
+}
+
+/* ---- Portfolio print / "Download PDF" ---- */
+@media print {
+  [data-no-print] { display: none !important; }
+  body { background: #fff !important; }
+  .portfolio-print-root { max-width: 100% !important; }
+  a[href]:after { content: none !important; }
+  .portfolio-print-root * { box-shadow: none !important; }
 }

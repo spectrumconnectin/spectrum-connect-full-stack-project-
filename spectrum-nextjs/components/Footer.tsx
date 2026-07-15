@@ -35,6 +35,7 @@ export default function Footer() {
           <h5>Product</h5>
           <ul>
             <li><Link href="/#features">Features</Link></li>
+            <li><Link href="/portfolios">Portfolio Builder</Link></li>
             <li><Link href="/how-it-works">How It Works</Link></li>
             <li><Link href="/pricing">Pricing</Link></li>
             <li><Link href="/community">Community</Link></li>

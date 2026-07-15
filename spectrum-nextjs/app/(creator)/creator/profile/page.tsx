@@ -12,7 +12,11 @@ import {
   type EducationCreate,
   type CertificationCreate,
 } from '@/lib/api';
-import PortfolioSection from '@/components/PortfolioSection';
+import ShareLinkBar from '@/components/portfolio/ShareLinkBar';
+import QualityScoreWidget from '@/components/portfolio/QualityScoreWidget';
+import PortfolioAnalyticsWidget from '@/components/portfolio/PortfolioAnalyticsWidget';
+import TemplatePicker from '@/components/portfolio/TemplatePicker';
+import PortfolioProjectEditor from '@/components/portfolio/PortfolioProjectEditor';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function fmt(date?: string) {
@@ -69,6 +73,7 @@ export default function ProfilePage() {
   const [authError, setAuthError] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [tab, setTab] = useState<Tab>('profile');
+  const [portfolioRefresh, setPortfolioRefresh] = useState(0);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -143,6 +148,7 @@ export default function ProfilePage() {
     else if (hash === 'notifications') setTab('notifications');
     else if (hash === 'experience') setTab('experience');
     else if (hash === 'education') setTab('education');
+    else if (hash === 'portfolio') setTab('portfolio');
 
     setLoadError('');
     profileApi.getMe().then(u => {
@@ -1009,10 +1015,23 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Portfolio tab */}
+        {/* Portfolio tab — Portfolio Builder */}
         {tab === 'portfolio' && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-8">
-            <PortfolioSection editable={true} />
+          <div className="space-y-5">
+            {user?.username && (
+              <ShareLinkBar
+                username={user.username}
+                initialSlug={(user?.profile as { portfolio_slug?: string })?.portfolio_slug || null}
+                initialPublished={user?.profile?.portfolio_published !== false}
+                initialAccess={user?.profile?.portfolio_access || 'public'}
+              />
+            )}
+            <QualityScoreWidget refreshKey={portfolioRefresh} />
+            <PortfolioAnalyticsWidget refreshKey={portfolioRefresh} />
+            <TemplatePicker initial={user?.profile?.portfolio_template || 'visual'} />
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8">
+              <PortfolioProjectEditor onSaved={() => setPortfolioRefresh(k => k + 1)} />
+            </div>
           </div>
         )}
 

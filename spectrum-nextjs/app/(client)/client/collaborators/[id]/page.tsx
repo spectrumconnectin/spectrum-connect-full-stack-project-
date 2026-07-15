@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { profile as profileApi, PublicProfile, PublicReview, jobs, messaging, proposals, JobPostItem } from '@/lib/api';
 import PortfolioSection from '@/components/PortfolioSection';
+import PortfolioProjectsReadOnly from '@/components/portfolio/PortfolioProjectsReadOnly';
 import EtfBadge from '@/components/EtfBadge';
 
 function formatRate(min?: number, max?: number): string {
@@ -308,8 +309,10 @@ export default function CollaboratorProfilePage() {
           {/* Portfolio — the most important section for decision-making */}
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900 mb-1">Portfolio</h2>
-            <p className="text-sm text-gray-500 mb-5">Up to 2 videos and 3 images</p>
-            <PortfolioSection editable={false} userId={id as string} />
+            <p className="text-sm text-gray-500 mb-5">Selected work and case studies</p>
+            {creator?.username
+              ? <PortfolioProjectsReadOnly username={creator.username} />
+              : <PortfolioSection editable={false} userId={id as string} />}
           </div>
 
           {/* Experience */}

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { profile } from '@/lib/api';
-import PortfolioSection from '@/components/PortfolioSection';
+import PortfolioProjectEditor from '@/components/portfolio/PortfolioProjectEditor';
 
 const SKILLS = [
   'Graphic Design', 'UI/UX Design', 'Product Design', 'Motion Graphics', '3D Design', 'Brand Identity Design',
@@ -275,10 +275,10 @@ export default function CreatorOnboardingPage() {
                 {step === 3 && (
                   <>
                     <h2>Add your portfolio</h2>
-                    <p className="lede">Show clients your best work. Up to 2 videos and 3 photos. You can add more later.</p>
+                    <p className="lede">Show clients your best work — images, video, or a case-study file. You can add more later.</p>
                     {err && <div className="alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><span>{err}</span></div>}
                     <div style={{ marginTop: 8 }}>
-                      <PortfolioSection editable={true} compact={true} />
+                      <PortfolioProjectEditor compact />
                     </div>
                     <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 16, textAlign: 'center' }}>
                       This step is optional — you can always add portfolio items from your profile settings.
