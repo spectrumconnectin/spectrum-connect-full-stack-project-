@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { notifications as notifApi, NotificationItem } from '@/lib/api';
+import PushOptIn from '@/components/PushOptIn';
 
 const TYPE_ICON: Record<string, string> = {
   message:      'fa-comment',
@@ -141,6 +142,9 @@ export default function NotificationBell() {
               </button>
             </div>
           </div>
+
+          {/* Browser push opt-in */}
+          <PushOptIn />
 
           {/* Body */}
           <div className="max-h-[420px] overflow-y-auto">

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { dashboard, auth, escrow as escrowApi, type CreatorDashboardResponse } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 import SetupJourney from '@/components/SetupJourney';
+import PushPromptCard from '@/components/PushPromptCard';
 
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-green-50 text-green-700 border-green-200',
@@ -68,6 +69,9 @@ export default function CreatorDashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Turn-on-notifications prompt (self-hides once enabled/dismissed) */}
+      <PushPromptCard />
 
       {/* Setup journey — guides new creators to first success */}
       <SetupJourney />
@@ -454,10 +458,11 @@ export default function CreatorDashboardPage() {
       {/* Quick actions */}
       <section className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-8">
         <h2 className="text-lg font-bold text-gray-900 mb-5">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
             { href: '/creator/projects', icon: 'fa-search', label: 'Find Projects', color: 'bg-blue-100 text-cobalt' },
             { href: '/creator/smart-connect', icon: 'fa-bolt', label: 'Smart Connect', color: 'bg-purple-100 text-purple-600' },
+            { href: '/creator/profile#portfolio', icon: 'fa-images', label: 'My Portfolio', color: 'bg-pink-100 text-pink-600' },
             { href: '/creator/profile', icon: 'fa-user', label: 'Edit Profile', color: 'bg-green-100 text-green-600' },
             { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings', color: 'bg-orange-100 text-orange-600' },
           ].map(({ href, icon, label, color }) => (

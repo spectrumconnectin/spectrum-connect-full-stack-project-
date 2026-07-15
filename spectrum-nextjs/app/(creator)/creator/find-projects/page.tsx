@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
+import PushPromptCard from '@/components/PushPromptCard';
 
 const DEPARTMENTS = [
   'All Departments', 'Camera', 'Cinematography', 'Directing', 'Editing',
@@ -95,6 +96,8 @@ export default function FindProjectsPage() {
 
   return (
     <>
+      <PushPromptCard />
+
       {/* ── Hero search ── */}
       <section className="mb-8">
         <div className="max-w-3xl mb-6">
