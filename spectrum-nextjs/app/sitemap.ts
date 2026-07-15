@@ -3,8 +3,9 @@ import { getPublishedPosts } from '@/lib/blog';
 
 const BASE = 'https://spectrumconect.com';
 
-// Regenerate hourly so newly-published posts get indexed without a redeploy.
-export const revalidate = 3600;
+// Render on every request so newly-published posts always appear. A statically
+// cached sitemap generated before posts existed would hide them from crawlers.
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -42,6 +43,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${BASE}/how-it-works`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${BASE}/portfolios`,
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.8,
@@ -103,7 +110,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Real published posts, fetched live from the blog API.
-  const { posts } = await getPublishedPosts(200);
+  const { posts } = await getPublishedPosts(100); // backend caps limit at 100
   const blogPages: MetadataRoute.Sitemap = posts.map((p) => ({
     url: `${BASE}/blog/${p.slug}`,
     lastModified: p.published_at ? new Date(p.published_at) : (p.created_at ? new Date(p.created_at) : now),

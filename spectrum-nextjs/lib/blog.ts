@@ -44,12 +44,23 @@ export async function getPublishedPosts(limit = 50): Promise<{ posts: BlogListIt
 
 export async function getPostBySlug(slug: string): Promise<BlogPostDetail | null> {
   try {
-    const res = await fetch(`${API}/blog/posts/${encodeURIComponent(slug)}`, { next: { revalidate: 60 } });
+    // count=false: this cached SSR fetch must not inflate views — real views
+    // are counted per reader via the client beacon (POST .../view).
+    const res = await fetch(`${API}/blog/posts/${encodeURIComponent(slug)}?count=false`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
     return null;
   }
+}
+
+/** Compact view count: 940 → "940", 1200 → "1.2k", 34000 → "34k". */
+export function formatViews(n?: number): string {
+  const v = n ?? 0;
+  if (v < 1000) return String(v);
+  if (v < 10000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  if (v < 1000000) return Math.round(v / 1000) + 'k';
+  return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
 }
 
 export function formatPostDate(iso?: string): string {

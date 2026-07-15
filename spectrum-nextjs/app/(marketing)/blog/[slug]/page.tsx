@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import ReadingProgress from '@/components/blog/ReadingProgress';
 import ShareRow from '@/components/blog/ShareRow';
+import ViewCounter from '@/components/blog/ViewCounter';
 import { getPostBySlug, getPublishedPosts, formatPostDate, type BlogListItem } from '@/lib/blog';
 
 const BASE = 'https://spectrumconect.com';
@@ -17,8 +18,10 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = post.seo?.meta_title || post.title;
   const description = post.seo?.meta_description || post.excerpt;
   const image = post.seo?.og_image || post.cover_image;
+  const keywords = [...(post.seo?.keywords || []), ...(post.tags || []), post.category].filter(Boolean) as string[];
   return {
     title, description,
+    keywords: keywords.length ? keywords : undefined,
     authors: post.author?.name ? [{ name: post.author.name, url: `${BASE}/about` }] : undefined,
     openGraph: {
       title, description, url, type: 'article',
@@ -101,11 +104,13 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <Link href="/blog" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-400 hover:text-cobalt transition mb-6">
             <i className="fa-solid fa-arrow-left" /> Back to Blog
           </Link>
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
             {post.category && <span className="text-xs font-bold tracking-wide text-cobalt uppercase">{post.category}</span>}
             {post.stats?.read_time_minutes ? (
               <><span className="text-gray-300">·</span><span className="text-xs text-gray-400 flex items-center gap-1.5"><i className="fa-regular fa-clock" />{post.stats.read_time_minutes} min read</span></>
             ) : null}
+            <span className="text-gray-300">·</span>
+            <ViewCounter slug={params.slug} initial={post.stats?.views ?? 0} />
           </div>
           <h1 className="text-3xl sm:text-[44px] font-extrabold text-gray-900 leading-[1.12] tracking-tight">{post.title}</h1>
           <p className="text-lg sm:text-xl text-gray-500 leading-relaxed mt-5">{post.excerpt}</p>
