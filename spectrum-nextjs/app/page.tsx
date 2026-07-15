@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import MarketingEffects from '@/components/MarketingEffects';
 import PageTransition from '@/components/PageTransition';
+import LottieIcon from '@/components/LottieIcon';
 
 export const metadata: Metadata = {
   title: 'Spectrum Connect — Hire Verified Creative Professionals',
@@ -47,6 +48,7 @@ const Icon = {
   Handshake: ({ size = 26 }: IconProps) => <svg viewBox="0 0 24 24" width={size} height={size} {...sw}><path d="M11 17l2 2a1.5 1.5 0 0 0 2-2"/><path d="M13 19l1.5 1.5a1.5 1.5 0 0 0 2-2l.5-.5"/><path d="M16 17a1.5 1.5 0 0 0 2-2l1-1"/><path d="M2 9l3-3 5 1 2-1 2 2-3 3-2-1"/><path d="M22 9l-3-3-3 1"/><path d="M2 9l4 8M22 9l-4 8"/></svg>,
   ArrowRight: ({ size = 16 }: IconProps) => <svg viewBox="0 0 24 24" width={size} height={size} {...sw}><path d="M5 12h14M13 6l6 6-6 6"/></svg>,
   Check: ({ size = 16 }: IconProps) => <svg viewBox="0 0 24 24" width={size} height={size} {...sw}><path d="M5 12l5 5L20 7"/></svg>,
+  Images: ({ size = 26 }: IconProps) => <svg viewBox="0 0 24 24" width={size} height={size} {...sw}><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M3 16l3.5-3.5a2 2 0 0 1 2.8 0L13 16"/><circle cx="8" cy="10" r="1.3" fill="currentColor" stroke="none"/><path d="M8 3h10a2 2 0 0 1 2 2v10"/></svg>,
 };
 
 /* ── Data ── */
@@ -180,19 +182,25 @@ export default function HomePage() {
           </div>
           <div className="mk-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
             {[
-              { Ic: Icon.Target, bg: '#eff6ff', bd: '#bfdbfe', fg: '#2563eb', title: 'Get matched with the right people', desc: 'Our AI matches creators and clients based on skills, style, and project fit — not just keywords.' },
-              { Ic: Icon.BadgeCheck, bg: '#f0fdf4', bd: '#bbf7d0', fg: '#16a34a', title: 'Work with verified creators and clients', desc: 'Every profile is identity-verified. Real reviews, real work history, real trust.' },
-              { Ic: Icon.Bolt, bg: '#faf5ff', bd: '#e9d5ff', fg: '#9333ea', title: 'Build full teams fast', desc: 'Assemble multi-skill creative crews for any project in hours, not weeks.' },
-              { Ic: Icon.Shield, bg: '#fff7ed', bd: '#fed7aa', fg: '#ea580c', title: 'Fair milestones for everyone', desc: 'Milestone-based escrow protects both sides — funds release only when work is approved.' },
-              { Ic: Icon.Chat, bg: '#f0f9ff', bd: '#bae6fd', fg: '#0284c7', title: 'Everything you need to manage work', desc: 'Integrated messaging, file sharing, task tracking, and payments all in one place.' },
-              { Ic: Icon.Rocket, bg: '#fdf2f8', bd: '#fbcfe8', fg: '#db2777', title: 'Long-term value for every project', desc: 'Build lasting working relationships with your best creative partners through reputation and reviews.' },
+              { anim: 'two-users-ai', bg: '#eff6ff', bd: '#bfdbfe', fg: '#2563eb', title: 'Get matched with the right people', desc: 'Our AI matches creators and clients based on skills, style, and project fit — not just keywords.' },
+              { anim: 'star-medal', bg: '#f0fdf4', bd: '#bbf7d0', fg: '#16a34a', title: 'Work with verified creators and clients', desc: 'Every profile is identity-verified. Real reviews, real work history, real trust.' },
+              { anim: 'add-like', bg: '#faf5ff', bd: '#e9d5ff', fg: '#9333ea', title: 'Build full teams fast', desc: 'Assemble multi-skill creative crews for any project in hours, not weeks.' },
+              { anim: 'dollar-up', bg: '#fff7ed', bd: '#fed7aa', fg: '#ea580c', title: 'Fair milestones for everyone', desc: 'Milestone-based escrow protects both sides — funds release only when work is approved.' },
+              { anim: 'repeat', bg: '#f0f9ff', bd: '#bae6fd', fg: '#0284c7', title: 'Everything you need to manage work', desc: 'Integrated messaging, file sharing, task tracking, and payments all in one place.' },
+              { anim: 'heart', bg: '#fdf2f8', bd: '#fbcfe8', fg: '#db2777', title: 'Long-term value for every project', desc: 'Build lasting working relationships with your best creative partners through reputation and reviews.' },
             ].map(f => (
               <div key={f.title} className="home-card" style={{ background: f.bg, border: `1px solid ${f.bd}`, borderRadius: 20, padding: '28px 28px 24px' }}>
-                <div style={{ color: f.fg, marginBottom: 14 }}><f.Ic /></div>
+                <div style={{ marginBottom: 12 }}><LottieIcon src={`/animations/${f.anim}.json`} size={44} playOnView color={f.fg} /></div>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 10px', lineHeight: 1.35 }}>{f.title}</h3>
                 <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
               </div>
             ))}
+            <Link href="/portfolios" className="home-card"
+              style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 20, padding: '28px 28px 24px', display: 'block', textDecoration: 'none' }}>
+              <div style={{ marginBottom: 12, color: '#4f46e5' }}><Icon.Images size={44} /></div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 10px', lineHeight: 1.35 }}>Show off your work</h3>
+              <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, margin: 0 }}>Build a free portfolio with rich case studies, 5 templates, and analytics — one link for your whole body of work.</p>
+            </Link>
           </div>
         </div>
       </section>
@@ -283,7 +291,7 @@ export default function HomePage() {
             ].map((step, i) => (
               <div key={step.title} className="home-card" style={{ background: '#fff', border: '1px solid #c7d2fe', borderRadius: 20, padding: '30px 24px', textAlign: 'center', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', background: '#2563eb', color: '#fff', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, boxShadow: '0 2px 8px rgba(37,99,235,0.4)' }}>{i + 1}</div>
-                {i < 3 && <div style={{ position: 'absolute', top: '50%', right: -12, color: '#93c5fd', zIndex: 1, transform: 'translateY(-50%)' }}><Icon.ArrowRight size={18} /></div>}
+                {i < 3 && <div style={{ position: 'absolute', top: '50%', right: -18, zIndex: 1, transform: 'translateY(-50%)' }}><LottieIcon src="/animations/right.json" size={30} loop color="#93c5fd" /></div>}
                 <div style={{ color: step.fg, margin: '12px auto 14px', width: 'fit-content' }}><step.Ic size={32} /></div>
                 <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 10px' }}>{step.title}</h3>
                 <p style={{ fontSize: 13.5, color: '#6b7280', lineHeight: 1.6, margin: 0 }}>{step.desc}</p>
@@ -331,13 +339,15 @@ export default function HomePage() {
             </p>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
               {[
-                { Ic: Icon.Lock, fg: '#2563eb', title: 'Identity Verification', desc: 'Every creator and client undergoes ID verification before going live.' },
-                { Ic: Icon.Dollar, fg: '#16a34a', title: 'Transparent Fees', desc: 'Simple, flat fees. No hidden charges — ever.' },
-                { Ic: Icon.Shield, fg: '#ea580c', title: 'Escrow Protection', desc: 'Funds are held safely and released only on milestone approval.' },
-                { Ic: Icon.Star, fg: '#d97706', title: 'Smart Reviews', desc: 'Two-way verified reviews build an accurate reputation over time.' },
+                { Ic: Icon.Lock, anim: '', fg: '#2563eb', title: 'Identity Verification', desc: 'Every creator and client undergoes ID verification before going live.' },
+                { Ic: Icon.Dollar, anim: 'discount', fg: '#16a34a', title: 'Transparent Fees', desc: 'Simple, flat fees. No hidden charges — ever.' },
+                { Ic: Icon.Shield, anim: '', fg: '#ea580c', title: 'Escrow Protection', desc: 'Funds are held safely and released only on milestone approval.' },
+                { Ic: Icon.Star, anim: 'star-medal', fg: '#d97706', title: 'Smart Reviews', desc: 'Two-way verified reviews build an accurate reputation over time.' },
               ].map(item => (
                 <li key={item.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                  <span style={{ color: item.fg, marginTop: 2, flexShrink: 0 }}><item.Ic size={22} /></span>
+                  <span style={{ color: item.fg, marginTop: 2, flexShrink: 0 }}>
+                    {item.anim ? <LottieIcon src={`/animations/${item.anim}.json`} size={26} playOnView color={item.fg} /> : <item.Ic size={22} />}
+                  </span>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 15, color: '#111827', marginBottom: 3 }}>{item.title}</div>
                     <div style={{ fontSize: 13.5, color: '#6b7280', lineHeight: 1.5 }}>{item.desc}</div>
@@ -431,7 +441,9 @@ export default function HomePage() {
       {/* ═══ FINAL CTA ═══ */}
       <section style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #7c3aed 100%)', color: '#fff', padding: '100px 24px', textAlign: 'center' }}>
         <div className="mk-reveal" style={{ maxWidth: 640, margin: '0 auto' }}>
-          <div style={{ display: 'inline-flex', width: 72, height: 72, borderRadius: 20, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}><Icon.Handshake size={34} /></div>
+          <div style={{ display: 'inline-flex', width: 72, height: 72, borderRadius: 20, background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: 22 }}>
+            <LottieIcon src="/animations/party.json" size={44} playOnView color="#ffffff" />
+          </div>
           <h2 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-0.025em', margin: '0 0 18px', lineHeight: 1.1 }}>Ready to Work Better Together?</h2>
           <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.85)', maxWidth: 500, margin: '0 auto 36px', lineHeight: 1.6 }}>
             Join thousands of creators and clients already building great work on Spectrum Connect.
