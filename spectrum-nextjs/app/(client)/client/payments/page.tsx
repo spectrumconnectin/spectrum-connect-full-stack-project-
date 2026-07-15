@@ -50,6 +50,54 @@ const MILESTONE_ICON_BG: Record<string, string> = {
   refunded:           'bg-gray-100 text-gray-500',
 };
 
+// ── Progress rail — the 4 stages every milestone travels through in order.
+// revision_requested rides the "Delivered" node (flagged orange) since it's a
+// detour off delivery, not a fifth stage. pending/disputed/refunded aren't on
+// this path at all (pre-escrow, or an exception) — they keep the plain badge.
+const RAIL_STAGES: { key: string; label: string }[] = [
+  { key: 'funded',    label: 'Funded' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'approved',  label: 'Approved' },
+  { key: 'released',  label: 'Released' },
+];
+const RAIL_INDEX: Record<string, number> = {
+  funded: 0, delivered: 1, revision_requested: 1, approved: 2, released: 3,
+};
+
+function MilestoneRail({ status }: { status: string }) {
+  if (!(status in RAIL_INDEX)) return null;
+  const current = RAIL_INDEX[status];
+  const isRevision = status === 'revision_requested';
+
+  return (
+    <div className="flex items-center gap-0.5 mt-1.5" aria-label={`Progress: ${MILESTONE_STATUS_LABEL[status] ?? status}`}>
+      {RAIL_STAGES.map((stage, i) => {
+        const isCurrent = i === current;
+        const isDone = i < current || (isCurrent && status === 'released');
+        return (
+          <div key={stage.key} className="flex items-center">
+            <span
+              title={isCurrent ? (isRevision ? 'Revisions requested' : stage.label) : stage.label}
+              className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
+                isCurrent && isRevision ? 'bg-orange-500 ring-2 ring-orange-100'
+                : isCurrent ? 'bg-cobalt ring-2 ring-blue-100'
+                : isDone ? 'bg-emerald-500'
+                : 'bg-gray-200'
+              }`}
+            />
+            {i < RAIL_STAGES.length - 1 && (
+              <span className={`w-3.5 h-0.5 ${i < current ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        );
+      })}
+      <span className={`ml-1.5 text-[11px] font-medium ${isRevision ? 'text-orange-600' : 'text-gray-400'}`}>
+        {isRevision ? 'Revisions requested' : RAIL_STAGES[current]?.label}
+      </span>
+    </div>
+  );
+}
+
 // ── Tab filter options (using internal milestone status names) ─────────────────
 const TABS = ['All', 'funded', 'delivered', 'revision_requested', 'released', 'pending'];
 const TAB_LABEL: Record<string, string> = {
@@ -993,6 +1041,7 @@ function PaymentsPageInner() {
                           <i className="fa-regular fa-clock mr-1"></i>Awaiting your approval
                         </p>
                       )}
+                      <MilestoneRail status={row.milestone.status} />
                     </div>
 
                     {/* Amount + date */}
