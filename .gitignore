@@ -51,3 +51,7 @@ backup-repo.git/
 *.swp
 scripts/seed_creators_created.json
 project-master-spectrum/scripts/seed_creators_created.json
+
+# Internal security planning docs - not for the public repo
+Spectrum-Connect-Security-Plan.md
+Spectrum-Connect-Security-Plan*.pdf
