@@ -5,12 +5,12 @@ import logging
 import secrets
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.models.schema import User, Profile, Location, Skill, CrewProfile
-from .auth import get_password_hash, verify_password, create_access_token, get_current_user
+from .auth import get_password_hash, verify_password, create_access_token, get_current_user, AUTH_COOKIE_NAME
 from .schemas import UserCreate, UserRead, Token, CreatorOnboarding, ProducerOnboarding, PasswordResetRequest, PasswordResetConfirm, OTPResponse
 from .oauth import google_oauth_client, facebook_oauth_client
 from app.services.email import send_email, get_otp_email_html, get_verification_email_html, get_password_reset_email_html
@@ -20,6 +20,24 @@ from app.core.rate_limit import rate_limiter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _set_auth_cookie(response: Response, jwt_token: str) -> None:
+    """Set the httpOnly session cookie the web app authenticates with.
+
+    Not readable by JS — closes the XSS-can-steal-the-token gap that existed
+    when the frontend kept the JWT in localStorage / a plain cookie. Callers
+    also still receive access_token in the JSON body for non-browser clients.
+    """
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=jwt_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
 
 # OAuth CSRF state tokens and post-callback exchange codes are persisted in
 # MongoDB (app.models.oauth_state.OAuthState) rather than a per-process dict,
@@ -288,6 +306,7 @@ async def register_user(
 
 @router.post("/login", response_model=Token, summary="Login user")
 async def login_for_access_token(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     _: None = Depends(rate_limiter("auth_login_ip", limit=10, window_seconds=60)),
 ):
@@ -356,6 +375,7 @@ async def login_for_access_token(
     )
 
     access_token = create_access_token(data={"sub": user.username})
+    _set_auth_cookie(response, access_token)
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -501,7 +521,7 @@ async def google_callback(code: str, state: str | None = None):
     response_model=Token,
     summary="Exchange one-time OAuth code for a JWT",
 )
-async def get_oauth_token(code: str):
+async def get_oauth_token(code: str, response: Response):
     """
     Exchange the opaque short-lived exchange code (from the OAuth redirect)
     for a proper JWT access token.
@@ -520,7 +540,16 @@ async def get_oauth_token(code: str):
     jwt_token = exchange_doc.value
     # Single-use: delete after retrieval.
     await exchange_doc.delete()
+    _set_auth_cookie(response, jwt_token)
     return {"access_token": jwt_token, "token_type": "bearer"}
+
+
+@router.post("/logout", summary="Log out and clear the auth cookie")
+async def logout(response: Response):
+    """Clear the httpOnly auth cookie. Client-side state (if any) is cleared
+    by the frontend itself; this is the part JS cannot do on its own."""
+    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    return {"message": "Logged out"}
 
 @router.get("/verify-email", summary="Verify email address")
 async def verify_email(token: str):

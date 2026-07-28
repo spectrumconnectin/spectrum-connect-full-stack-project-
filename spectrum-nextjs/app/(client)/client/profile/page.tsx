@@ -228,7 +228,7 @@ export default function ClientProfilePage() {
     finally { setNotifSaving(false); setTimeout(() => setNotifMsg(''), 3500); }
   };
 
-  const signOut = () => { auth.logout(); window.location.href = '/login'; };
+  const signOut = () => { auth.logout().finally(() => { window.location.href = '/login'; }); };
 
   // ── Computed display values ───────────────────────────────────────────────
   const nameDisplay = [firstName, lastName].filter(Boolean).join(' ')

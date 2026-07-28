@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import bcrypt
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -14,8 +14,25 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
+# Name of the httpOnly cookie the web app authenticates with (set at /auth/login
+# and /auth/oauth-token). Kept in sync with app/auth/router.py.
+AUTH_COOKIE_NAME = "auth_token"
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
+
+async def _resolve_token(
+    request: Request,
+    header_token: Optional[str] = Depends(oauth2_scheme_optional),
+) -> Optional[str]:
+    """Prefer the Authorization header (API clients, mobile, scripts); fall back
+    to the httpOnly auth cookie the browser sends automatically. This lets the
+    web frontend stop keeping the JWT in JS-readable storage (localStorage /
+    non-HttpOnly cookie) without breaking any existing header-based caller."""
+    if header_token:
+        return header_token
+    return request.cookies.get(AUTH_COOKIE_NAME)
 
 def verify_password(plain_password, hashed_password):
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -42,12 +59,14 @@ def _is_account_active(user: User) -> bool:
     return True
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: Optional[str] = Depends(_resolve_token)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token:
+        raise credentials_exception
     try:
         # Hardcode HS256 — never accept "none" or RS algorithms even if config changes.
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
@@ -69,7 +88,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme_optional)):
+async def get_current_user_optional(token: Optional[str] = Depends(_resolve_token)):
     """
     Same as get_current_user but returns None instead of raising when token is missing/invalid.
     Useful for optional auth flows (e.g., public profile views).

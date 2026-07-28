@@ -1,49 +1,34 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
-// ── Token helpers ────────────────────────────────────────────────────────────
-const COOKIE_NAME = 'spectrum_token';
+// ── Session helpers ──────────────────────────────────────────────────────────
+// The JWT itself is never stored here — the backend sets it as an httpOnly
+// cookie (not readable by JS) at /auth/login and /auth/oauth-token, and the
+// browser attaches it automatically on same-origin requests. This store only
+// keeps a non-sensitive "was logged in" flag for client-side UI checks
+// (nav guards, presence tracking) — stealing it gives an attacker nothing.
+const LOGGED_IN_KEY = 'spectrum_logged_in';
 const REMEMBER_ME_KEY = 'spectrum_remember_me';
 
-function setCookie(token: string, rememberMe: boolean = false) {
-  // 30 days if "Remember me" is checked, otherwise 7 days
-  const daysToExpire = rememberMe ? 30 : 7;
-  const expires = new Date(Date.now() + daysToExpire * 24 * 60 * 60 * 1000).toUTCString();
-  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; expires=${expires}; path=/; SameSite=Strict${secureFlag}`;
-}
-
-function getCookie(): string | null {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(?:^|;\\s*)' + COOKIE_NAME + '=([^;]+)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function clearCookie() {
-  document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-}
-
 export const tokenStore = {
-  get: (): string | null => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(COOKIE_NAME) || getCookie();
+  isLoggedIn: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(LOGGED_IN_KEY) === 'true';
   },
-  set: (token: string, rememberMe: boolean = false) => {
-    localStorage.setItem(COOKIE_NAME, token);
+  markLoggedIn: (rememberMe: boolean = false) => {
+    localStorage.setItem(LOGGED_IN_KEY, 'true');
     if (rememberMe) {
       localStorage.setItem(REMEMBER_ME_KEY, 'true');
     } else {
       localStorage.removeItem(REMEMBER_ME_KEY);
     }
-    setCookie(token, rememberMe);
   },
   isRemembered: (): boolean => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
   },
   clear: () => {
-    localStorage.removeItem(COOKIE_NAME);
+    localStorage.removeItem(LOGGED_IN_KEY);
     localStorage.removeItem(REMEMBER_ME_KEY);
-    clearCookie();
   },
 };
 
@@ -61,12 +46,10 @@ async function request<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (auth) {
-    const token = tokenStore.get();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  // Auth is carried by the httpOnly session cookie, sent automatically by the
+  // browser — 'include' makes that explicit rather than relying on the
+  // same-origin default.
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers, credentials: 'include' });
 
   if (!res.ok) {
     if (auth && res.status === 401) {
@@ -180,7 +163,9 @@ export const auth = {
       body: form.toString(),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     }, false);
-    tokenStore.set(data.access_token, rememberMe);
+    // The backend also set an httpOnly session cookie on this response —
+    // this just records "logged in" for client-side UI checks.
+    tokenStore.markLoggedIn(rememberMe);
     return data;
   },
 
@@ -226,7 +211,16 @@ export const auth = {
 
   me: (): Promise<MeResponse> => request<MeResponse>('/auth/me/role'),
 
-  logout: () => tokenStore.clear(),
+  logout: async () => {
+    // Clearing localStorage alone can't remove an httpOnly cookie — only the
+    // server can do that, hence the round trip.
+    try {
+      await request('/auth/logout', { method: 'POST' }, false);
+    } catch {
+      // Best-effort — still clear local UI state below even if this fails.
+    }
+    tokenStore.clear();
+  },
 
   googleLogin: () => { window.location.href = `${BASE_URL}/auth/google_login`; },
 };
@@ -1049,46 +1043,40 @@ export const earnings = {
 
   /** Download a CSV earnings report (creator). Triggers file download. */
   downloadCreatorCSV: (): void => {
-    const token = tokenStore.get();
     const url = `${BASE_URL}/earnings/invoice/csv`;
     const a = document.createElement('a');
     a.href = url;
     a.setAttribute('download', 'spectrum_earnings.csv');
     // For auth'd download, open in new tab (the endpoint returns a binary response)
-    if (token) {
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.blob())
-        .then(b => {
-          const burl = URL.createObjectURL(b);
-          a.href = burl;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(burl);
-        })
-        .catch(() => { /* ignore */ });
-    }
+    fetch(url, { credentials: 'include' })
+      .then(r => r.blob())
+      .then(b => {
+        const burl = URL.createObjectURL(b);
+        a.href = burl;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(burl);
+      })
+      .catch(() => { /* ignore */ });
   },
 
   /** Download a CSV payment report (client). Triggers file download. */
   downloadClientCSV: (): void => {
-    const token = tokenStore.get();
     const url = `${BASE_URL}/earnings/invoice/client-csv`;
-    if (token) {
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.blob())
-        .then(b => {
-          const burl = URL.createObjectURL(b);
-          const a = document.createElement('a');
-          a.href = burl;
-          a.setAttribute('download', 'spectrum_payments.csv');
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(burl);
-        })
-        .catch(() => { /* ignore */ });
-    }
+    fetch(url, { credentials: 'include' })
+      .then(r => r.blob())
+      .then(b => {
+        const burl = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = burl;
+        a.setAttribute('download', 'spectrum_payments.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(burl);
+      })
+      .catch(() => { /* ignore */ });
   },
 };
 
@@ -1954,12 +1942,11 @@ export const messaging = {
     request<MessageListResponse>(`/messages/conversations/${conversationId}/messages${buildQS(params as Record<string, string | number | undefined> || {})}`),
 
   uploadAttachment: async (file: File): Promise<{ id: string; filename: string; file_url: string; file_size: number; file_type: string }> => {
-    const token = tokenStore.get();
     const form = new FormData();
     form.append('file', file);
     const res = await fetch(`${BASE_URL}/messages/attachments/upload`, {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
       body: form,
     });
     if (!res.ok) throw new Error('File upload failed');

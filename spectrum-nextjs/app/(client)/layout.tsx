@@ -148,7 +148,7 @@ function ClientHeader() {
                       <i className="fa-solid fa-compass w-5 text-gray-400 mr-2.5" />Take a tour
                     </button>
                     <div className="border-t border-gray-100 my-1" />
-                    <button onClick={() => { auth.logout(); window.location.href = '/login'; }}
+                    <button onClick={() => { auth.logout().finally(() => { window.location.href = '/login'; }); }}
                       className="flex items-center w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
                       <i className="fa-solid fa-right-from-bracket w-5 mr-2.5" />Sign Out
                     </button>
@@ -199,7 +199,7 @@ function ClientHeader() {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-700 hover:bg-gray-50">
                 <i className="fa-solid fa-medal w-5 text-center text-gray-400" />ETF — Earn Trust
               </Link>
-              <button onClick={() => { auth.logout(); window.location.href = '/login'; }}
+              <button onClick={() => { auth.logout().finally(() => { window.location.href = '/login'; }); }}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm text-red-600 hover:bg-red-50">
                 <i className="fa-solid fa-right-from-bracket w-5 text-center" />Sign Out
               </button>

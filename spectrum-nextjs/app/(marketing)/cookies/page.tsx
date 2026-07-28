@@ -38,8 +38,7 @@ export default function CookiesPage() {
         cart, dispute draft, or proposal-in-progress survives a page reload.
       </p>
       <ul>
-        <li><code>spectrum_token</code> — your authenticated session.</li>
-        <li><code>auth_token</code> — the same token, set as an HttpOnly cookie after Google sign-in.</li>
+        <li><code>auth_token</code> — your authenticated session, set as an HttpOnly cookie (not readable by page scripts).</li>
         <li><code>user_role</code> — whether you&apos;re in the creator or client surface.</li>
         <li>Anti-CSRF cookies set by our framework.</li>
       </ul>

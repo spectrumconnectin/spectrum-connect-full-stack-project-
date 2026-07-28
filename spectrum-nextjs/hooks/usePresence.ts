@@ -17,7 +17,7 @@ import { presence, auth, tokenStore } from '@/lib/api';
 export function usePresence() {
   useEffect(() => {
     // Only run on client side and if user is logged in
-    if (typeof window === 'undefined' || !tokenStore.get()) {
+    if (typeof window === 'undefined' || !tokenStore.isLoggedIn()) {
       return;
     }
 
@@ -39,12 +39,12 @@ export function usePresence() {
     // the only reliable mechanism because browsers guarantee it finishes even
     // after the page has been destroyed (spec: https://w3c.github.io/beacon/).
     const handleBeforeUnload = () => {
-      const token = tokenStore.get();
       const url = `${window.location.origin}/backend/presence/offline`;
       if (navigator.sendBeacon) {
-        // sendBeacon sends as text/plain; include auth token in body so the
-        // backend can identify the user without a header.
-        navigator.sendBeacon(url, token ?? '');
+        // sendBeacon can't set custom headers, but it's a same-origin request
+        // so the browser attaches the httpOnly auth cookie automatically —
+        // no need to pass a token in the body.
+        navigator.sendBeacon(url);
       } else {
         // Fallback for very old browsers — best effort only.
         presence.setOffline().catch(() => {});

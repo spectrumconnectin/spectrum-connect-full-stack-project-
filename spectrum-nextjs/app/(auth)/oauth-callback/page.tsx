@@ -30,7 +30,9 @@ function OAuthCallbackInner() {
       if (!exchangeCode) return null;
       // Exchange the opaque code for the actual JWT
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/backend'}/auth/oauth-token?code=${encodeURIComponent(exchangeCode)}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || '/backend'}/auth/oauth-token?code=${encodeURIComponent(exchangeCode)}`, {
+          credentials: 'include',
+        });
         if (!res.ok) return null;
         const data = await res.json();
         return data.access_token ?? null;
@@ -47,8 +49,9 @@ function OAuthCallbackInner() {
         return;
       }
 
-      // Store the JWT
-      tokenStore.set(token);
+      // The httpOnly session cookie was already set by the /auth/oauth-token
+      // response above — this just records "logged in" for client-side UI checks.
+      tokenStore.markLoggedIn();
 
       // Fetch profile to determine account type → redirect to correct dashboard
       // Backend stores: 'crew' (creator), 'producer' (client), 'both'

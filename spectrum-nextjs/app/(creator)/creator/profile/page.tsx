@@ -418,7 +418,7 @@ export default function ProfilePage() {
     finally { setNotifSaving(false); setTimeout(() => setNotifMsg(''), 3500); }
   };
 
-  const signOut = () => { auth.logout(); window.location.href = '/login'; };
+  const signOut = () => { auth.logout().finally(() => { window.location.href = '/login'; }); };
 
   const nameDisplay = [firstName, lastName].filter(Boolean).join(' ') || user?.profile?.display_name || user?.username || 'Your Profile';
   const avatar = avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(nameDisplay)}&background=195ad7&color=fff&size=128`;
