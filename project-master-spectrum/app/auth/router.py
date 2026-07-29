@@ -958,7 +958,10 @@ class AdminRegisterResponse(BaseModel):
 from pydantic import BaseModel as _BaseModel
 
 @router.post("/register-admin", summary="Register admin user (requires secret key)")
-async def register_admin(request: AdminRegisterRequest):
+async def register_admin(
+    request: AdminRegisterRequest,
+    _: None = Depends(rate_limiter("register_admin_ip", limit=3, window_seconds=3600)),
+):
     """
     Register a new admin or moderator account.
 

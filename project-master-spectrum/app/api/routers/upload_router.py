@@ -23,6 +23,11 @@ _USER_DAILY_QUOTA_BYTES = 200 * 1024 * 1024   # 200 MB / user / day
 
 # ── Allowlists ────────────────────────────────────────────────────────────────
 _ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"}
+# SVG can carry an embedded <script>/event-handler payload. Browsers never execute
+# it when the SVG is rendered via <img src="...">, but they DO execute it if the
+# raw URL is opened as a top-level document — so SVG must never get an inline
+# Content-Disposition, only these genuinely inert raster types may.
+_INLINE_SAFE_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 _ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
 _ALLOWED_IMAGE_EXTS  = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
 _ALLOWED_VIDEO_EXTS  = {".mp4", ".webm", ".mov", ".avi"}
@@ -128,9 +133,10 @@ def _upload_to_s3(content: bytes, folder: str, ext: str, content_type: str) -> s
         Key=key,
         Body=content,
         ContentType=content_type,
-        # Use attachment for non-image types to prevent inline rendering of
-        # potentially dangerous content (e.g. SVG with inline JS).
-        ContentDisposition="inline" if content_type.startswith("image/") else "attachment",
+        # Only genuinely inert raster types get inline rendering. SVG is
+        # excluded even though its MIME type starts with "image/" — see
+        # _INLINE_SAFE_IMAGE_TYPES above.
+        ContentDisposition="inline" if content_type in _INLINE_SAFE_IMAGE_TYPES else "attachment",
         # Encrypt at rest using the bucket's default SSE-S3 key.
         ServerSideEncryption="AES256",
     )
