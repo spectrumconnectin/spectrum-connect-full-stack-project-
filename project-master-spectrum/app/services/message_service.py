@@ -9,6 +9,7 @@ Handles business logic for messaging system:
 - Typing indicators
 """
 
+import re
 from datetime import datetime
 from typing import List, Optional, Tuple
 from beanie import PydanticObjectId
@@ -494,7 +495,8 @@ class MessageService:
         search_query = {
             "conversation_id": {"$in": conversation_ids},
             "is_deleted": False,
-            "content": {"$regex": query, "$options": "i"}  # Case-insensitive search
+            # re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
+            "content": {"$regex": re.escape(query[:100]), "$options": "i"}  # Case-insensitive search
         }
 
         if conversation_id:

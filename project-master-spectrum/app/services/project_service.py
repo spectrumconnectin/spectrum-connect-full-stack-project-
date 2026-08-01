@@ -9,6 +9,7 @@ Business logic for project management:
 - Dashboard data aggregation
 """
 
+import re
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from beanie import PydanticObjectId
@@ -122,14 +123,15 @@ class ProjectService:
         if status and status != "all":
             query = query.find(Project.status == status)
 
-        # Search
+        # Search. re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
         if search:
+            safe_search = re.escape(search[:100])
             query = query.find(
                 {
                     "$or": [
-                        {"title": {"$regex": search, "$options": "i"}},
-                        {"description": {"$regex": search, "$options": "i"}},
-                        {"tags": {"$regex": search, "$options": "i"}}
+                        {"title": {"$regex": safe_search, "$options": "i"}},
+                        {"description": {"$regex": safe_search, "$options": "i"}},
+                        {"tags": {"$regex": safe_search, "$options": "i"}}
                     ]
                 }
             )
@@ -689,6 +691,14 @@ class ProjectService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Deadline not found"
+            )
+
+        # Verify user has access to the project this deadline belongs to
+        project = await Project.get(deadline.project_id)
+        if not project or not (project.is_owner(user_id) or project.is_team_member(user_id)):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized"
             )
 
         deadline.mark_completed(user_id)

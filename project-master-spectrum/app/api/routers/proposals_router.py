@@ -55,6 +55,102 @@ def _oid(raw: str) -> ObjectId:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+# ── Direct Hire ───────────────────────────────────────────────────────────────
+# Must be registered before the "/{job_id}" wildcard route below — FastAPI/Starlette
+# match routes in registration order, so a literal sibling registered AFTER a
+# same-depth wildcard is permanently shadowed by it (this exact bug previously broke
+# this endpoint: every request here was being swallowed by submit_proposal below,
+# with job_id="direct-hire", which _oid() rejects as an invalid ObjectId).
+
+class DirectHireRequest(BaseModel):
+    job_id: str
+    creator_id: str
+    note: Optional[str] = None  # optional message to creator
+
+@router.post(
+    "/direct-hire",
+    status_code=status.HTTP_201_CREATED,
+    summary="Client directly hires a creator (skips proposal phase)",
+)
+async def direct_hire(
+    data: DirectHireRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Client bypasses the proposal flow and directly hires a creator.
+
+    1. Verifies the client owns the job post.
+    2. Verifies the creator is not the client (no self-hire).
+    3. Creates an Application with status='accepted'.
+    4. Notifies the creator.
+    5. Optionally starts a conversation with a welcome message.
+    """
+    from app.models.schema import JobPost, Application
+    from bson import ObjectId as _OId
+
+    job = await JobPost.get(_oid(data.job_id))
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You do not own this project")
+    if job.status not in ("open", "in_review"):
+        raise HTTPException(status_code=400, detail="Project must be open or under review to hire directly")
+    if data.creator_id == str(current_user.id):
+        raise HTTPException(status_code=400, detail="You cannot hire yourself")
+
+    # Prevent duplicate — if already hired, return existing
+    existing = await Application.find_one(
+        Application.project_id == _oid(data.job_id),
+        Application.crew_id == _oid(data.creator_id),
+    )
+    if existing:
+        if existing.status == "accepted":
+            return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id, "already_hired": True}
+        existing.status = "accepted"
+        await existing.save()
+        return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id}
+
+    app = Application(
+        project_id=_oid(data.job_id),
+        crew_id=_oid(data.creator_id),
+        cover_letter=data.note or f"Directly hired by client for: {job.title}",
+        status="accepted",
+    )
+    await app.insert()
+
+    await job.update({"$inc": {"proposal_count": 1}, "$set": {"status": "pending_funding"}})
+
+    # Notify creator
+    try:
+        from app.services.notification_service import NotificationService
+        await NotificationService.proposal_accepted(
+            creator_id=data.creator_id,
+            client_id=str(current_user.id),
+            job_title=job.title,
+            job_id=data.job_id,
+        )
+    except Exception:
+        pass
+
+    # Open a conversation with the creator
+    try:
+        from app.services.messaging_service import MessagingService
+        welcome = data.note or (
+            f"Hi! I've hired you directly for my project: **{job.title}**. "
+            "Looking forward to working with you!"
+        )
+        await MessagingService.create_or_get_conversation(
+            participants=[str(current_user.id), data.creator_id],
+            job_id=data.job_id,
+            initial_message=welcome,
+            sender_id=str(current_user.id),
+        )
+    except Exception:
+        pass
+
+    return {"id": str(app.id), "status": "accepted", "job_id": data.job_id}
+
+
 @router.post(
     "/{job_id}",
     status_code=status.HTTP_201_CREATED,
@@ -825,94 +921,3 @@ async def get_proposal_reviews(
         "proposal_id":    proposal_id,
         "job_title":      job.title if job else None,
     }
-
-
-# ── Direct Hire ───────────────────────────────────────────────────────────────
-
-class DirectHireRequest(BaseModel):
-    job_id: str
-    creator_id: str
-    note: Optional[str] = None  # optional message to creator
-
-@router.post(
-    "/direct-hire",
-    status_code=status.HTTP_201_CREATED,
-    summary="Client directly hires a creator (skips proposal phase)",
-)
-async def direct_hire(
-    data: DirectHireRequest,
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Client bypasses the proposal flow and directly hires a creator.
-
-    1. Verifies the client owns the job post.
-    2. Verifies the creator is not the client (no self-hire).
-    3. Creates an Application with status='accepted'.
-    4. Notifies the creator.
-    5. Optionally starts a conversation with a welcome message.
-    """
-    from app.models.schema import JobPost, Application
-    from bson import ObjectId as _OId
-
-    job = await JobPost.get(_oid(data.job_id))
-    if not job:
-        raise HTTPException(status_code=404, detail="Project not found")
-    if str(job.client_id) != str(current_user.id):
-        raise HTTPException(status_code=403, detail="You do not own this project")
-    if job.status not in ("open", "in_review"):
-        raise HTTPException(status_code=400, detail="Project must be open or under review to hire directly")
-    if data.creator_id == str(current_user.id):
-        raise HTTPException(status_code=400, detail="You cannot hire yourself")
-
-    # Prevent duplicate — if already hired, return existing
-    existing = await Application.find_one(
-        Application.project_id == _oid(data.job_id),
-        Application.crew_id == _oid(data.creator_id),
-    )
-    if existing:
-        if existing.status == "accepted":
-            return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id, "already_hired": True}
-        existing.status = "accepted"
-        await existing.save()
-        return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id}
-
-    app = Application(
-        project_id=_oid(data.job_id),
-        crew_id=_oid(data.creator_id),
-        cover_letter=data.note or f"Directly hired by client for: {job.title}",
-        status="accepted",
-    )
-    await app.insert()
-
-    await job.update({"$inc": {"proposal_count": 1}, "$set": {"status": "pending_funding"}})
-
-    # Notify creator
-    try:
-        from app.services.notification_service import NotificationService
-        await NotificationService.proposal_accepted(
-            creator_id=data.creator_id,
-            client_id=str(current_user.id),
-            job_title=job.title,
-            job_id=data.job_id,
-        )
-    except Exception:
-        pass
-
-    # Open a conversation with the creator
-    try:
-        from app.services.messaging_service import MessagingService
-        welcome = data.note or (
-            f"Hi! I've hired you directly for my project: **{job.title}**. "
-            "Looking forward to working with you!"
-        )
-        await MessagingService.create_or_get_conversation(
-            participants=[str(current_user.id), data.creator_id],
-            job_id=data.job_id,
-            initial_message=welcome,
-            sender_id=str(current_user.id),
-        )
-    except Exception:
-        pass
-
-    return {"id": str(app.id), "status": "accepted", "job_id": data.job_id}

@@ -289,6 +289,12 @@ class EscrowService:
         Set is_auto_release=True to bypass the client_id ownership check and
         the manual review gate (used by the auto-release background job).
         """
+        if settings.ESCROW_RELEASES_PAUSED:
+            raise HTTPException(
+                status_code=503,
+                detail="Payment releases are temporarily paused. Please try again shortly.",
+            )
+
         escrow = await Escrow.get(PydanticObjectId(escrow_id))
         if not escrow:
             raise HTTPException(status_code=404, detail="Escrow not found.")

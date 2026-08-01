@@ -4,6 +4,7 @@ Business logic for job posting management
 """
 import asyncio
 import logging
+import re
 from datetime import datetime
 from typing import List, Optional
 from fastapi import HTTPException, status
@@ -299,11 +300,13 @@ class JobService:
         if filters.experience_level:
             query["experience_level"] = filters.experience_level
 
-        # Text search (title and description)
+        # Text search (title and description).
+        # re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
         if filters.search:
+            safe_search = re.escape(filters.search[:100])
             query["$or"] = [
-                {"title": {"$regex": filters.search, "$options": "i"}},
-                {"description": {"$regex": filters.search, "$options": "i"}}
+                {"title": {"$regex": safe_search, "$options": "i"}},
+                {"description": {"$regex": safe_search, "$options": "i"}}
             ]
 
         # Get total count

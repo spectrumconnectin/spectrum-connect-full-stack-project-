@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.services.contact_service import ContactService
 from app.auth.auth import get_current_user_optional
+from app.core.rate_limit import rate_limiter
 
 router = APIRouter(prefix="/contact", tags=["Contact"])
 
@@ -23,6 +24,7 @@ class ContactRequest(BaseModel):
 async def submit_contact(
     payload: ContactRequest,
     user=Depends(get_current_user_optional),
+    _: None = Depends(rate_limiter("contact_submit_ip", limit=5, window_seconds=300)),
 ):
     try:
         return await ContactService.create_message(

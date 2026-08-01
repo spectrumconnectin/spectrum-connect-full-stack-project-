@@ -128,9 +128,14 @@ async def run_auto_release_check():
     3. Auto-release if past deadline
     """
     from app.models.escrow import Escrow as EscrowDoc
+    from app.core.config import settings
 
     now = datetime.utcnow()
     processed = released = reminders = 0
+
+    if settings.ESCROW_RELEASES_PAUSED:
+        logger.warning("Auto-release skipped this cycle — ESCROW_RELEASES_PAUSED is set.")
+        return {"checked": 0, "released": 0, "reminders_sent": 0, "paused": True}
 
     try:
         # Find all active escrows that have at least one delivered milestone.

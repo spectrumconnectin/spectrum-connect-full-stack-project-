@@ -27,6 +27,7 @@ Trust tier breakdown
     diamond -> 5 pts | platinum -> 4 | gold -> 3 | silver -> 2 | bronze -> 1
 """
 
+import re
 from typing import Dict, Any, List, Optional
 from beanie import PydanticObjectId
 
@@ -393,9 +394,13 @@ class SmartConnectService:
             crew_query = CrewProfile.find()
 
             if roles:
+                # re.escape each term before joining with the regex-alternation
+                # operator — otherwise a crafted role string like '(a+)+' causes
+                # catastrophic backtracking (ReDoS) in the query engine.
+                safe_roles = "|".join(re.escape(r[:100]) for r in roles)
                 crew_query = crew_query.find({
                     "$or": [
-                        {"title": {"$regex": "|".join(roles), "$options": "i"}},
+                        {"title": {"$regex": safe_roles, "$options": "i"}},
                         {"departments": {"$in": roles}},
                     ]
                 })

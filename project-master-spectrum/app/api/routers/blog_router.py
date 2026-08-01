@@ -18,6 +18,7 @@ from app.api.schemas.blog_schemas import (
     BlogCategoryUpdate
 )
 from app.auth.auth import get_current_user
+from app.core.rate_limit import rate_limiter
 
 router = APIRouter(prefix="/blog", tags=["Blog"])
 
@@ -105,7 +106,10 @@ async def get_post(
 
 
 @router.post("/posts/{slug}/view")
-async def count_view(slug: str) -> Dict[str, Any]:
+async def count_view(
+    slug: str,
+    _rl: None = Depends(rate_limiter("blog_view_ip", limit=60, window_seconds=60)),
+) -> Dict[str, Any]:
     """Record one view for a post (atomic $inc) and return the new total.
     Called client-side by the article page — deduped per reader on the client."""
     from pymongo import ReturnDocument
@@ -256,7 +260,10 @@ async def delete_post(
 
 
 @router.post("/posts/{post_id}/like")
-async def toggle_like(post_id: str) -> Dict[str, Any]:
+async def toggle_like(
+    post_id: str,
+    _rl: None = Depends(rate_limiter("blog_like_ip", limit=30, window_seconds=60)),
+) -> Dict[str, Any]:
     """
     Toggle like on blog post
 
@@ -320,7 +327,8 @@ async def get_comments(
 async def create_comment(
     post_id: str,
     request: CommentCreate,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("blog_comment_ip", limit=10, window_seconds=300)),
 ) -> Dict[str, Any]:
     """
     Create comment on blog post

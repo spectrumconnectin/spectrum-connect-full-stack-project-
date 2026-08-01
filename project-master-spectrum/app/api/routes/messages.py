@@ -475,12 +475,15 @@ async def upload_attachment(
 
     declared_type = file.content_type or "application/octet-stream"
     if declared_type not in _ALLOWED_ATTACHMENT_TYPES:
-        # Allow images regardless of exact sub-type for convenience
-        if not declared_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported file type '{declared_type}'. Allowed: images, PDF, Word, Excel, text, zip.",
-            )
+        # NOTE: previously fell through here for ANY "image/*" content-type,
+        # which let image/svg+xml (not in the allowlist, no magic-byte check
+        # below, and served inline) bypass validation entirely — a stored-XSS
+        # vector. The allowlist above already covers every real image type we
+        # support, so unknown image subtypes are now rejected like anything else.
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{declared_type}'. Allowed: images, PDF, Word, Excel, text, zip.",
+        )
 
     # Magic byte validation for images: reject files whose bytes don't match the declared type.
     # This prevents an attacker from declaring image/jpeg but uploading an HTML/JS payload.
@@ -522,8 +525,14 @@ async def upload_attachment(
             Key=key,
             Body=content,
             ContentType=declared_type,
-            # Force download for non-image files (security: prevent inline JS execution)
-            ContentDisposition=f'attachment; filename="{safe_name}"' if not declared_type.startswith("image/") else "inline",
+            # Only genuinely inert raster types (the ones magic-byte-checked
+            # above) get inline rendering. Everything else — including any
+            # unexpected image subtype — downloads as an attachment so a
+            # crafted file can never execute as a top-level document.
+            ContentDisposition=(
+                "inline" if declared_type in _IMAGE_MAGIC
+                else f'attachment; filename="{safe_name}"'
+            ),
             # Encrypt at rest — uses the bucket's default KMS/SSE key.
             ServerSideEncryption="AES256",
         )

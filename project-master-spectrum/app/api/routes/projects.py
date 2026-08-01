@@ -432,7 +432,19 @@ async def get_project_deadlines(
     project_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Get all deadlines for a project"""
+    """Get all deadlines for a project (owner or team member only)"""
+    project = await Project.get(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+    if not (project.is_owner(str(current_user.id)) or project.is_team_member(str(current_user.id))):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized"
+        )
+
     deadlines = await ProjectDeadline.find(
         ProjectDeadline.project_id == project_id
     ).sort(+ProjectDeadline.due_date).to_list()
