@@ -1,9 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  jobs, JobPostItem, formatJobBudget,
+  talent, type TalentItem,
+  profile as profileApi,
+  smartConnect, type CreatorSmartMatch,
+} from '@/lib/api';
 import PushPromptCard from '@/components/PushPromptCard';
+import SegmentedTabs from '@/components/SegmentedTabs';
+import CreatorCard from '@/components/CreatorCard';
+import DiscoverFiltersSheet from '@/components/DiscoverFiltersSheet';
+import MatchReasoningSheet, { type MatchReasoningTarget } from '@/components/MatchReasoningSheet';
 
 const DEPARTMENTS = [
   'All Departments', 'Camera', 'Cinematography', 'Directing', 'Editing',
@@ -38,9 +48,35 @@ function formatPosted(dateStr?: string): string {
   return `${Math.floor(days / 7)}w ago`;
 }
 
+type Segment = 'projects' | 'creators' | 'companies';
+
+// A "company" here is a client with at least one currently open role — this
+// list is bounded by jobs.search()'s results, not a real company directory
+// (no such endpoint exists), so counts and membership reflect open jobs only.
+interface CompanyEntry {
+  clientId: string;
+  name: string;
+  avatar?: string;
+  location?: string;
+  isVerified?: boolean;
+  openRoles: number;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function FindProjectsPage() {
+export default function DiscoverPage() {
+  const router = useRouter();
+  const [segment, setSegment] = useState<Segment>('projects');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Own profile — used for the Creators segment's real "shared skills" chip
+  // and to seed Smart Connect reasoning.
+  const [viewerSkills, setViewerSkills] = useState<string[]>([]);
+  useEffect(() => {
+    profileApi.getMe().then(me => setViewerSkills((me.profile?.skills || []).map(s => s.name))).catch(() => {});
+  }, []);
+
+  // ── Projects segment state (unchanged logic from the former Find Projects page) ──
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('All Departments');
   const [budget, setBudget] = useState('Any Budget');
@@ -56,13 +92,13 @@ export default function FindProjectsPage() {
     setSaved(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   useEffect(() => {
+    if (segment !== 'projects') return;
     let cancelled = false;
     const delay = search ? 400 : 0;
     const timeout = setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
-        // No status filter — backend defaults to open + in_review (both accept proposals)
         const params: Record<string, string | number | undefined> = { limit: 40 };
         if (search.trim()) params.search = search.trim();
         if (department !== 'All Departments') params.department = department;
@@ -83,9 +119,8 @@ export default function FindProjectsPage() {
       }
     }, delay);
     return () => { cancelled = true; clearTimeout(timeout); };
-  }, [search, department, budget, sort, refreshKey]);
+  }, [segment, search, department, budget, sort, refreshKey]);
 
-  // Client-side sort for proposals (API might not sort by proposals correctly)
   const sorted = sort === 'Lowest Competition'
     ? [...projects].sort((a, b) => a.proposal_count - b.proposal_count)
     : sort === 'Highest Budget'
@@ -94,111 +129,310 @@ export default function FindProjectsPage() {
         ? [...projects].sort((a, b) => getBudgetMin(a) - getBudgetMin(b))
         : projects;
 
+  // Real AI-curated matches (with real match_percent) — this is the honest
+  // home for "why matched" reasoning; the plain browse list above has no
+  // per-job match score, so it never gets a fabricated one.
+  const [aiMatches, setAiMatches] = useState<CreatorSmartMatch[]>([]);
+  const [aiMatchesLoading, setAiMatchesLoading] = useState(true);
+  useEffect(() => {
+    smartConnect.getCreatorMatches(4)
+      .then(r => setAiMatches(r.matches || []))
+      .catch(() => {})
+      .finally(() => setAiMatchesLoading(false));
+  }, []);
+  const [reasoningTarget, setReasoningTarget] = useState<MatchReasoningTarget | null>(null);
+
+  // ── Creators segment state ──
+  const [creatorQuery, setCreatorQuery] = useState('');
+  const [creatorSkill, setCreatorSkill] = useState('');
+  const [creatorLocation, setCreatorLocation] = useState('');
+  const [creators, setCreators] = useState<TalentItem[]>([]);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
+  const [resolvingCreatorId, setResolvingCreatorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (segment !== 'creators') return;
+    let cancelled = false;
+    const delay = creatorQuery ? 400 : 0;
+    const timeout = setTimeout(() => {
+      setCreatorsLoading(true);
+      talent.search({
+        q: creatorQuery.trim() || undefined,
+        skill: creatorSkill.trim() || undefined,
+        location: creatorLocation.trim() || undefined,
+        limit: 30,
+      })
+        .then(r => { if (!cancelled) setCreators(r.talent || []); })
+        .catch(() => { if (!cancelled) setCreators([]); })
+        .finally(() => { if (!cancelled) setCreatorsLoading(false); });
+    }, delay);
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [segment, creatorQuery, creatorSkill, creatorLocation]);
+
+  // Lazily resolves a TalentItem's real username (not exposed on TalentItem
+  // itself) via the public profile endpoint, then navigates to the real,
+  // already-indexed public portfolio page — reusing it instead of building a
+  // duplicate profile overlay.
+  const openCreatorProfile = async (item: TalentItem) => {
+    setResolvingCreatorId(item.id);
+    try {
+      const pub = await profileApi.getPublic(item.id);
+      router.push(`/portfolio/${pub.username}`);
+    } catch {
+      // Swallow — leave the creator on Discover rather than a broken route.
+    } finally {
+      setResolvingCreatorId(null);
+    }
+  };
+
+  // ── Companies segment state ──
+  const [companies, setCompanies] = useState<CompanyEntry[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+
+  useEffect(() => {
+    if (segment !== 'companies' || companies.length > 0) return;
+    let cancelled = false;
+    setCompaniesLoading(true);
+    jobs.search({ limit: 40 })
+      .then(async result => {
+        const list = result.jobs || [];
+        const counts = new Map<string, number>();
+        list.forEach(j => counts.set(j.client_id, (counts.get(j.client_id) || 0) + 1));
+        const ids = Array.from(counts.keys()).slice(0, 12);
+        const settled = await Promise.allSettled(ids.map(id => profileApi.getPublic(id)));
+        if (cancelled) return;
+        const entries: CompanyEntry[] = settled
+          .map((res, i): CompanyEntry | null => {
+            if (res.status !== 'fulfilled') return null;
+            const pub = res.value;
+            return {
+              clientId: ids[i],
+              name: pub.profile?.display_name || pub.username,
+              avatar: pub.profile?.profile_picture,
+              location: [pub.profile?.location?.city, pub.profile?.location?.country].filter(Boolean).join(', '),
+              isVerified: pub.is_verified,
+              openRoles: counts.get(ids[i]) || 0,
+            };
+          })
+          .filter((e): e is CompanyEntry => e !== null);
+        setCompanies(entries);
+      })
+      .catch(() => { if (!cancelled) setCompanies([]); })
+      .finally(() => { if (!cancelled) setCompaniesLoading(false); });
+    return () => { cancelled = true; };
+  }, [segment, companies.length]);
+
+  const segmentLabel = useMemo(() => ({
+    projects: 'Search by skill, keyword, or department…',
+    creators: 'Search creators by name or skill…',
+    companies: '',
+  }[segment]), [segment]);
+
   return (
     <>
       <PushPromptCard />
 
-      {/* ── Hero search ── */}
-      <section className="mb-8">
-        <div className="max-w-3xl mb-6">
-          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Find Projects</h1>
-          <p className="text-lg text-gray-500">Browse film & creative opportunities that match your skills.</p>
+      {/* ── Header ── */}
+      <section className="mb-6">
+        <div className="max-w-3xl mb-5">
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-2">Discover</h1>
+          <p className="text-lg text-gray-500">Browse open projects, fellow creators, and clients hiring right now.</p>
         </div>
 
-        <div className="flex gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-60">
-            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search by skill, keyword, or department…"
-              className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 shadow-sm"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <i className="fa-solid fa-xmark text-sm"></i>
-              </button>
-            )}
+        {segment !== 'companies' && (
+          <div className="flex gap-3 flex-wrap mb-4">
+            <div className="relative flex-1 min-w-60">
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+              <input
+                type="text"
+                value={segment === 'projects' ? search : creatorQuery}
+                onChange={e => segment === 'projects' ? setSearch(e.target.value) : setCreatorQuery(e.target.value)}
+                placeholder={segmentLabel}
+                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-cobalt focus:ring-2 focus:ring-blue-100 shadow-sm"
+              />
+            </div>
+            <button onClick={() => setFiltersOpen(true)}
+              className="w-[46px] h-[46px] flex-shrink-0 bg-gray-900 rounded-xl flex items-center justify-center hover:bg-gray-800 transition">
+              <i className="fa-solid fa-sliders text-white text-sm"></i>
+            </button>
           </div>
+        )}
 
-          <select value={department} onChange={e => setDepartment(e.target.value)}
-            className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-cobalt shadow-sm">
-            {DEPARTMENTS.map(c => <option key={c}>{c}</option>)}
-          </select>
-
-          <select value={budget} onChange={e => setBudget(e.target.value)}
-            className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-cobalt shadow-sm">
-            {BUDGET_RANGES.map(b => <option key={b}>{b}</option>)}
-          </select>
-
-          <select value={sort} onChange={e => setSort(e.target.value)}
-            className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-cobalt shadow-sm">
-            {SORT_OPTIONS.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
+        <SegmentedTabs
+          value={segment}
+          onChange={setSegment}
+          options={[
+            { value: 'projects', label: 'Projects' },
+            { value: 'creators', label: 'Creators' },
+            { value: 'companies', label: 'Companies' },
+          ]}
+        />
       </section>
 
-      {/* ── Stats row ── */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-gray-600">
-          {loading ? (
-            <span className="text-gray-400">Searching…</span>
-          ) : error ? (
-            <span className="text-red-500">Error loading</span>
-          ) : (
-            <>
-              <span className="font-semibold text-gray-900">{sorted.length}</span> projects found
-              {search && <span> for <span className="font-semibold text-cobalt">&ldquo;{search}&rdquo;</span></span>}
-            </>
+      {segment === 'projects' && (
+        <>
+          {/* AI-recommended matches — the only place with a real match score */}
+          {!aiMatchesLoading && aiMatches.length > 0 && (
+            <section className="mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-wand-magic-sparkles text-purple-500 text-sm"></i>
+                  <h2 className="text-base font-bold text-gray-900">Matched for you</h2>
+                </div>
+                <Link href="/creator/smart-connect" className="text-xs font-semibold text-cobalt hover:underline">See all →</Link>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {aiMatches.map(m => (
+                  <div key={m.id} className="flex-shrink-0 w-[220px] bg-white rounded-[18px] p-4 shadow-[0_1px_2px_rgba(15,23,42,.05)] flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-cobalt bg-blue-50 px-2.5 py-1 rounded-full">{m.match_percent}% match</span>
+                    </div>
+                    <div className="text-[14px] font-bold text-gray-900 leading-snug line-clamp-2">{m.title}</div>
+                    <button onClick={() => setReasoningTarget({ title: m.title, match_percent: m.match_percent, skills: m.skills })}
+                      className="text-left text-[11.5px] font-semibold text-purple-600 bg-transparent border-0 p-0 mt-auto">
+                      Why this matched <i className="fa-solid fa-arrow-right text-[9px] ml-0.5"></i>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
-        </p>
-        <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span><i className="fa-solid fa-circle text-green-400 mr-1 text-[8px]"></i>Live opportunities</span>
-        </div>
-      </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading projects…</p>
-        </div>
-      ) : error ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
-          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <i className="fa-solid fa-circle-exclamation text-red-400 text-2xl"></i>
+          {/* Live count + list */}
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-sm text-gray-600">
+              {loading ? (
+                <span className="text-gray-400">Searching…</span>
+              ) : error ? (
+                <span className="text-red-500">Error loading</span>
+              ) : (
+                <>
+                  <span className="font-semibold text-gray-900">{sorted.length}</span> projects found
+                  {search && <span> for <span className="font-semibold text-cobalt">&ldquo;{search}&rdquo;</span></span>}
+                </>
+              )}
+            </p>
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">Failed to load projects</h3>
-          <p className="text-gray-500 text-sm mb-4">{error}</p>
-          <button onClick={() => setRefreshKey(k => k + 1)}
-            className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-            Try again
-          </button>
-        </div>
-      ) : sorted.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <i className="fa-solid fa-magnifying-glass text-gray-400 text-2xl"></i>
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">No projects found</h3>
-          <p className="text-gray-500 text-sm mb-4">Try adjusting your filters or search terms.</p>
-          <button onClick={() => { setSearch(''); setDepartment('All Departments'); setBudget('Any Budget'); }}
-            className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
-            Clear filters
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {sorted.map(p => (
-            <ProjectCard key={p.id} project={p} saved={saved} onSave={toggleSave} expanded={expanded} onExpand={setExpanded} />
-          ))}
-        </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+              <p className="text-gray-500 text-sm">Loading projects…</p>
+            </div>
+          ) : error ? (
+            <div className="bg-white rounded-[20px] p-16 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Failed to load projects</h3>
+              <p className="text-gray-500 text-sm mb-4">{error}</p>
+              <button onClick={() => setRefreshKey(k => k + 1)}
+                className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
+                Try again
+              </button>
+            </div>
+          ) : sorted.length === 0 ? (
+            <div className="bg-white rounded-[20px] p-16 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">No projects found</h3>
+              <p className="text-gray-500 text-sm mb-4">Try adjusting your filters or search terms.</p>
+              <button onClick={() => { setSearch(''); setDepartment('All Departments'); setBudget('Any Budget'); }}
+                className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sorted.map(p => (
+                <ProjectCard key={p.id} project={p} saved={saved} onSave={toggleSave} expanded={expanded} onExpand={setExpanded} />
+              ))}
+            </div>
+          )}
+        </>
       )}
+
+      {segment === 'creators' && (
+        <>
+          {creatorsLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : creators.length === 0 ? (
+            <div className="bg-white rounded-[20px] p-16 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">No creators found</h3>
+              <p className="text-gray-500 text-sm">Try a different search or clear your filters.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {creators.map(item => (
+                <CreatorCard
+                  key={item.id}
+                  item={item}
+                  viewerSkills={viewerSkills}
+                  onOpen={() => openCreatorProfile(item)}
+                />
+              ))}
+            </div>
+          )}
+          {resolvingCreatorId && (
+            <p className="text-center text-xs text-gray-400 mt-4">Opening profile…</p>
+          )}
+        </>
+      )}
+
+      {segment === 'companies' && (
+        <>
+          {companiesLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="w-10 h-10 border-4 border-cobalt border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : companies.length === 0 ? (
+            <div className="bg-white rounded-[20px] p-16 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">No open roles right now</h3>
+              <p className="text-gray-500 text-sm">Check back soon, or browse Projects directly.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {companies.map(c => (
+                <div key={c.clientId} className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-[0_1px_2px_rgba(15,23,42,.05)]">
+                  {c.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.avatar} alt={c.name} className="w-12 h-12 rounded-2xl object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {c.name[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[15px] font-bold text-gray-900 truncate">{c.name}</span>
+                      {c.isVerified && <i className="fa-solid fa-circle-check text-cobalt text-xs" title="Verified"></i>}
+                    </div>
+                    <div className="text-[12px] text-gray-400 font-semibold">
+                      {c.location || 'Location not set'} · {c.openRoles} open role{c.openRoles !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-center text-[11px] text-gray-300 mt-5">Showing clients with currently open roles.</p>
+        </>
+      )}
+
+      <DiscoverFiltersSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        segment={segment === 'companies' ? 'projects' : segment}
+        department={department} onDepartmentChange={setDepartment} departments={DEPARTMENTS}
+        budget={budget} onBudgetChange={setBudget} budgets={BUDGET_RANGES}
+        sort={sort} onSortChange={setSort} sorts={SORT_OPTIONS}
+        skill={creatorSkill} onSkillChange={setCreatorSkill}
+        location={creatorLocation} onLocationChange={setCreatorLocation}
+      />
+
+      <MatchReasoningSheet target={reasoningTarget} onClose={() => setReasoningTarget(null)} />
     </>
   );
 }
 
-// ── Project card ──────────────────────────────────────────────────────────────
+// ── Project card (unchanged from the former Find Projects page) ────────────────
 
 function ProjectCard({
   project: p,
@@ -221,7 +455,7 @@ function ProjectCard({
   const durationStr = p.duration || (p.estimated_duration ? `${p.estimated_duration} days` : null);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 hover:border-cobalt hover:shadow-md transition-all">
+    <div className="bg-white rounded-[20px] shadow-[0_1px_2px_rgba(15,23,42,.05)] hover:shadow-md transition-all">
       <div className="p-5">
         <div className="flex items-start gap-4">
           {/* Department icon */}

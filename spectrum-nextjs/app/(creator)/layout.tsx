@@ -15,16 +15,18 @@ const navLinks = [
   { href: '/creator/smart-connect',label: 'Smart Connect', icon: 'fa-bolt' },
   { href: '/creator/projects',     label: 'My Work',       icon: 'fa-briefcase' },
   { href: '/creator/profile#portfolio', label: 'Portfolio', icon: 'fa-images' },
-  { href: '/creator/disputes',     label: 'Disputes',      icon: 'fa-scale-balanced' },
   { href: '/creator/ai-assistant', label: 'Miya',          icon: 'fa-sparkles', isMiya: true },
 ];
 
+// Home / Discover / Projects / Messages / Profile — matches the mockup's
+// 5-tab IA. Smart Connect ("Match") is no longer a dedicated FAB tab; it's
+// reachable from inside Discover instead (see find-projects/page.tsx).
 const bottomNav = [
-  { href: '/creator/dashboard',    label: 'Home',     icon: 'fa-house' },
-  { href: '/creator/profile#portfolio', label: 'Portfolio', icon: 'fa-images' },
-  { href: '/creator/smart-connect',label: 'Match',    icon: 'fa-bolt', primary: true },
-  { href: '/creator/projects',     label: 'My Work',  icon: 'fa-briefcase' },
-  { href: '/creator/messaging',    label: 'Messages', icon: 'fa-comment' },
+  { href: '/creator/dashboard',     label: 'Home',     icon: 'fa-house' },
+  { href: '/creator/find-projects', label: 'Discover', icon: 'fa-compass' },
+  { href: '/creator/projects',      label: 'Projects', icon: 'fa-briefcase' },
+  { href: '/creator/messaging',     label: 'Messages', icon: 'fa-comment' },
+  { href: '/creator/account',       label: 'Profile',  icon: 'fa-user' },
 ];
 
 function CreatorHeader() {
@@ -147,6 +149,7 @@ function CreatorHeader() {
                       { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings' },
                       { href: '/creator/services', icon: 'fa-store', label: 'My Services' },
                       { href: '/creator/etf',      icon: 'fa-medal', label: 'ETF — Earn Trust' },
+                      { href: '/creator/disputes', icon: 'fa-scale-balanced', label: 'Disputes' },
                       { href: '/client/dashboard', icon: 'fa-arrow-right-arrow-left', label: 'Switch to Client' },
                     ].map(({ href, icon, label }) => (
                       <Link key={href} href={href} onClick={() => setMenuOpen(false)}
@@ -242,25 +245,18 @@ function CreatorBottomNav() {
 
   return (
     <nav className="sc-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/70 flex items-center safe-bottom">
-      {bottomNav.map(({ href, label, icon, primary }) => {
+      {bottomNav.map(({ href, label, icon }) => {
         const [path, fragment] = href.split('#');
         const pathMatches = pathname === path || (path !== '/creator/dashboard' && pathname.startsWith(path + '/'));
         const active = pathMatches && (fragment ? hash === `#${fragment}` : true);
         return (
           <Link key={href} href={href}
-            className={`sc-press flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${
-              primary ? 'relative' : active ? 'text-cobalt' : 'text-gray-400'
+            className={`sc-press relative flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-all ${
+              active ? 'text-cobalt' : 'text-gray-400'
             }`}>
-            {!primary && active && (
-              <span className="absolute top-0 h-0.5 w-7 rounded-full bg-cobalt" />
-            )}
-            {primary
-              ? <div className="w-12 h-12 bg-cobalt rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 -mt-5 active:scale-95 transition-transform">
-                  <i className="fa-solid fa-bolt text-white text-lg" />
-                </div>
-              : <i className={`fa-solid ${icon} text-lg transition-transform ${active ? 'scale-110' : ''}`} />
-            }
-            {!primary && <span className={`text-[10px] font-medium ${active ? 'text-cobalt' : 'text-gray-400'}`}>{label}</span>}
+            {active && <span className="absolute top-0 h-0.5 w-7 rounded-full bg-cobalt" />}
+            <i className={`fa-solid ${icon} text-lg transition-transform ${active ? 'scale-110' : ''}`} />
+            <span className={`text-[10px] font-medium ${active ? 'text-cobalt' : 'text-gray-400'}`}>{label}</span>
           </Link>
         );
       })}

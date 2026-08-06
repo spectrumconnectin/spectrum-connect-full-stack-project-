@@ -202,6 +202,8 @@ class Profile(BaseModel):
     # Analytics — bounded, lightweight (no time-series collection)
     portfolio_total_views: int = 0
     portfolio_daily_views: Dict[str, int] = Field(default_factory=dict)  # "YYYY-MM-DD" -> count, pruned to last 30 days
+    portfolio_contact_clicks: int = 0        # "Contact Creator" button clicks (counted regardless of login outcome)
+    portfolio_conversations_started: int = 0 # conversations actually created via the portfolio contact flow
     # Sharing controls
     portfolio_access: str = "public"                    # "public" | "password"
     portfolio_passcode_hash: Optional[str] = None

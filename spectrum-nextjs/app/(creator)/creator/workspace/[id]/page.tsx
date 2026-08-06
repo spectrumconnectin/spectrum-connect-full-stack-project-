@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { proposals, escrow as escrowApi, messaging, ProposalDetail, EscrowMilestone, currencySymbol } from '@/lib/api';
+import SegmentedTabs from '@/components/SegmentedTabs';
 
 // ── Deadline countdown ────────────────────────────────────────────────────────
 function useDeadlineCountdown(deadlineAt?: string) {
@@ -432,17 +433,17 @@ export default function CreatorWorkspacePage() {
       {/* Escrow status bar (if hired) */}
       {data.status === 'accepted' && escrow && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-[16px] p-4 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
             <p className="text-xs text-gray-500 mb-1">Total Escrow</p>
             <p className="text-2xl font-bold text-gray-900">${escrow.total_amount.toLocaleString()}</p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-[16px] p-4 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
             <p className="text-xs text-gray-500 mb-1">Funded</p>
             <p className={`text-2xl font-bold ${escrow.funded_amount > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
               ${escrow.funded_amount.toLocaleString()}
             </p>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+          <div className="bg-white rounded-[16px] p-4 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
             <p className="text-xs text-gray-500 mb-1">Released to You</p>
             <p className="text-2xl font-bold text-gray-900">${escrow.released_amount.toLocaleString()}</p>
           </div>
@@ -450,24 +451,17 @@ export default function CreatorWorkspacePage() {
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="flex border-b border-gray-200 px-2">
-          {([
-            { key: 'overview',     label: 'Overview',     icon: 'fa-circle-info' },
-            { key: 'deliverables', label: 'Deliverables', icon: 'fa-box-open' },
-            { key: 'payment',      label: 'Payment',      icon: 'fa-shield-halved' },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-6 py-4 text-sm font-semibold whitespace-nowrap flex items-center gap-2 transition border-b-2 ${
-                activeTab === t.key
-                  ? 'text-cobalt border-cobalt'
-                  : 'text-gray-500 border-transparent hover:text-gray-900'
-              }`}>
-              <i className={`fa-solid ${t.icon} text-xs`}></i>{t.label}
-            </button>
-          ))}
-        </div>
-
+      <SegmentedTabs
+        className="mb-4"
+        value={activeTab}
+        onChange={setActiveTab}
+        options={[
+          { value: 'overview',     label: 'Overview' },
+          { value: 'deliverables', label: 'Deliverables' },
+          { value: 'payment',      label: 'Payment' },
+        ]}
+      />
+      <div className="bg-white rounded-[20px] overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,.05)]">
         <div className="p-6">
 
           {/* ── Overview Tab ── */}

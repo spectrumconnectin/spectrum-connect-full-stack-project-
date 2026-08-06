@@ -4,8 +4,23 @@ import Link from 'next/link';
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { proposals, escrow, ProposalItem, EscrowListItem } from '@/lib/api';
+import SegmentedTabs from '@/components/SegmentedTabs';
 
-const APP_STATUS_TABS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected', 'withdrawn'];
+// Mockup-style Open/Active/Delivered/Completed segments, mapped onto the
+// real application-status + job-stage fields below. "All" is kept as an
+// escape hatch so rejected/withdrawn/cancelled/closed items are never
+// silently hidden — they just don't fit any of the four real-world buckets.
+type ProjectSegment = 'all' | 'open' | 'active' | 'delivered' | 'completed';
+
+function matchesSegment(app: ProposalItem, segment: ProjectSegment): boolean {
+  if (segment === 'all') return true;
+  if (segment === 'open') return ['submitted', 'shortlisted', 'interviewing'].includes(app.status);
+  if (app.status !== 'accepted') return false;
+  if (segment === 'active') return ['pending_funding', 'in_progress', 'revision_requested'].includes(app.job_status ?? '');
+  if (segment === 'delivered') return ['delivered', 'approved'].includes(app.job_status ?? '');
+  if (segment === 'completed') return app.job_status === 'completed';
+  return false;
+}
 
 const APP_STATUS_STYLE: Record<string, string> = {
   submitted:    'bg-blue-50 text-blue-700',
@@ -83,7 +98,7 @@ function formatRelative(dateStr?: string): string {
 function MyWorkInner() {
   const router = useRouter();
 
-  const [appTab, setAppTab] = useState('All');
+  const [segment, setSegment] = useState<ProjectSegment>('all');
   const [appList, setAppList] = useState<ProposalItem[]>([]);
   const [appLoading, setAppLoading] = useState(true);
   const [appError, setAppError] = useState<string | null>(null);
@@ -115,15 +130,21 @@ function MyWorkInner() {
     return () => { cancelled = true; };
   }, []);
 
-  const filteredApps = appTab === 'All'
-    ? appList
-    : appList.filter(a => a.status === appTab);
+  const filteredApps = appList.filter(a => matchesSegment(a, segment));
 
   const appCounts = {
     total:        appList.length,
     submitted:    appList.filter(a => a.status === 'submitted').length,
     shortlisted:  appList.filter(a => a.status === 'shortlisted').length,
     accepted:     appList.filter(a => a.status === 'accepted').length,
+  };
+
+  const segmentCounts: Record<ProjectSegment, number> = {
+    all:       appList.length,
+    open:      appList.filter(a => matchesSegment(a, 'open')).length,
+    active:    appList.filter(a => matchesSegment(a, 'active')).length,
+    delivered: appList.filter(a => matchesSegment(a, 'delivered')).length,
+    completed: appList.filter(a => matchesSegment(a, 'completed')).length,
   };
 
   const handleWithdraw = async (id: string, e: React.MouseEvent) => {
@@ -164,7 +185,7 @@ function MyWorkInner() {
           { label: 'Shortlisted',    value: appCounts.shortlisted, icon: 'fa-star',         bg: 'bg-purple-50',  iconColor: 'text-purple-600' },
           { label: 'Hired',          value: appCounts.accepted,    icon: 'fa-circle-check', bg: 'bg-emerald-50', iconColor: 'text-emerald-600' },
         ].map(({ label, value, icon, bg, iconColor }) => (
-          <div key={label} className="bg-white rounded-2xl p-6 border border-gray-200">
+          <div key={label} className="bg-white rounded-[20px] p-6 shadow-[0_1px_2px_rgba(15,23,42,.05)]">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-gray-600">{label}</span>
               <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
@@ -183,30 +204,25 @@ function MyWorkInner() {
           <p className="text-gray-500 text-sm">Loading applications…</p>
         </div>
       ) : appError ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-16 text-center">
+        <div className="bg-white rounded-[20px] p-16 text-center shadow-[0_1px_2px_rgba(15,23,42,.05)]">
           <i className="fa-solid fa-circle-exclamation text-4xl text-red-300 mb-4 block"></i>
           <p className="text-red-500 text-sm">{appError}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          {/* Status sub-tabs */}
-          <div className="flex items-center border-b border-gray-200 px-2 overflow-x-auto">
-            {APP_STATUS_TABS.map(tab => {
-              const count = tab === 'All' ? appList.length : appList.filter(a => a.status === tab).length;
-              return (
-                <button key={tab} onClick={() => setAppTab(tab)}
-                  className={`px-5 py-4 text-sm font-semibold whitespace-nowrap transition border-b-2 ${
-                    appTab === tab ? 'text-cobalt border-cobalt' : 'text-gray-500 border-transparent hover:text-gray-900'
-                  }`}>
-                  {tab === 'All' ? 'All' : (APP_STATUS_LABEL[tab] ?? tab)}
-                  {count > 0 && (
-                    <span className="ml-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{count}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
+        <>
+          <SegmentedTabs
+            className="mb-4"
+            value={segment}
+            onChange={setSegment}
+            options={[
+              { value: 'all',       label: 'All',       count: segmentCounts.all },
+              { value: 'open',      label: 'Open',      count: segmentCounts.open },
+              { value: 'active',    label: 'Active',    count: segmentCounts.active },
+              { value: 'delivered', label: 'Delivered', count: segmentCounts.delivered },
+              { value: 'completed', label: 'Done',      count: segmentCounts.completed },
+            ]}
+          />
+          <div className="bg-white rounded-[20px] overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,.05)]">
           {filteredApps.length === 0 ? (
             <div className="p-20 text-center">
               <i className="fa-solid fa-inbox text-4xl text-gray-300 mb-4 block"></i>
@@ -325,7 +341,8 @@ function MyWorkInner() {
               })}
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
     </>
   );

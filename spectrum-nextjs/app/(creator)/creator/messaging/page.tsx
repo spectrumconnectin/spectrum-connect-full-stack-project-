@@ -31,11 +31,14 @@ function displayName(p?: ConversationItem['participants'][number]): string {
 
 function Avatar({ url, name, size = 10 }: { url?: string; name: string; size?: number }) {
   const px = size * 4;
+  // Rounded-square tiles (not circles) — matches the avatar shape used
+  // everywhere else in the redesign (CreatorCard, dashboard, account hub).
+  const radius = Math.max(Math.round(px * 0.3), 8);
   // eslint-disable-next-line @next/next/no-img-element
-  if (url) return <img src={url} alt={name} style={{ width: px, height: px }} className="rounded-full object-cover flex-shrink-0" />;
+  if (url) return <img src={url} alt={name} style={{ width: px, height: px, borderRadius: radius }} className="object-cover flex-shrink-0" />;
   return (
-    <div style={{ width: px, height: px, fontSize: Math.max(px * 0.38, 11) }}
-      className="rounded-full bg-blue-100 flex items-center justify-center text-cobalt font-bold flex-shrink-0">
+    <div style={{ width: px, height: px, fontSize: Math.max(px * 0.38, 11), borderRadius: radius }}
+      className="bg-blue-100 flex items-center justify-center text-cobalt font-bold flex-shrink-0">
       {name[0]?.toUpperCase()}
     </div>
   );
@@ -44,6 +47,8 @@ function Avatar({ url, name, size = 10 }: { url?: string; name: string; size?: n
 function CreatorMessagingPageInner() {
   const searchParams = useSearchParams();
   const targetUserId = searchParams.get('userId');
+  const prefillMsg = searchParams.get('msg');
+  const contactSource = searchParams.get('source') || undefined;
 
   const [myId, setMyId] = useState('');
   const [convos, setConvos] = useState<ConversationItem[]>([]);
@@ -100,16 +105,17 @@ function CreatorMessagingPageInner() {
     // No existing conversation — create one
     targetHandledRef.current = true;
     setCreatingConvo(true);
-    messaging.createConversation([targetUserId])
+    messaging.createConversation([targetUserId], undefined, undefined, contactSource)
       .then(newConvo => {
         setConvos(prev => [newConvo, ...prev]);
         setSelectedId(newConvo.id);
+        if (prefillMsg) setInput(prefillMsg); // editable in the composer, never auto-sent
       })
       .catch(() => {
         if (convos.length > 0) setSelectedId(convos[0].id);
       })
       .finally(() => setCreatingConvo(false));
-  }, [targetUserId, loadingConvos, myId, convos]);
+  }, [targetUserId, loadingConvos, myId, convos, prefillMsg, contactSource]);
 
   useEffect(() => {
     loadConversations();
@@ -379,7 +385,7 @@ function CreatorMessagingPageInner() {
 
             {/* Input */}
             <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex items-end gap-3 bg-gray-50 rounded-2xl border border-gray-200 p-3">
+              <div className="flex items-end gap-3 bg-gray-50 rounded-[20px] border border-gray-200 p-3">
                 <textarea
                   placeholder="Type your message… (Enter to send, Shift+Enter for new line)"
                   rows={input.split('\n').length > 2 ? Math.min(input.split('\n').length, 6) : 1}

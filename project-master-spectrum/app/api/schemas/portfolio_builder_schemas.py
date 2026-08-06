@@ -195,6 +195,9 @@ class AnalyticsResponse(BaseModel):
     total_views: int = 0
     this_week_views: int = 0
     top_projects: List[ProjectViewSummary] = []
+    contact_clicks: int = 0
+    conversations_started: int = 0
+    conversion_rate: float = 0.0  # conversations_started / total_views * 100
 
 
 class ViewRequest(BaseModel):

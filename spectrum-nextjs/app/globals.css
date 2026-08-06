@@ -327,7 +327,15 @@ body {
 
 /* ---- Dashboard UI (app.css polish) ---- */
 @keyframes sc-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-main { animation: sc-page-in .45s var(--sc-ease) both; }
+/* `backwards`, not `both` — see the identical fix on .page-enter further down
+   this file for the full explanation. `both` keeps applying the animation's final transform
+   forever, which makes every <main> a containing block for its `position:
+   fixed` descendants site-wide — silently breaking every fixed-position
+   modal/sheet/overlay rendered inside <main> on every page (found via the new
+   BottomSheet component landing off-screen in the creator app; the same
+   containing-block corruption applies to every other fixed overlay that lives
+   inside <main>, on every page, not just this one). */
+main { animation: sc-page-in .45s var(--sc-ease) backwards; }
 header { backdrop-filter: saturate(180%) blur(8px); -webkit-backdrop-filter: saturate(180%) blur(8px); }
 nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important; background: var(--sc-brand-50) !important; font-weight: 600; }
 .sc-skeleton { background: linear-gradient(90deg, #eef2f7 0%, #f8fafc 50%, #eef2f7 100%); background-size: 200% 100%; animation: sc-skeleton 1.4s linear infinite; border-radius: 8px; }
@@ -353,6 +361,13 @@ nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important;
 .sc-notif-item p { font-size: 13.5px; color: var(--sc-ink-2); line-height: 1.45; }
 .sc-notif-item time { display: block; font-size: 11.5px; color: var(--sc-mute); margin-top: 3px; }
 .sc-notif-footer { padding: 10px 18px; text-align: center; font-size: 13px; font-weight: 600; color: var(--sc-brand); cursor: pointer; border-top: 1px solid var(--sc-line); }
+
+/* Shared bottom-sheet (components/BottomSheet.tsx) — slides up on mobile,
+   fades+scales in as a centered modal on wider screens. */
+@keyframes sc-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sc-sheet-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.sc-sheet-panel { animation: sc-sheet-up .25s cubic-bezier(0.32,0.72,0,1); }
+@media (min-width: 640px) { .sc-sheet-panel { animation: sc-sheet-in .2s ease-out; } }
 
 /* ============================================================
    PRICING PAGE (pages/pricing.css)
@@ -476,7 +491,7 @@ nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important;
 .pr-final .meta { font-size:13.5px; color:rgba(255,255,255,0.85); }
 @media (max-width:900px) {
   .pr-hero h1 { font-size:36px; }
-  .fee-grid,.covers-grid,.up-grid,.wpw-grid,.pr-foot-inner { grid-template-columns:1fr; }
+  .fee-grid,.fee-split,.covers-grid,.up-grid,.wpw-grid,.pr-foot-inner { grid-template-columns:1fr; }
   .no-hidden .nh-grid { grid-template-columns:1fr; }
   .fee-split { grid-template-columns:1fr; }
 }
@@ -654,8 +669,16 @@ nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important;
    PAGE TRANSITIONS
    ============================================================ */
 
+/* `backwards`, not `both`. A `both` fill keeps applying the animation's output
+   after it ends, and an interpolated transform always resolves to a matrix —
+   even an identity one. Any transform makes the element a containing block for
+   `position: fixed` descendants, which pinned the mobile nav drawer to the full
+   document height instead of the viewport and pushed its bottom actions
+   thousands of px off screen. `backwards` still holds the `from` state through
+   any delay, but releases once the animation finishes, and the end state is
+   visually identical to the element's base style so nothing snaps. */
 .page-enter {
-  animation: pageIn 0.38s cubic-bezier(0.22, 0.9, 0.36, 1) both;
+  animation: pageIn 0.38s cubic-bezier(0.22, 0.9, 0.36, 1) backwards;
 }
 
 @keyframes pageIn {
@@ -664,14 +687,15 @@ nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important;
 }
 
 /* Stagger direct children sections so they cascade in */
+/* `backwards` for the same containing-block reason as .page-enter above. */
 .page-enter > section:nth-child(1),
-.page-enter > div:nth-child(1)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.04s both; }
+.page-enter > div:nth-child(1)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.04s backwards; }
 .page-enter > section:nth-child(2),
-.page-enter > div:nth-child(2)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.10s both; }
+.page-enter > div:nth-child(2)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.10s backwards; }
 .page-enter > section:nth-child(3),
-.page-enter > div:nth-child(3)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.16s both; }
+.page-enter > div:nth-child(3)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.16s backwards; }
 .page-enter > section:nth-child(4),
-.page-enter > div:nth-child(4)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.22s both; }
+.page-enter > div:nth-child(4)  { animation: pageIn 0.38s cubic-bezier(0.22,0.9,0.36,1) 0.22s backwards; }
 
 
 /* ============================================================
@@ -1005,6 +1029,16 @@ header nav a.active::after {
 .mk-reveal-r.in {
   opacity: 1;
   transform: translateX(0);
+}
+
+/* .mk-reveal-x/-r sit translateX(±32px) off their resting position until
+   scrolled into view — before that, the offset counts toward the page's
+   scrollable overflow (Chrome includes transform in scroll bounds even
+   though it doesn't reflow layout), adding a few px of sideways slop on
+   first load. Contain it at the section level, same as the hero already does
+   explicitly, so no section needs to opt in by hand. */
+section:has(.mk-reveal-x, .mk-reveal-r) {
+  overflow-x: hidden;
 }
 
 /* Stagger grid: parent gets .mk-stagger, children animate in cascade */

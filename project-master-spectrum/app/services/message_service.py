@@ -28,9 +28,10 @@ class MessageService:
         participant_ids: List[str],
         job_id: Optional[str] = None,
         initial_message: Optional[str] = None
-    ) -> Conversation:
+    ) -> tuple[Conversation, bool]:
         """
-        Create a new conversation
+        Create a new conversation, or return the existing one between the
+        same participants.
 
         Args:
             creator_id: ID of user creating the conversation
@@ -39,7 +40,8 @@ class MessageService:
             initial_message: Optional first message to send
 
         Returns:
-            Created Conversation
+            (Conversation, was_created) — was_created is False when an existing
+            conversation was returned instead of a new one.
         """
         # Ensure creator is in participants
         all_participants = list(set([creator_id] + participant_ids))
@@ -52,7 +54,7 @@ class MessageService:
             )
         )
         if existing:
-            return existing
+            return existing, False
 
         # Get job details if job_id provided
         job_title = None
@@ -87,7 +89,7 @@ class MessageService:
                 content=initial_message
             )
 
-        return conversation
+        return conversation, True
 
     @staticmethod
     async def send_message(

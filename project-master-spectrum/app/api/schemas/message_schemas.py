@@ -65,6 +65,7 @@ class ConversationCreate(BaseModel):
     participant_ids: List[str]  # List of user IDs to include
     job_id: Optional[str] = None  # Link to a job if project-related
     initial_message: Optional[str] = None  # First message to send
+    source: Optional[str] = None  # Where this conversation originated, e.g. "portfolio" (analytics only)
 
 
 class ConversationParticipant(BaseModel):

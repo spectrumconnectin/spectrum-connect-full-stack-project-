@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { dashboard, auth, escrow as escrowApi, type CreatorDashboardResponse } from '@/lib/api';
+import { dashboard, auth, escrow as escrowApi, profile as profileApi, type CreatorDashboardResponse } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 import SetupJourney from '@/components/SetupJourney';
 import PushPromptCard from '@/components/PushPromptCard';
+import { consumeContactIntent } from '@/lib/contactIntent';
 
 const difficultyStyles: Record<string, string> = {
   Beginner: 'bg-green-50 text-green-700 border-green-200',
@@ -14,11 +16,24 @@ const difficultyStyles: Record<string, string> = {
 };
 
 export default function CreatorDashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<CreatorDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [inEscrow, setInEscrow] = useState(0);
   const [pendingRelease, setPendingRelease] = useState(0);
   const [totalEarned, setTotalEarned] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState('');
+
+  // A visitor who clicked "Contact Creator" while logged out (unusual for a
+  // creator account, but the same portfolio button is shared code) lands here
+  // right after login/signup — continue straight into that conversation.
+  useEffect(() => {
+    const intent = consumeContactIntent();
+    if (intent) {
+      const qs = new URLSearchParams({ userId: intent.userId, msg: intent.message, source: 'portfolio' });
+      router.replace(`/creator/messaging?${qs.toString()}`);
+    }
+  }, [router]);
 
   useEffect(() => {
     Promise.allSettled([
@@ -33,7 +48,20 @@ export default function CreatorDashboardPage() {
         setTotalEarned(escrows.reduce((s, e) => s + e.released_amount, 0));
       }
     }).catch(() => {}).finally(() => setLoading(false));
+    // Small, cheap call just for the avatar — a separate re-fetch here is
+    // simpler and safer than threading CreatorHeader's already-fetched
+    // profile down through layout state.
+    profileApi.getMe().then(u => {
+      if (u.profile?.profile_picture) setAvatarUrl(u.profile.profile_picture);
+    }).catch(() => {});
   }, []);
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  })();
 
   const stats = data?.stats;
   const opportunities = data?.opportunities ?? [];
@@ -54,20 +82,49 @@ export default function CreatorDashboardPage() {
   return (
     <>
       {/* Welcome Hero */}
-      <section className="mb-10">
+      <section className="mb-6">
         <div className="bg-gradient-to-br from-cobalt via-blue-600 to-blue-500 rounded-3xl p-10 lg:p-12 text-white relative overflow-hidden shadow-xl">
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-400 rounded-full opacity-20 blur-3xl" />
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-300 rounded-full opacity-20 blur-3xl" />
-          <div className="relative z-10 max-w-3xl">
-            <p className="text-blue-200 font-semibold uppercase tracking-widest text-sm mb-2">Welcome back</p>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
-            <p className="text-blue-100 text-lg">
-              {stats?.active_projects
-                ? `You have ${stats.active_projects} active project${stats.active_projects !== 1 ? 's' : ''}.`
-                : 'Complete your profile to start getting matched with projects.'}
-            </p>
+          <div className="relative z-10 max-w-3xl flex items-center gap-5">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt={displayName} className="hidden sm:block w-16 h-16 rounded-2xl object-cover border-2 border-white/40 flex-shrink-0" />
+            ) : (
+              <div className="hidden sm:flex w-16 h-16 rounded-2xl bg-white/15 border-2 border-white/40 items-center justify-center text-white font-bold text-xl flex-shrink-0">
+                {displayName[0]?.toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-blue-200 font-semibold uppercase tracking-widest text-sm mb-2">{greeting}</p>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">{displayName}</h1>
+              <p className="text-blue-100 text-lg">
+                {stats?.active_projects
+                  ? `You have ${stats.active_projects} active project${stats.active_projects !== 1 ? 's' : ''}.`
+                  : 'Complete your profile to start getting matched with projects.'}
+              </p>
+            </div>
           </div>
         </div>
+      </section>
+
+      {/* Quick actions — moved up front so the most common next steps are
+          one tap away, right under the greeting. */}
+      <section className="grid grid-cols-4 gap-2.5 sm:gap-3 mb-6">
+        {[
+          { href: '/creator/find-projects', icon: 'fa-magnifying-glass', label: 'Find Projects', color: 'bg-blue-50 text-cobalt' },
+          { href: '/creator/smart-connect', icon: 'fa-bolt', label: 'Smart Connect', color: 'bg-purple-50 text-purple-600' },
+          { href: '/creator/profile#portfolio', icon: 'fa-images', label: 'Portfolio', color: 'bg-pink-50 text-pink-600' },
+          { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings', color: 'bg-orange-50 text-orange-600' },
+        ].map(({ href, icon, label, color }) => (
+          <Link key={label} href={href}
+            className="flex flex-col items-center gap-1.5 py-3 px-1 bg-white rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,.05)] hover:shadow-md transition text-center">
+            <div className={`w-[34px] h-[34px] ${color} rounded-[11px] flex items-center justify-center`}>
+              <i className={`fa-solid ${icon} text-sm`} />
+            </div>
+            <span className="text-[11px] font-semibold text-gray-900 leading-tight">{label}</span>
+          </Link>
+        ))}
       </section>
 
       {/* Turn-on-notifications prompt (self-hides once enabled/dismissed) */}
@@ -121,7 +178,7 @@ export default function CreatorDashboardPage() {
             color: 'bg-sky-100 text-sky-600',
           },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div key={s.label} className="bg-white rounded-[20px] p-6 shadow-[0_1px_2px_rgba(15,23,42,.05)] hover:shadow-md transition">
             <div className={`w-12 h-12 ${s.color} rounded-xl flex items-center justify-center mb-4`}>
               <i className={`fa-solid ${s.icon} text-xl`} />
             </div>
@@ -331,7 +388,7 @@ export default function CreatorDashboardPage() {
 
                   return (
                     <div key={team.project_id}
-                      className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:border-cobalt hover:shadow-md transition-all group">
+                      className="bg-white rounded-[20px] p-4 shadow-[0_1px_2px_rgba(15,23,42,.05)] hover:shadow-md transition-all group">
                       {/* Status bar */}
                       <div className="flex items-center justify-between mb-2">
                         <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${statusStyle}`}>
@@ -375,7 +432,7 @@ export default function CreatorDashboardPage() {
                 <p className="text-sm text-gray-400">No messages yet.</p>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm divide-y divide-gray-50">
+              <div className="bg-white rounded-[20px] shadow-[0_1px_2px_rgba(15,23,42,.05)] divide-y divide-gray-50">
                 {messages.map(msg => (
                   <Link key={msg.id} href="/creator/messages"
                     className="flex items-center gap-3 p-4 hover:bg-gray-50 transition first:rounded-t-2xl last:rounded-b-2xl">
@@ -404,7 +461,7 @@ export default function CreatorDashboardPage() {
       {tasks.length > 0 && (
         <section className="mb-10">
           <h2 className="text-xl font-bold text-gray-900 mb-5">Upcoming Tasks</h2>
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+          <div className="bg-white rounded-[20px] p-6 shadow-[0_1px_2px_rgba(15,23,42,.05)]">
             <div className="space-y-3">
               {tasks.map(task => (
                 <div key={task.id} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
@@ -455,27 +512,6 @@ export default function CreatorDashboardPage() {
         </section>
       )}
 
-      {/* Quick actions */}
-      <section className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-8">
-        <h2 className="text-lg font-bold text-gray-900 mb-5">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[
-            { href: '/creator/projects', icon: 'fa-search', label: 'Find Projects', color: 'bg-blue-100 text-cobalt' },
-            { href: '/creator/smart-connect', icon: 'fa-bolt', label: 'Smart Connect', color: 'bg-purple-100 text-purple-600' },
-            { href: '/creator/profile#portfolio', icon: 'fa-images', label: 'My Portfolio', color: 'bg-pink-100 text-pink-600' },
-            { href: '/creator/profile', icon: 'fa-user', label: 'Edit Profile', color: 'bg-green-100 text-green-600' },
-            { href: '/creator/earnings', icon: 'fa-wallet', label: 'Earnings', color: 'bg-orange-100 text-orange-600' },
-          ].map(({ href, icon, label, color }) => (
-            <Link key={label} href={href}
-              className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col items-center gap-3 hover:border-cobalt hover:shadow-md transition text-center">
-              <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center`}>
-                <i className={`fa-solid ${icon} text-lg`} />
-              </div>
-              <span className="text-sm font-semibold text-gray-900">{label}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
     </>
   );
 }

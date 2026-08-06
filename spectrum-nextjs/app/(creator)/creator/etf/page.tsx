@@ -94,43 +94,39 @@ export default function CreatorEtfPage() {
 
       {/* Hero stats */}
       <section className="grid lg:grid-cols-3 gap-5 mb-8">
-        {/* Balance */}
-        <div className="bg-gradient-to-br from-cobalt via-blue-600 to-blue-500 text-white rounded-3xl p-8 shadow-xl">
-          <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-3">
-            Current balance
-          </p>
-          <div className="flex items-baseline gap-3 mb-2">
-            <div className="text-5xl font-bold tabular-nums">
+        {/* Balance + level, combined — dark hero card with a "trust spectrum"
+            gradient bar. All numbers are real: balance, lifetime points, and
+            level.progress_pct (0–100 to the next tier). There is no backend
+            concept of a single 0–100 "trust score", so unlike the mockup this
+            never invents one — the headline number stays the real point
+            balance, and the gradient bar's fill is the real progress_pct. */}
+        <div className="lg:col-span-2 bg-[#0B1220] text-white rounded-3xl p-8 relative overflow-hidden shadow-xl">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 via-amber-500 via-emerald-500 via-blue-500 to-purple-500" />
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-white/50 text-xs font-bold uppercase tracking-widest">Earned Trust Factor</p>
+            {level && <EtfBadge level={level} size="sm" />}
+          </div>
+          <div className="flex items-baseline gap-3 mb-1">
+            <div className="text-5xl font-extrabold tabular-nums tracking-tight">
               {(balance?.balance ?? 0).toLocaleString('en-US')}
             </div>
-            <div className="text-blue-200 text-base">ETF Points</div>
+            <div className="text-white/50 text-base">points</div>
           </div>
-          <p className="text-blue-100 text-sm">
+          <p className="text-white/40 text-sm mb-5">
             Lifetime: {(balance?.lifetime_points ?? 0).toLocaleString('en-US')} pts earned
-          </p>
-        </div>
-
-        {/* Level */}
-        <div className="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-widest text-gray-500 mb-3">
-            Current level
           </p>
           {level && (
             <>
-              <div className="flex items-center gap-3 mb-3">
-                <i className={`fa-solid ${level.icon} text-3xl`} style={{ color: level.color }}></i>
-                <div className="text-3xl font-bold text-gray-900">{level.label}</div>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+              <div className="w-full bg-white/15 rounded-full h-2 mb-2 overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-cobalt to-blue-500 h-2 rounded-full"
+                  className="h-full rounded-full bg-gradient-to-r from-red-500 via-orange-500 via-amber-500 via-emerald-500 via-blue-500 to-purple-500"
                   style={{ width: `${level.progress_pct}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-white/45 text-xs font-semibold">
                 {level.next_min_points
                   ? `${pointsToNext.toLocaleString('en-US')} pts to next level`
-                  : 'You\'ve reached the top tier'}
+                  : "You've reached the top tier"}
               </p>
             </>
           )}

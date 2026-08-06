@@ -136,12 +136,26 @@ async def create_conversation(
     - Group chat: 3+ participants
     - Job-related: Include job_id
     """
-    conversation = await MessageService.create_conversation(
+    conversation, was_created = await MessageService.create_conversation(
         creator_id=str(current_user.id),
         participant_ids=data.participant_ids,
         job_id=data.job_id,
         initial_message=data.initial_message
     )
+
+    # Portfolio "Contact Creator" funnel: only counts conversations actually
+    # created here, never a reused existing one, and only the other party
+    # (not the visitor who clicked Contact) gets the credit on their profile.
+    if was_created and data.source == "portfolio":
+        try:
+            other_ids = [pid for pid in data.participant_ids if pid != str(current_user.id)]
+            if other_ids:
+                await User.get_motor_collection().update_one(
+                    {"_id": PydanticObjectId(other_ids[0])},
+                    {"$inc": {"profile.portfolio_conversations_started": 1}},
+                )
+        except Exception:
+            pass
 
     # ETF: platform activity for initiating contact
     try:

@@ -478,15 +478,35 @@ async def _slug_available(slug: str, *, exclude_user_id) -> bool:
     return clash is None
 
 
+async def _suggest_slugs(base: str, *, exclude_user_id, count: int = 3) -> list[str]:
+    """A few available variations on a taken handle, so a dead-end error
+    isn't the end of the interaction — same pattern as most signup forms."""
+    suggestions: list[str] = []
+    i = 2
+    while len(suggestions) < count and i <= 25:
+        candidate = f"{base}-{i}"[:30]
+        if (
+            _SLUG_RE.match(candidate)
+            and candidate not in _RESERVED_SLUGS
+            and await _slug_available(candidate, exclude_user_id=exclude_user_id)
+        ):
+            suggestions.append(candidate)
+        i += 1
+    return suggestions
+
+
 @router.get("/slug/check", summary="Check portfolio handle availability")
 async def check_slug(slug: str, current_user: User = Depends(get_current_user)):
     norm = _normalize_slug(slug)
     if not _SLUG_RE.match(norm):
-        return {"slug": norm, "available": False, "reason": "3–30 chars, letters/numbers/hyphens only."}
+        return {"slug": norm, "available": False, "reason": "3–30 chars, letters/numbers/hyphens only.", "suggestions": []}
     if norm in _RESERVED_SLUGS:
-        return {"slug": norm, "available": False, "reason": "That handle is reserved."}
+        return {"slug": norm, "available": False, "reason": "That handle is reserved.", "suggestions": []}
     ok = await _slug_available(norm, exclude_user_id=current_user.id)
-    return {"slug": norm, "available": ok, "reason": None if ok else "That handle is already taken."}
+    if ok:
+        return {"slug": norm, "available": True, "reason": None, "suggestions": []}
+    suggestions = await _suggest_slugs(norm, exclude_user_id=current_user.id)
+    return {"slug": norm, "available": False, "reason": "That handle is already taken.", "suggestions": suggestions}
 
 
 @router.post("/slug", summary="Set the portfolio handle")
@@ -509,6 +529,60 @@ async def set_slug(
 
 
 # ── Public aggregator ─────────────────────────────────────────────────────────
+
+# NOTE: this literal route is registered before "/public/{username}" below so the
+# wildcard can never shadow it (FastAPI matches in registration order).
+@router.get("/sitemap", summary="Indexable public portfolios + projects (for the XML sitemap)")
+async def portfolio_sitemap():
+    """Enumerate published, non-password-gated public portfolios and their
+    projects so the Next.js sitemap can list them. Read-only; returns only data
+    that is already public on /portfolio/{handle}. Emits the same clean handle
+    the portfolio page uses as its canonical, so sitemap and canonical agree.
+    """
+    # Only real, intentional public portfolios: published, and either the owner
+    # claimed a handle or actually has at least one project. Excludes the large
+    # tail of users whose portfolio was never built (portfolio_published defaults
+    # to True on every account).
+    users = await User.find(
+        {
+            "deleted_at": None,
+            "profile.portfolio_published": {"$ne": False},
+            "$or": [
+                {"profile.portfolio_slug": {"$ne": None}},
+                {"profile.portfolio_projects.0": {"$exists": True}},
+            ],
+        }
+    ).to_list()
+
+    portfolios: list[dict] = []
+    for u in users:
+        p = u.profile
+        if not p:
+            continue
+        # Password-gated portfolios render a lock screen — never index them.
+        if getattr(p, "portfolio_access", "public") == "password":
+            continue
+        handle = p.portfolio_slug or u.username
+        if not handle:
+            continue
+
+        projects: list[dict] = []
+        last_mod: Optional[datetime] = None
+        for pr in (p.portfolio_projects or []):
+            if not pr.slug:
+                continue
+            projects.append({"slug": pr.slug, "updated_at": pr.updated_at.isoformat() if pr.updated_at else None})
+            if pr.updated_at and (last_mod is None or pr.updated_at > last_mod):
+                last_mod = pr.updated_at
+
+        portfolios.append({
+            "handle": handle,
+            "updated_at": last_mod.isoformat() if last_mod else None,
+            "projects": projects,
+        })
+
+    return {"portfolios": portfolios}
+
 
 @router.get(
     "/public/{username}",
@@ -646,6 +720,26 @@ async def record_view(username: str, payload: ViewRequest):
         return {"ok": False}
 
 
+@router.post("/public/{username}/contact-click", summary="Record a 'Contact Creator' button click")
+async def record_contact_click(username: str):
+    """Best-effort atomic click counter — mirrors record_view. Counted the
+    moment a visitor clicks Contact, regardless of whether they're logged in
+    or complete the conversation, so it can be compared against
+    conversations_started to see where the funnel actually drops off."""
+    try:
+        user = await _resolve_portfolio_user(username)
+    except HTTPException:
+        return {"ok": False}
+    try:
+        await User.get_motor_collection().update_one(
+            {"_id": user.id},
+            {"$inc": {"profile.portfolio_contact_clicks": 1}},
+        )
+        return {"ok": True}
+    except Exception:
+        return {"ok": False}
+
+
 @router.get("/analytics", response_model=AnalyticsResponse, summary="Own portfolio view analytics")
 async def get_analytics(current_user: User = Depends(get_current_user)):
     p = current_user.profile
@@ -653,11 +747,19 @@ async def get_analytics(current_user: User = Depends(get_current_user)):
     last_7 = sorted(daily.keys())[-7:]
     this_week = sum(daily.get(d, 0) for d in last_7)
 
+    total_views = (p.portfolio_total_views if p else 0) or 0
+    contact_clicks = (p.portfolio_contact_clicks if p else 0) or 0
+    conversations_started = (p.portfolio_conversations_started if p else 0) or 0
+    conversion_rate = round((conversations_started / total_views) * 100, 1) if total_views else 0.0
+
     top = sorted(_projects(current_user), key=lambda proj: proj.view_count, reverse=True)[:5]
     return AnalyticsResponse(
-        total_views=(p.portfolio_total_views if p else 0) or 0,
+        total_views=total_views,
         this_week_views=this_week,
         top_projects=[ProjectViewSummary(title=proj.title, slug=proj.slug, view_count=proj.view_count) for proj in top],
+        contact_clicks=contact_clicks,
+        conversations_started=conversations_started,
+        conversion_rate=conversion_rate,
     )
 
 
