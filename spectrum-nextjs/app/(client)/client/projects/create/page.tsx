@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { jobs, JobCreatePayload } from '@/lib/api';
+import { jobs, JobCreatePayload, ProjectRoleInput } from '@/lib/api';
+import ProjectRolesEditor from '@/components/ProjectRolesEditor';
 
 const CATEGORIES = [
   'Design', 'Film & Video', 'Writing & Content', 'Marketing & Strategy',
@@ -197,6 +198,7 @@ const SECTIONS = [
   { id: 'section-goals', label: 'Goals' },
   { id: 'section-deliverables', label: 'Deliverables' },
   { id: 'section-budget', label: 'Budget' },
+  { id: 'section-roles', label: 'Roles' },
   { id: 'section-location', label: 'Location' },
   { id: 'section-timeline', label: 'Timeline' },
 ];
@@ -311,6 +313,9 @@ export default function CreateProjectPage() {
   const [budget, setBudget] = useState('');
   const [currency, setCurrency] = useState(defaultCurrency);
 
+  // ── Project roles (empty = single-creator project) ─────────────────────
+  const [roles, setRoles] = useState<ProjectRoleInput[]>([]);
+
   // ── Step 4: Timeline & Skills ──────────────────────────────────────────
   const [timeline, setTimeline]   = useState('');
   const [skills, setSkills]       = useState<string[]>([]);
@@ -393,6 +398,19 @@ export default function CreateProjectPage() {
     const budgetNum = parseFloat(budget);
     if (!budget || isNaN(budgetNum))         errs.push('Project budget is required');
     else if (budgetNum < MIN_BUDGET)         errs.push(`Projects must have a minimum budget of $${MIN_BUDGET}.`);
+
+    // Role checks — the API rejects both of these, so catch them before the round trip.
+    const namedRoles = roles.filter(r => r.title.trim());
+    if (roles.length && !namedRoles.length) {
+      errs.push('Give each project role a title, or remove the empty rows.');
+    }
+    const allocated = namedRoles.reduce((sum, r) => sum + (r.budget_allocation || 0), 0);
+    if (!isNaN(budgetNum) && allocated > budgetNum) {
+      errs.push(
+        `Role budgets total ${allocated.toLocaleString()}, which is more than the ` +
+        `${budgetNum.toLocaleString()} project budget.`
+      );
+    }
     if (errs.length) { setSubmitError(errs.join('\n')); return; }
 
     setSubmitting(true);
@@ -419,13 +437,27 @@ export default function CreateProjectPage() {
       return undefined;
     })();
 
-    // Determine crew_size: if on-site work and location is set, or budget > $1,500, it's
-    // likely a multi-creator project. Otherwise keep 'individual' as the default.
+    // Roles the client actually filled in — a blank row left behind while
+    // editing shouldn't become a role nobody can apply to.
+    const cleanedRoles = roles
+      .filter(r => r.title.trim())
+      .map(r => ({
+        ...r,
+        title: r.title.trim(),
+        count: Math.max(1, r.count || 1),
+      }));
+
+    // Determine crew_size. Explicit roles are the strongest signal: the client
+    // has told us exactly how many people they need. Otherwise fall back to
+    // inferring it from on-site work or a larger budget.
     const budgetNum2 = parseFloat(budget);
-    const derivedCrewSize = (
-      (workType === 'onsite' && location.trim()) ||
-      (!isNaN(budgetNum2) && budgetNum2 >= 1500)
-    ) ? 'small_crew' : 'individual';
+    const totalSeats = cleanedRoles.reduce((sum, r) => sum + r.count, 0);
+    const derivedCrewSize = totalSeats > 1
+      ? (totalSeats >= 5 ? 'full_crew' : 'small_crew')
+      : (
+          (workType === 'onsite' && location.trim()) ||
+          (!isNaN(budgetNum2) && budgetNum2 >= 1500)
+        ) ? 'small_crew' : 'individual';
 
     const payload: JobCreatePayload & { goals?: string[]; deliverables?: string[]; deadline?: string } = {
       title:       title.trim(),
@@ -444,6 +476,7 @@ export default function CreateProjectPage() {
       location:     location.trim() || undefined,
       event_date:   eventDate || undefined,
       is_remote:    workType === 'remote' ? true : workType === 'onsite' ? false : undefined,
+      roles:        cleanedRoles.length ? cleanedRoles : undefined,
       status: publishRef.current,
       ...buildRate(),
     };
@@ -460,7 +493,8 @@ export default function CreateProjectPage() {
   const sectionHeader = (icon: string, iconBg: string, title: string, subtitle: string) => (
     <div className="flex items-center gap-4 mb-6">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
-        <i className={`fa-solid ${icon}`}></i>
+        {/* Callers pass a bare icon name ('bullseye'); Font Awesome needs the fa- prefix. */}
+        <i className={`fa-solid fa-${icon}`}></i>
       </div>
       <div>
         <h2 className="text-lg font-bold text-gray-900">{title}</h2>
@@ -779,7 +813,19 @@ export default function CreateProjectPage() {
           </div>
         </div>
 
-        {/* ── 5. Location & Work Type ── */}
+        {/* ── 5. Project Roles ── */}
+        <div id="section-roles" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
+          {sectionHeader('users', 'bg-indigo-100 text-indigo-600', 'Project Roles', 'Hiring a team? Add each position you need to fill')}
+          <ProjectRolesEditor
+            roles={roles}
+            onChange={setRoles}
+            category={category}
+            totalBudget={!isNaN(parseFloat(budget)) ? parseFloat(budget) : null}
+            currencySymbol={currencySymbol(currency)}
+          />
+        </div>
+
+        {/* ── 6. Location & Work Type ── */}
         <div id="section-location" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('location-dot', 'bg-rose-100 text-rose-600', 'Location & Work Type', 'Is this an in-person, on-site, or remote project?')}
           <div className="space-y-5">
@@ -833,7 +879,7 @@ export default function CreateProjectPage() {
           </div>
         </div>
 
-        {/* ── 6. Timeline & Skills ── */}
+        {/* ── 7. Timeline & Skills ── */}
         <div id="section-timeline" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
           <div className="space-y-5">

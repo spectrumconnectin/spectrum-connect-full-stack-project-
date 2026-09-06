@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { proposals, profile as profileApi, JobProposalItem } from '@/lib/api';
+import { proposals, profile as profileApi, JobProposalItem, ProjectRole } from '@/lib/api';
+import ProjectRoleTabs from '@/components/ProjectRoleTabs';
 
 const STATUS_FILTERS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected'];
 
@@ -37,6 +38,8 @@ function formatDate(dateStr?: string): string {
 export default function ApplicantsPage() {
   const { id } = useParams<{ id: string }>();
   const [filter, setFilter] = useState('All');
+  const [roleFilter, setRoleFilter] = useState<string | null>(null); // null = every role
+  const [roles, setRoles] = useState<ProjectRole[]>([]);
   const [applicants, setApplicants] = useState<JobProposalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,15 +54,29 @@ export default function ApplicantsPage() {
     ])
       .then(([data, me]) => {
         setApplicants((data?.proposals ?? data ?? []) as JobProposalItem[]);
+        setRoles(data?.roles ?? []);
         setMyUserId(me.id ?? null);
       })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Role and status narrow the list independently: "camera operators I've
+  // shortlisted" is the question a client actually asks while staffing.
+  const byRole = roleFilter
+    ? applicants.filter(a => a.role_id === roleFilter)
+    : applicants;
+
   const filtered = filter === 'All'
-    ? applicants
-    : applicants.filter(a => a.status === filter);
+    ? byRole
+    : byRole.filter(a => a.status === filter);
+
+  const activeRole = roles.find(r => r.role_id === roleFilter) ?? null;
+
+  const countsByRole = applicants.reduce<Record<string, number>>((acc, a) => {
+    if (a.role_id) acc[a.role_id] = (acc[a.role_id] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const handleStatus = async (proposalId: string, newStatus: string) => {
     setUpdating(proposalId);
@@ -68,6 +85,11 @@ export default function ApplicantsPage() {
       setApplicants(prev =>
         prev.map(a => a.id === proposalId ? { ...a, status: newStatus } : a)
       );
+      // Hiring or releasing someone changes that role's seat count, and the
+      // seat count is what gates further hiring — so re-read it from the server
+      // rather than adjusting a local tally that could drift.
+      const fresh = await proposals.getForJob(id, roleFilter ? { role_id: roleFilter } : undefined);
+      if (fresh?.roles) setRoles(fresh.roles);
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -92,10 +114,19 @@ export default function ApplicantsPage() {
         </div>
       </section>
 
+      {/* Roles — only rendered on projects staffed by role */}
+      <ProjectRoleTabs
+        roles={roles}
+        countsByRole={countsByRole}
+        totalCount={applicants.length}
+        activeRoleId={roleFilter}
+        onSelect={setRoleFilter}
+      />
+
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-8 flex items-center gap-2 flex-wrap shadow-sm">
         {STATUS_FILTERS.map(f => {
-          const count = f === 'All' ? applicants.length : applicants.filter(a => a.status === f).length;
+          const count = f === 'All' ? byRole.length : byRole.filter(a => a.status === f).length;
           return (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-4 py-2 text-sm rounded-lg font-medium transition ${filter === f ? 'bg-blue-50 text-cobalt font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -122,12 +153,18 @@ export default function ApplicantsPage() {
         <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">
           <i className="fa-solid fa-users text-4xl text-gray-300 mb-4 block"></i>
           <h3 className="font-semibold text-gray-600 mb-2">
-            {applicants.length === 0 ? 'No applications yet' : 'No applicants match this filter'}
+            {applicants.length === 0
+              ? 'No applications yet'
+              : activeRole && byRole.length === 0
+                ? `No one has applied for ${activeRole.title} yet`
+                : 'No applicants match this filter'}
           </h3>
           <p className="text-gray-400 text-sm">
             {applicants.length === 0
               ? 'Make sure your job is published and open to receive proposals.'
-              : 'Try a different filter tab.'}
+              : activeRole && byRole.length === 0
+                ? 'Other roles on this project may still have applicants waiting.'
+                : 'Try a different filter tab.'}
           </p>
         </div>
       ) : (
@@ -155,7 +192,16 @@ export default function ApplicantsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900">{a.creator_name}</h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-lg font-bold text-gray-900">{a.creator_name}</h3>
+                        {/* Which seat they're up for — redundant once the list is
+                            already narrowed to one role. */}
+                        {a.role && !roleFilter && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {a.role}
+                          </span>
+                        )}
+                      </div>
                       {a.creator_title && <p className="text-cobalt font-semibold text-sm">{a.creator_title}</p>}
                       {a.creator_location && (
                         <p className="text-gray-400 text-xs mt-0.5">

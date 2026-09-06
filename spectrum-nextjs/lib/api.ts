@@ -624,11 +624,52 @@ export interface JobSearchResponse {
   jobs: JobPostItem[];
 }
 
+/** A staffed position on a project. `count` seats are hired independently. */
+export interface ProjectRoleInput {
+  role_id?: string;          // omit when new; pass to edit an existing role in place
+  title: string;
+  count: number;
+  budget_allocation?: number;
+  skills?: string[];
+  deliverables?: string[];
+  description?: string;
+  duration_days?: number;
+}
+
+/** A role as the backend reports it, including live staffing state. */
+export interface ProjectRole extends ProjectRoleInput {
+  role_id: string;
+  filled_count: number;
+  seats_remaining: number;
+  status: 'open' | 'partially_filled' | 'filled' | 'closed';
+  budget_per_seat?: number | null;
+  applicant_count?: number;
+  pending_count?: number;
+  hired_count?: number;
+  derived?: boolean;         // synthesised from a legacy post; cannot be applied to
+}
+
+export interface RoleStaffing {
+  job_id: string;
+  title: string;
+  multi_role: boolean;
+  summary: {
+    total_roles: number;
+    total_seats: number;
+    filled_seats: number;
+    open_seats: number;
+    fully_staffed: boolean;
+    allocated_budget: number;
+  };
+  roles: ProjectRole[];
+}
+
 export interface JobCreatePayload {
   title: string;
   description: string;
   department: string;
   role?: string;
+  roles?: ProjectRoleInput[];
   tags?: string[];
   crew_size?: string;
   complexity?: string;
@@ -677,6 +718,16 @@ export const jobs = {
 
   updateStatus: (id: string, status: string): Promise<JobPostItem> =>
     request<JobPostItem>(`/jobs/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+
+  // ── Role staffing ─────────────────────────────────────────────────────────
+  roles: (id: string): Promise<RoleStaffing> =>
+    request<RoleStaffing>(`/jobs/${id}/roles`),
+
+  addRole: (id: string, role: ProjectRoleInput): Promise<JobPostItem> =>
+    request<JobPostItem>(`/jobs/${id}/roles`, { method: 'POST', body: JSON.stringify(role) }),
+
+  closeRole: (id: string, roleId: string): Promise<JobPostItem> =>
+    request<JobPostItem>(`/jobs/${id}/roles/${roleId}/close`, { method: 'PATCH' }),
 
   delete: (id: string): Promise<void> =>
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
@@ -1127,6 +1178,7 @@ export interface JobProposalItem {
   cover_letter: string;
   proposed_budget?: number;
   portfolio_url?: string;
+  role_id?: string | null;
   role?: string;
   status: string;
   client_viewed: boolean;
@@ -1168,9 +1220,19 @@ export interface ProposalDetail {
   };
 }
 
+export interface JobProposalsResponse {
+  proposals: JobProposalItem[];
+  total: number;
+  skip: number;
+  limit: number;
+  role_id?: string | null;   // echoes the filter that was applied
+  roles?: ProjectRole[];     // staffing breakdown, for the per-role tabs
+}
+
 export interface ProposalSubmitPayload {
   cover_letter: string;
   proposed_budget?: number;
+  role_id?: string;          // which role slot this application is for
   role?: string;
   proposed_duration?: number;
   portfolio_url?: string;
@@ -1186,8 +1248,11 @@ export const proposals = {
   getDetail: (proposalId: string): Promise<ProposalDetail> =>
     request<ProposalDetail>(`/proposals/${proposalId}/detail`),
 
-  getForJob: (jobId: string, params?: { limit?: number; skip?: number; sort_by?: string }): Promise<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }> =>
-    request<{ proposals: JobProposalItem[]; total: number; skip: number; limit: number }>(
+  getForJob: (
+    jobId: string,
+    params?: { limit?: number; skip?: number; sort_by?: string; role_id?: string },
+  ): Promise<JobProposalsResponse> =>
+    request<JobProposalsResponse>(
       `/proposals/job/${jobId}${buildQS(params as Record<string, string | number | undefined> || {})}`
     ),
 
