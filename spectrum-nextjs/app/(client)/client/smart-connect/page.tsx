@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { smartConnect, SmartCreativeProfile, MatchHistoryItem, SmartMatchResultItem, jobs } from '@/lib/api';
+import { smartConnect, SmartCreativeProfile, MatchHistoryItem, SmartMatchResultItem, RoleMatchBlock, jobs } from '@/lib/api';
 import EtfBadge from '@/components/EtfBadge';
 
 const ROLE_OPTIONS = [
@@ -71,6 +71,9 @@ function SmartConnectInner() {
   const [history, setHistory] = useState<MatchHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [projectTitle, setProjectTitle] = useState('');
+  // Per-role match blocks, when the project is staffed by role.
+  const [roleBlocks, setRoleBlocks] = useState<RoleMatchBlock[]>([]);
+  const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
   const isProjectMode = Boolean(projectId && matchResults.length > 0);
 
   const loadFeatured = useCallback(async () => {
@@ -86,18 +89,26 @@ function SmartConnectInner() {
     }
   }, []);
 
-  // Auto-match when ?project= param is present
+  // Auto-match when ?project= param is present.
+  // Matches come back ranked per role, so a camera operator is ranked for the
+  // camera seat rather than against the project as a whole. Single-creator
+  // projects come back as one block, so this path handles both.
   useEffect(() => {
     if (!projectId) { loadFeatured(); return; }
     setLoading(true); setError(null);
     Promise.allSettled([
-      smartConnect.matchForProject(projectId, 12),
+      smartConnect.matchByRole(projectId, { limitPerRole: 12 }),
       jobs.getById(projectId),
     ]).then(([matchRes, jobRes]) => {
       if (matchRes.status === 'fulfilled') {
-        setMatchResults(matchRes.value.matches);
-        setCreatives(matchRes.value.matches.map(m => m.profile));
-        setTotalResults(matchRes.value.matches.length);
+        const blocks = matchRes.value.roles ?? [];
+        setRoleBlocks(blocks);
+        // Open on the first role that still has a seat to fill — a filled role
+        // is not what the client came here to staff.
+        const firstOpen = blocks.find(b => b.seats_remaining > 0 && b.matches.length)
+          ?? blocks.find(b => b.matches.length)
+          ?? blocks[0];
+        setActiveRoleId(firstOpen?.role_id ?? null);
         setHasSearched(true);
       } else {
         setError((matchRes.reason as Error).message);
@@ -105,6 +116,15 @@ function SmartConnectInner() {
       if (jobRes.status === 'fulfilled') setProjectTitle(jobRes.value.title);
     }).finally(() => setLoading(false));
   }, [projectId, loadFeatured]);
+
+  // The visible list follows the selected role.
+  useEffect(() => {
+    if (!roleBlocks.length) return;
+    const block = roleBlocks.find(b => b.role_id === activeRoleId) ?? roleBlocks[0];
+    setMatchResults(block?.matches ?? []);
+    setCreatives((block?.matches ?? []).map(m => m.profile));
+    setTotalResults(block?.matches.length ?? 0);
+  }, [roleBlocks, activeRoleId]);
 
   useEffect(() => {
     if (activeTab === 'history' && history.length === 0) {
@@ -225,6 +245,74 @@ function SmartConnectInner() {
                 className="text-xs text-purple-600 font-semibold hover:underline flex-shrink-0">
                 Back to project →
               </Link>
+            </div>
+          )}
+
+          {/* Role selector — creators are ranked per seat, so the client picks
+              which seat they are staffing rather than reading one blended list. */}
+          {roleBlocks.length > 1 && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 shadow-sm">
+              <div className="flex items-baseline justify-between gap-4 mb-3">
+                <h2 className="font-bold text-gray-900">Matching for</h2>
+                <p className="text-sm text-gray-500">Ranked separately for each role</p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {roleBlocks.map(b => {
+                  const isActive = b.role_id === activeRoleId;
+                  const filled = b.seats_remaining === 0;
+                  return (
+                    <button
+                      key={b.role_id ?? b.title}
+                      onClick={() => setActiveRoleId(b.role_id)}
+                      className={`px-4 py-2 text-sm rounded-lg font-medium transition flex items-center gap-2 ${
+                        isActive ? 'bg-blue-50 text-cobalt font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                      }`}>
+                      {b.title}
+                      {filled ? (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                          Filled
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5">
+                          {b.matches.length}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {(() => {
+                const b = roleBlocks.find(x => x.role_id === activeRoleId);
+                if (!b) return null;
+                return (
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-600">
+                    <span>
+                      <span className="font-semibold text-gray-900">{b.seats_remaining}</span>
+                      {b.seats_remaining === 1 ? ' seat' : ' seats'} to fill
+                      <span className="text-gray-300 mx-2">·</span>
+                      {b.filled_count}/{b.count} hired
+                    </span>
+                    {b.budget_per_seat != null && (
+                      <span>
+                        <span className="text-gray-400">Budget per person</span>{' '}
+                        <span className="font-semibold text-gray-900">
+                          ${b.budget_per_seat.toLocaleString()}
+                        </span>
+                      </span>
+                    )}
+                    {(b.skills?.length ?? 0) > 0 && (
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-gray-400">Matching on</span>
+                        {b.skills!.slice(0, 4).map(s => (
+                          <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-cobalt border border-blue-100">
+                            {s}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

@@ -666,6 +666,20 @@ export default function ClientProjectDetailPage() {
                 <i className="fa-solid fa-users text-cobalt"></i>
                 Review Applicants {job.proposal_count > 0 && `(${job.proposal_count})`}
               </Link>
+              {allHiredCreators.length > 0 && (
+                <>
+                  <Link href={`/client/projects/${id}/team`}
+                    className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200">
+                    <i className="fa-solid fa-people-group text-cobalt"></i>
+                    Team Workspace ({allHiredCreators.length})
+                  </Link>
+                  <Link href={`/client/projects/${id}/funding`}
+                    className="flex items-center gap-3 w-full bg-gray-50 text-gray-700 px-4 py-3 rounded-xl font-semibold hover:bg-gray-100 transition text-sm border border-gray-200">
+                    <i className="fa-solid fa-coins text-cobalt"></i>
+                    Team Funding
+                  </Link>
+                </>
+              )}
               {(job.status === 'open' || job.status === 'in_progress') && (
                 <Link href={`/client/smart-connect?project=${id}`}
                   className="flex items-center gap-3 w-full bg-purple-50 text-purple-700 px-4 py-3 rounded-xl font-semibold hover:bg-purple-100 transition text-sm border border-purple-200">
