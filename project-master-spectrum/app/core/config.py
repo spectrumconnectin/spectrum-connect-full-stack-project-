@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours — daily re-auth; upgrade to refresh tokens when Redis is added
 
+    # Emergency kill switch — set to true (env var) to immediately stop all escrow
+    # fund releases (manual and auto-release) without a code deploy. Does not
+    # affect funding/refunds/disputes. See incident-response notes.
+    ESCROW_RELEASES_PAUSED: bool = False
+
     # Google OAuth
     GOOGLE_CLIENT_ID: str = "dev-google-client-id"
     GOOGLE_CLIENT_SECRET: str = "dev-google-client-secret"

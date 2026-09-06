@@ -16,6 +16,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.auth.auth import get_admin_user, get_current_user_optional
 from app.core.config import settings
+from app.core.rate_limit import rate_limiter
 from app.models.ceo_call import CeoCallRequest, CEO_CALL_STATUSES
 from app.models.schema import User
 
@@ -47,7 +48,11 @@ class CeoCallStatusUpdate(BaseModel):
 # ── Public: submit a request ─────────────────────────────────────────────────
 
 @router.post("", summary="Request a call with the founder")
-async def submit_ceo_call(payload: CeoCallCreate, _user=Depends(get_current_user_optional)):
+async def submit_ceo_call(
+    payload: CeoCallCreate,
+    _user=Depends(get_current_user_optional),
+    _rl: None = Depends(rate_limiter("ceo_call_submit_ip", limit=5, window_seconds=300)),
+):
     doc = CeoCallRequest(
         full_name=payload.full_name.strip(),
         email=str(payload.email).lower().strip(),

@@ -55,8 +55,9 @@ class BlogService:
                 query = query.find(BlogPost.tags == tag)
 
             if search:
-                # Search in title, excerpt, and tags
-                search_pattern = {"$regex": search, "$options": "i"}
+                # Search in title, excerpt, and tags.
+                # re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
+                search_pattern = {"$regex": re.escape(search[:100]), "$options": "i"}
                 query = query.find({
                     "$or": [
                         {"title": search_pattern},
@@ -622,7 +623,7 @@ class BlogService:
             List of matching posts
         """
         try:
-            search_pattern = {"$regex": query, "$options": "i"}
+            search_pattern = {"$regex": re.escape(query[:100]), "$options": "i"}
 
             posts = await BlogPost.find(
                 BlogPost.status == "published",

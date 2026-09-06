@@ -87,16 +87,35 @@ class DisputeService:
 
         raised_against = escrow.creator_id if is_client else escrow.client_id
 
-        # Mark specific milestone as disputed
-        if milestone_id:
-            for m in escrow.milestones:
-                if m.milestone_id == milestone_id and m.status == "funded":
-                    m.status = "disputed"
-                    break
+        # Atomic claim — a full-document escrow.save() here would clobber any
+        # concurrent atomic milestone update (fund/release), silently reverting
+        # it. That could re-open an already-released milestone for a second
+        # release (a fresh transaction_id each time means the unique-index
+        # backstop wouldn't catch it). Targeted $set only, same pattern used
+        # by fund_milestone/release_milestone/refund_escrow.
+        now = datetime.utcnow()
+        coll = escrow.get_motor_collection()
 
-        escrow.status = "disputed"
-        escrow.updated_at = datetime.utcnow()
-        await escrow.save()
+        set_fields: Dict[str, Any] = {"status": "disputed", "updated_at": now}
+        array_filters = None
+        milestone = None
+        if milestone_id:
+            milestone = next((m for m in escrow.milestones if m.milestone_id == milestone_id), None)
+            if milestone and milestone.status == "funded":
+                set_fields["milestones.$[m].status"] = "disputed"
+                array_filters = [{"m.milestone_id": milestone_id}]
+
+        update_kwargs = {"array_filters": array_filters} if array_filters else {}
+        claimed = await coll.find_one_and_update(
+            {"_id": escrow.id, "status": {"$nin": ["completed", "refunded", "cancelled"]}},
+            {"$set": set_fields},
+            **update_kwargs,
+        )
+        if claimed is None:
+            raise HTTPException(
+                status_code=400,
+                detail="This escrow's status just changed and can no longer be disputed. Please refresh and try again.",
+            )
 
         dispute = Dispute(
             escrow_id=escrow.id,

@@ -39,6 +39,15 @@ async def log_event(
             severity=severity,
         )
         await entry.insert()
+
+        # Also emit to the standard logger so this event reaches stdout/CloudWatch —
+        # audit events previously only landed in MongoDB, which is invisible to any
+        # log-based alerting (e.g. a CloudWatch metric filter on repeated failed
+        # logins). The Mongo record stays the durable source of truth; this line is
+        # what makes the event actually alertable.
+        log_fn = {"critical": logger.critical, "warning": logger.warning}.get(severity, logger.info)
+        log_fn("audit_event type=%s actor=%s target=%s:%s", event_type,
+               actor.username if actor else "anonymous", target_type, target_id)
     except Exception:
         logger.exception("Failed to write audit log for event %s", event_type)
 

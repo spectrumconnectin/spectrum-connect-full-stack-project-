@@ -462,6 +462,32 @@ async def upload_service_media(
             detail=f"File too large. Max size: {max_size // (1024*1024)}MB"
         )
 
+    # Magic-byte check: the content-type header above is entirely client-supplied
+    # and can be spoofed, so verify the bytes actually match the declared type
+    # before trusting it (same check used by upload_router.py / messages.py).
+    _MEDIA_MAGIC: dict[str, list[bytes]] = {
+        "image/jpeg": [b"\xff\xd8\xff"],
+        "image/png":  [b"\x89PNG\r\n\x1a\n"],
+        "image/gif":  [b"GIF87a", b"GIF89a"],
+        "image/webp": [b"RIFF"],
+        "video/mp4":       [b"ftyp"],   # offset 4
+        "video/quicktime": [b"ftyp"],   # offset 4
+        "video/webm":      [b"\x1aE\xdf\xa3"],
+        "video/x-msvideo": [b"RIFF"],
+    }
+    sigs = _MEDIA_MAGIC.get(content_type)
+    if sigs:
+        offset = 4 if content_type in ("video/mp4", "video/quicktime") else 0
+        window = file_content[offset:offset + 12]
+        magic_ok = any(window.startswith(sig) for sig in sigs)
+        if magic_ok and content_type == "image/webp":
+            magic_ok = len(file_content) >= 12 and file_content[8:12] == b"WEBP"
+        if not magic_ok:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File content does not match its declared type.",
+            )
+
     # Convert to base64
     base64_data = base64.b64encode(file_content).decode('utf-8')
 

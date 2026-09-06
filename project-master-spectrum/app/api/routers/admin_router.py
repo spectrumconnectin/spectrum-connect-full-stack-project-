@@ -33,6 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.auth.auth import get_admin_user, get_superadmin_user
+from app.core.rate_limit import rate_limiter
 from app.models.schema import User
 
 
@@ -676,7 +677,7 @@ class RoleUpdate(BaseModel):
     user_role: str  # user | admin | moderator
 
 
-@router.patch("/users/{user_id}/role", summary="Change user role (no auth)")
+@router.patch("/users/{user_id}/role", summary="Change user role")
 async def update_user_role(user_id: str, body: RoleUpdate, admin: User = Depends(get_admin_user)):
     if body.user_role not in {"user", "admin", "moderator"}:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid role")
@@ -1298,6 +1299,7 @@ async def admin_force_refund(
     escrow_id: str,
     body: dict,
     admin: User = Depends(get_admin_user),
+    _rl: None = Depends(rate_limiter("admin_force_refund", limit=10, window_seconds=60)),
 ):
     from app.models.escrow import Escrow
     from beanie import PydanticObjectId
@@ -1308,19 +1310,34 @@ async def admin_force_refund(
         raise HTTPException(status_code=400, detail="Invalid escrow ID.")
     if not escrow:
         raise HTTPException(status_code=404, detail="Escrow not found.")
-    if escrow.status in ("refunded", "completed"):
-        raise HTTPException(status_code=400, detail=f"Escrow is already {escrow.status}.")
+
+    # Atomic claim — the previous read-then-save() here had the same double-refund
+    # race the client-facing refund_escrow() already guards against: two
+    # concurrent calls (double-click, retried request, two admins) could both
+    # read status="active" before either saved, and both refund. Same "flip to
+    # a transient state first" pattern used by fund/release/refund elsewhere.
+    now = datetime.utcnow()
+    coll = escrow.get_motor_collection()
+    claimed = await coll.find_one_and_update(
+        {"_id": escrow.id, "status": {"$nin": ["completed", "refunded", "cancelled", "refunding"]}},
+        {"$set": {"status": "refunding", "updated_at": now}},
+    )
+    if claimed is None:
+        raise HTTPException(status_code=409, detail="This escrow is already refunded or being refunded.")
+
+    # Re-read fresh so milestone statuses reflect the state at claim time.
+    escrow = await Escrow.get(PydanticObjectId(escrow_id))
 
     refund_total = 0.0
     for m in (escrow.milestones or []):
         if m.status == "funded":
             m.status = "refunded"
-            m.refunded_at = datetime.utcnow()
+            m.refunded_at = now
             refund_total += float(m.amount)
 
     escrow.refunded_amount = float(escrow.refunded_amount or 0) + refund_total
     escrow.status = "refunded"
-    escrow.updated_at = datetime.utcnow()
+    escrow.updated_at = now
     await escrow.save()
 
     return {
@@ -1965,6 +1982,7 @@ async def list_broadcasts(
 async def send_broadcast(
     body: BroadcastRequest,
     admin: User = Depends(get_admin_user),
+    _rl: None = Depends(rate_limiter("admin_send_broadcast", limit=5, window_seconds=60)),
 ):
     from app.services.audit_service import log_event
 
@@ -2040,7 +2058,11 @@ _WIPE_PHRASE = "WIPE ALL DATA"
 
 
 @router.post("/wipe-data", summary="DANGER: erase all platform data except admin accounts")
-async def wipe_all_data(body: WipeDataBody, admin: User = Depends(get_superadmin_user)):
+async def wipe_all_data(
+    body: WipeDataBody,
+    admin: User = Depends(get_superadmin_user),
+    _rl: None = Depends(rate_limiter("admin_wipe_data", limit=3, window_seconds=3600)),
+):
     """
     Irreversibly delete every document in every collection EXCEPT:
       - admin/moderator accounts in `users`

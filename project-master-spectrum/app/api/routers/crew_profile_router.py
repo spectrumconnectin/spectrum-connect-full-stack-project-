@@ -472,7 +472,7 @@ async def endorse_skill(
 # PUBLIC CREW PROFILE ENDPOINT
 # ============================================================================
 
-@router.get("/user/{user_id}", summary="Get crew profile by user ID")
+@router.get("/user/{user_id}", response_model=PublicCrewProfileRead, summary="Get crew profile by user ID")
 async def get_crew_profile_by_user(user_id: str):
     """
     Get a user's crew profile by their user ID.

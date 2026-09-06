@@ -247,9 +247,10 @@ class ServiceService:
         if filters.delivery_time:
             query["packages.delivery_time"] = {"$lte": filters.delivery_time}
 
-        # Text search in title and description
+        # Text search in title and description.
+        # re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
         if filters.search:
-            search_regex = {"$regex": filters.search, "$options": "i"}
+            search_regex = {"$regex": re.escape(filters.search[:100]), "$options": "i"}
             query["$or"] = [
                 {"title": search_regex},
                 {"description": search_regex},

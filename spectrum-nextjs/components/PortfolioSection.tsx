@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { portfolio, tokenStore, PortfolioItem, PortfolioResponse } from '@/lib/api';
+import { portfolio, PortfolioItem, PortfolioResponse } from '@/lib/api';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/backend';
 
@@ -246,10 +246,9 @@ function PortfolioModal({ mode, item, data, onClose, onSaved }: ModalProps) {
     try {
       const fd = new FormData();
       fd.append('files', file);
-      const token = tokenStore.get();
       const res = await fetch(`${API_BASE}/upload/images`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
         body: fd,
       });
       if (!res.ok) {

@@ -33,7 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }).catch(() => router.replace('/login'));
   }, [router]);
 
-  const signOut = () => { auth.logout(); window.location.href = '/login'; };
+  const signOut = () => { auth.logout().finally(() => { window.location.href = '/login'; }); };
 
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">

@@ -56,10 +56,11 @@ def _oid(raw: str) -> ObjectId:
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 # ── Direct Hire ───────────────────────────────────────────────────────────────
-# Must be registered before the /{job_id} route below — FastAPI matches routes
-# in registration order, and "/direct-hire" would otherwise be swallowed by the
-# single-segment wildcard (treated as job_id="direct-hire"), silently routing
-# every direct-hire request into submit_proposal instead.
+# Must be registered before the "/{job_id}" wildcard route below — FastAPI/Starlette
+# match routes in registration order, so a literal sibling registered AFTER a
+# same-depth wildcard is permanently shadowed by it (this exact bug previously broke
+# this endpoint: every request here was being swallowed by submit_proposal below,
+# with job_id="direct-hire", which _oid() rejects as an invalid ObjectId).
 
 class DirectHireRequest(BaseModel):
     job_id: str
@@ -920,4 +921,3 @@ async def get_proposal_reviews(
         "proposal_id":    proposal_id,
         "job_title":      job.title if job else None,
     }
-

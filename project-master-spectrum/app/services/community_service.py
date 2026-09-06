@@ -4,6 +4,7 @@ Community Service
 Business logic for community projects, events, forums, and collab calls
 """
 
+import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from beanie import PydanticObjectId
@@ -478,7 +479,8 @@ class CommunityService:
     async def search_community(query: str, limit: int = 20) -> Dict[str, Any]:
         """Search across projects, events, and threads"""
         try:
-            search_pattern = {"$regex": query, "$options": "i"}
+            # re.escape prevents ReDoS from a crafted pattern like '(a+)+'.
+            search_pattern = {"$regex": re.escape(query[:100]), "$options": "i"}
 
             # Search projects
             projects = await CommunityProject.find(
