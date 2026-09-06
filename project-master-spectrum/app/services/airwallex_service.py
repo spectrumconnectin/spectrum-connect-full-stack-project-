@@ -183,7 +183,7 @@ async def create_beneficiary(
 async def create_transfer(
     *,
     beneficiary_id: str,
-    amount: float,
+    source_amount: float,
     idempotency_key: str,
     source_currency: Optional[str] = None,
     target_currency: str = "LKR",
@@ -191,14 +191,24 @@ async def create_transfer(
 ) -> Dict[str, Any]:
     """Pay a registered beneficiary from the platform's Airwallex balance.
 
-    `amount` is in the *target* currency the creator receives. Idempotency-keyed
-    so a retried request cannot pay twice.
+    `source_amount` is denominated in `source_currency` — the currency the
+    creator's Spectrum balance is held in (USD), NOT the currency they receive.
+
+    This distinction is the whole point of the parameter name. Sending the
+    amount as `payment_amount` in LKR instead would pay a creator owed $100
+    exactly LKR 100 — about a third of a dollar. We send `source_amount` and let
+    Airwallex convert, so the creator receives the LKR equivalent of what they
+    actually earned.
+
+    Idempotency-keyed so a retried request cannot pay twice.
     """
     payload = {
         "beneficiary_id": beneficiary_id,
         "source_currency": (source_currency or settings.AIRWALLEX_SOURCE_CURRENCY).upper(),
         "payment_currency": target_currency.upper(),
-        "payment_amount": round(float(amount), 2),
+        # Debit this much from the platform balance; Airwallex converts and the
+        # beneficiary receives the equivalent in payment_currency.
+        "source_amount": round(float(source_amount), 2),
         "reason": reason,
         "reference": idempotency_key[:32],
         "request_id": idempotency_key,

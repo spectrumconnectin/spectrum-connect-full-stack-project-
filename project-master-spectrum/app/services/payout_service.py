@@ -212,10 +212,14 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
             )
         elif method == "airwallex":
             from app.services import airwallex_service
+            # `amount` is the creator's USD balance figure, so it is the SOURCE
+            # amount — Airwallex converts it into their local currency. Passing
+            # it as the payment amount would pay LKR 100 for a $100 balance.
             result = await airwallex_service.create_transfer(
                 beneficiary_id=user.airwallex_beneficiary_id,
-                amount=amount,
+                source_amount=amount,
                 idempotency_key=f"payout_{tx_id}",
+                source_currency="USD",
                 target_currency=(user.bank_currency or "LKR"),
             )
         else:
