@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     # Default to the sandbox host so nothing can move real money until the live
     # host is explicitly configured. Set to https://api-m.paypal.com for live.
     PAYPAL_API_BASE: str = "https://api-m.sandbox.paypal.com"
+    # Airwallex Payouts — direct bank transfer to a creator's own account, for
+    # countries Stripe Connect doesn't reach (Sri Lanka above all).
+    AIRWALLEX_CLIENT_ID: str = ""
+    AIRWALLEX_API_KEY: str = ""
+    # Default to the demo host so nothing can move real money until the live
+    # host is explicitly configured. Live is https://api.airwallex.com
+    AIRWALLEX_API_BASE: str = "https://api-demo.airwallex.com"
+    # Source currency held in the Airwallex balance that payouts are funded from.
+    AIRWALLEX_SOURCE_CURRENCY: str = "usd"
+
     # Minimum withdrawal amount (in USD) a creator can request.
     PAYOUT_MIN_AMOUNT: float = 1.0
     # Currency used for Stripe Connect transfers to creators. Must be a currency

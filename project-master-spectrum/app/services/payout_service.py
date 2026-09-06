@@ -90,7 +90,7 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
          (which frees the reserved funds again).
     """
     method = (method or "paypal").lower()
-    if method not in ("paypal", "stripe"):
+    if method not in ("paypal", "stripe", "airwallex"):
         raise HTTPException(status_code=400, detail="Unknown payout method.")
 
     # ── Per-method preconditions / destination ──────────────────────────────
@@ -100,6 +100,18 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
         if not user.paypal_payout_email:
             raise HTTPException(status_code=400, detail="Add your PayPal email before withdrawing.")
         destination_label = user.paypal_payout_email
+    elif method == "airwallex":
+        from app.services import airwallex_service
+        if not airwallex_service.is_enabled():
+            raise HTTPException(status_code=503, detail="Bank transfers are not enabled yet.")
+        if not getattr(user, "airwallex_beneficiary_id", None):
+            raise HTTPException(
+                status_code=400,
+                detail="Add your bank details before withdrawing.",
+            )
+        destination_label = (
+            f"{user.bank_name or 'your bank'} {user.bank_account_masked or ''}".strip()
+        )
     else:
         if not stripe_connect_service.is_enabled():
             raise HTTPException(status_code=503, detail="Bank payouts are not enabled yet.")
@@ -198,6 +210,14 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
                 sender_batch_id=f"SC-{tx_id}",
                 sender_item_id=tx_id,
             )
+        elif method == "airwallex":
+            from app.services import airwallex_service
+            result = await airwallex_service.create_transfer(
+                beneficiary_id=user.airwallex_beneficiary_id,
+                amount=amount,
+                idempotency_key=f"payout_{tx_id}",
+                target_currency=(user.bank_currency or "LKR"),
+            )
         else:
             result = stripe_connect_service.create_transfer(
                 account_id=user.stripe_account_id,
@@ -219,7 +239,9 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
         txn.completed_at = datetime.utcnow()
         txn.external_transaction_id = ext_id
         await txn.save()
-        dest = user.paypal_payout_email if method == "paypal" else "your bank account"
+        dest = destination_label or (
+            user.paypal_payout_email if method == "paypal" else "your bank account"
+        )
         return {
             "success": True,
             "transaction_id": tx_id,

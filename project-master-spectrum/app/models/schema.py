@@ -348,6 +348,19 @@ class User(Document):
     # platform's Stripe balance. Set once the creator completes Stripe onboarding.
     stripe_account_id: Optional[str] = None
     stripe_payouts_enabled: bool = False   # cached from the connected account's capabilities
+
+    # Airwallex direct-to-bank payouts, for creators Stripe Connect cannot reach.
+    # Deliberately NOT the creator's account number: their details are registered
+    # with Airwallex and only the resulting reference is kept, so a database dump
+    # contains no bank account numbers. The rest is display-only, to let a
+    # creator confirm which account they are being paid into.
+    airwallex_beneficiary_id: Optional[str] = None
+    bank_account_masked: Optional[str] = None      # e.g. "••••4321"
+    bank_account_name: Optional[str] = None        # name on the account
+    bank_name: Optional[str] = None
+    bank_currency: Optional[str] = None            # e.g. "LKR"
+    bank_country: Optional[str] = None             # ISO code, e.g. "LK"
+
     last_active: Optional[datetime] = None
     last_login: Optional[datetime] = None
     login_history: Optional[List[LoginHistory]] = None

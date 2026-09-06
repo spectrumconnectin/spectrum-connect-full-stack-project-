@@ -1103,13 +1103,41 @@ export interface PayoutOptions {
     unsupported_country: boolean;
     note: string | null;
   };
+  /** Direct transfer to the creator's own bank account — no intermediary wallet. */
+  bank_direct: {
+    available: boolean;
+    connected: boolean;
+    account_masked: string | null;
+    bank_name: string | null;
+    currency: string | null;
+  };
   paypal: {
     available: boolean;
     email_on_file: boolean;
     /** Country-specific guidance, e.g. Sri Lanka's partner-bank requirement. */
     note: string | null;
   };
-  recommended: 'stripe' | 'paypal' | null;
+  recommended: 'stripe' | 'paypal' | 'airwallex' | null;
+}
+
+export interface BankDetails {
+  connected: boolean;
+  account_name: string | null;
+  account_masked: string | null;
+  bank_name: string | null;
+  currency: string | null;
+  country: string | null;
+}
+
+/** Bank details a creator submits. Sent to the payment provider, not stored by us. */
+export interface BankDetailsPayload {
+  account_name: string;
+  account_number: string;
+  bank_name: string;
+  branch?: string;
+  swift_code?: string;
+  country_code?: string;
+  currency?: string;
 }
 
 export const earnings = {
@@ -1128,7 +1156,8 @@ export const earnings = {
     request('/earnings/payout-method', { method: 'POST', body: JSON.stringify({ paypal_email: paypalEmail }) }),
 
   /** Withdraw from available balance via 'paypal' or 'stripe' (bank). */
-  withdraw: (amount: number, method: 'paypal' | 'stripe' = 'paypal'): Promise<WithdrawResult> =>
+  /** `airwallex` pays straight into the creator's own bank account. */
+  withdraw: (amount: number, method: 'paypal' | 'stripe' | 'airwallex' = 'paypal'): Promise<WithdrawResult> =>
     request('/earnings/withdraw', { method: 'POST', body: JSON.stringify({ amount, method }) }),
 
   /** Start/continue Stripe bank onboarding — returns a hosted URL to redirect to. */
@@ -1139,6 +1168,20 @@ export const earnings = {
    */
   payoutOptions: (): Promise<PayoutOptions> =>
     request<PayoutOptions>('/earnings/payout-options'),
+
+  /** Saved bank payout account — masked; the full number is never returned. */
+  getBankDetails: (): Promise<BankDetails> =>
+    request<BankDetails>('/earnings/bank-details'),
+
+  /**
+   * Register a bank account for direct payouts. The account number goes to the
+   * payment provider and is not stored by Spectrum.
+   */
+  saveBankDetails: (data: BankDetailsPayload): Promise<{
+    success: boolean; connected: boolean; account_masked: string;
+    bank_name: string; currency: string; message: string;
+  }> =>
+    request('/earnings/bank-details', { method: 'POST', body: JSON.stringify(data) }),
 
   connectOnboard: (): Promise<{ url: string; account_id: string }> =>
     request('/earnings/connect/onboard', { method: 'POST' }),

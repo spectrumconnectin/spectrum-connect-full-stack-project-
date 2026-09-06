@@ -123,7 +123,7 @@ def payout_options(user) -> Dict[str, Any]:
     Drives the earnings UI so a creator is only offered a rail that can reach
     them.
     """
-    from app.services import paypal_service, stripe_connect_service
+    from app.services import paypal_service, stripe_connect_service, airwallex_service
 
     country = creator_country(user)
     stripe_ok = stripe_supports(country)
@@ -131,9 +131,19 @@ def payout_options(user) -> Dict[str, Any]:
     # Unknown country is treated as eligible: better to let someone try Stripe
     # onboarding than to hide the option from a creator who could use it.
     stripe_available = stripe_connect_service.is_enabled() and stripe_ok is not False
+    airwallex_available = airwallex_service.is_enabled()
 
     return {
         "country": country,
+        # Direct transfer to the creator's own bank account, for countries
+        # Stripe cannot reach. The creator needs no account with anyone.
+        "bank_direct": {
+            "available": airwallex_available,
+            "connected": bool(getattr(user, "airwallex_beneficiary_id", None)),
+            "account_masked": getattr(user, "bank_account_masked", None),
+            "bank_name": getattr(user, "bank_name", None),
+            "currency": getattr(user, "bank_currency", None),
+        },
         "bank_via_stripe": {
             "available": stripe_available,
             "connected": bool(getattr(user, "stripe_account_id", None)),
@@ -151,11 +161,18 @@ def payout_options(user) -> Dict[str, Any]:
             "email_on_file": bool(getattr(user, "paypal_payout_email", None)),
             "note": PAYPAL_LOCAL_GUIDANCE.get(country or ""),
         },
-        # The rail a creator should be shown first.
+        # The rail a creator should be shown first. A bank account they have
+        # already registered wins — it is the most direct route to their money,
+        # with no intermediary wallet.
         "recommended": (
-            "stripe" if (stripe_available and getattr(user, "stripe_payouts_enabled", False))
+            "airwallex" if (airwallex_available and getattr(user, "airwallex_beneficiary_id", None))
+            else "stripe" if (stripe_available and getattr(user, "stripe_payouts_enabled", False))
+            # Somewhere Stripe cannot reach: offer the direct bank rail over an
+            # intermediary wallet, since it pays into their own account.
+            else "airwallex" if (airwallex_available and stripe_ok is False)
             else "paypal" if paypal_service.is_enabled()
             else "stripe" if stripe_available
+            else "airwallex" if airwallex_available
             else None
         ),
     }

@@ -12,7 +12,7 @@ import re
 
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -150,7 +150,8 @@ class PayoutMethodUpdate(BaseModel):
 
 class WithdrawRequest(BaseModel):
     amount: float
-    method: str = "paypal"   # "paypal" | "stripe"
+    # "paypal" | "stripe" (Connect) | "airwallex" (direct to the creator's bank)
+    method: str = "paypal"
 
 
 @router.get("/balance", summary="Creator's withdrawable balance")
@@ -216,6 +217,94 @@ async def withdraw(
 
 
 # ── Stripe Connect (bank cash-out) ──────────────────────────────────────────
+
+class BankDetailsRequest(BaseModel):
+    """A creator's own bank account, for direct payouts.
+
+    Sent straight to the payment provider and never stored here — see
+    save_bank_details.
+    """
+    account_name: str = Field(..., min_length=2, max_length=140,
+                              description="Name exactly as it appears on the bank account")
+    account_number: str = Field(..., min_length=4, max_length=34)
+    bank_name: str = Field(..., min_length=2, max_length=140)
+    branch: Optional[str] = Field(None, max_length=140)
+    swift_code: Optional[str] = Field(None, min_length=8, max_length=11)
+    country_code: str = Field("LK", min_length=2, max_length=2)
+    currency: str = Field("LKR", min_length=3, max_length=3)
+
+
+@router.get("/bank-details", summary="Creator's saved bank payout account")
+async def get_bank_details(current_user: User = Depends(get_current_user)):
+    """What we hold for this creator's bank payouts — masked, never the number."""
+    return {
+        "connected": bool(getattr(current_user, "airwallex_beneficiary_id", None)),
+        "account_name": getattr(current_user, "bank_account_name", None),
+        "account_masked": getattr(current_user, "bank_account_masked", None),
+        "bank_name": getattr(current_user, "bank_name", None),
+        "currency": getattr(current_user, "bank_currency", None),
+        "country": getattr(current_user, "bank_country", None),
+    }
+
+
+@router.post("/bank-details", summary="Save bank details for direct payouts")
+async def save_bank_details(
+    data: BankDetailsRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("bank_details", limit=10, window_seconds=600)),
+):
+    """
+    Register the creator's bank account for direct transfers.
+
+    The account number is passed to the payment provider and **not** written to
+    our database — we keep the provider's reference plus a masked last-four, so
+    there is no account number here to leak.
+
+    **Who:** Creator
+    """
+    from app.services import airwallex_service
+
+    if not airwallex_service.is_enabled():
+        raise HTTPException(status_code=503, detail="Bank transfers are not enabled yet.")
+
+    result = await airwallex_service.create_beneficiary(
+        account_name=data.account_name,
+        account_number=data.account_number,
+        bank_name=data.bank_name,
+        swift_code=data.swift_code,
+        branch=data.branch,
+        country_code=data.country_code,
+        currency=data.currency,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Could not save bank details."))
+
+    current_user.airwallex_beneficiary_id = result["beneficiary_id"]
+    current_user.bank_account_masked = result["masked_account"]
+    current_user.bank_account_name = data.account_name.strip()
+    current_user.bank_name = data.bank_name.strip()
+    current_user.bank_currency = data.currency.upper()
+    current_user.bank_country = data.country_code.upper()
+    await current_user.save()
+
+    # Audit the change without recording anything sensitive.
+    await log_event(
+        "payout.bank_details_saved", actor=current_user, target_type="user",
+        target_id=str(current_user.id), request=request,
+        metadata={"bank": current_user.bank_name, "currency": current_user.bank_currency},
+        severity="info",
+    )
+
+    return {
+        "success": True,
+        "connected": True,
+        "account_masked": current_user.bank_account_masked,
+        "bank_name": current_user.bank_name,
+        "currency": current_user.bank_currency,
+        "message": "Bank details saved. You can now withdraw straight to your account.",
+    }
+
 
 @router.get("/payout-options", summary="Which payout rails this creator can use")
 async def get_payout_options(current_user: User = Depends(get_current_user)):

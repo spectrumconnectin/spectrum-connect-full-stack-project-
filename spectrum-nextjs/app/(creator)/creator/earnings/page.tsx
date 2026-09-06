@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { earnings, EarningTransaction, EarningsStats, PayoutBalance, PayoutOptions } from '@/lib/api';
+import { earnings, EarningTransaction, EarningsStats, PayoutBalance, PayoutOptions, BankDetails } from '@/lib/api';
+import BankPayoutForm from '@/components/BankPayoutForm';
 
 const TXN_STATUS_STYLE: Record<string, string> = {
   completed:  'bg-emerald-50 text-emerald-700',
@@ -68,20 +69,23 @@ export default function EarningsPage() {
   const [editingEmail, setEditingEmail] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
-  const [method, setMethod] = useState<'stripe' | 'paypal'>('stripe');
+  const [method, setMethod] = useState<'stripe' | 'paypal' | 'airwallex'>('stripe');
   const [payoutOptions, setPayoutOptions] = useState<PayoutOptions | null>(null);
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   const loadBalance = useCallback(async () => {
     try {
-      const [b, opts] = await Promise.all([
+      const [b, opts, bank] = await Promise.all([
         earnings.getBalance(),
         // Best-effort: if this fails we fall back to showing both rails rather
         // than hiding one a creator might be able to use.
         earnings.payoutOptions().catch(() => null),
+        earnings.getBankDetails().catch(() => null),
       ]);
       setBalance(b);
       setPayoutOptions(opts);
+      setBankDetails(bank);
       setPaypalEmail(b.paypal_email ?? '');
       setEditingEmail(!b.paypal_email);
       setWithdrawAmount(b.available > 0 ? b.available.toFixed(2) : '');
@@ -410,9 +414,18 @@ export default function EarningsPage() {
               const stripeShown = !!balance?.stripe_enabled
                 && (payoutOptions?.bank_via_stripe.available ?? true);
               const paypalShown = !!balance?.payouts_enabled;
+              // Direct bank transfer, for creators Stripe can't reach.
+              const bankShown = !!payoutOptions?.bank_direct.available;
+              const bankReady = !!payoutOptions?.bank_direct.connected || !!bankDetails?.connected;
               const stripeReady = !!balance?.stripe_payouts_enabled;
               const noRails = balance && !stripeShown && !paypalShown;
-              const showAmount = method === 'paypal' ? paypalShown : stripeReady;
+              // The amount field only appears once the chosen rail can actually
+              // receive money — otherwise a creator types an amount, presses
+              // withdraw, and is told to go set up the destination first.
+              const showAmount =
+                method === 'paypal' ? paypalShown
+                : method === 'airwallex' ? bankReady
+                : stripeReady;
               return (
             <div className="px-6 pb-2 space-y-4">
               {withdrawError && (
@@ -428,21 +441,47 @@ export default function EarningsPage() {
                 </div>
               ) : (
                 <>
-                  {/* Method picker */}
-                  {(stripeShown && paypalShown) && (
-                    <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
-                      {([
-                        { id: 'stripe', label: 'Bank', icon: 'fa-building-columns', sub: 'Instant' },
-                        { id: 'paypal', label: 'PayPal', icon: 'fa-paypal brand', sub: 'Minutes' },
-                      ] as const).map(m => (
-                        <button key={m.id} onClick={() => { setMethod(m.id); setWithdrawError(''); }}
-                          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition ${
-                            method === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                          }`}>
-                          <i className={`${m.icon.includes('brand') ? 'fa-brands fa-paypal' : 'fa-solid ' + m.icon}`}></i>{m.label}
-                        </button>
-                      ))}
-                    </div>
+                  {/* Method picker — only the rails that can actually reach
+                      this creator, so nobody picks one that will fail. */}
+                  {(() => {
+                    const rails = [
+                      bankShown && { id: 'airwallex' as const, label: 'Bank', icon: 'fa-building-columns' },
+                      stripeShown && { id: 'stripe' as const, label: 'Bank', icon: 'fa-building-columns' },
+                      paypalShown && { id: 'paypal' as const, label: 'PayPal', icon: 'fa-paypal brand' },
+                    ].filter(Boolean) as { id: 'airwallex' | 'stripe' | 'paypal'; label: string; icon: string }[];
+
+                    if (rails.length < 2) return null;
+                    return (
+                      <div className={`grid gap-2 p-1 bg-gray-100 rounded-xl ${rails.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        {rails.map(m => (
+                          <button key={m.id} onClick={() => { setMethod(m.id); setWithdrawError(''); }}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition ${
+                              method === m.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                            }`}>
+                            <i className={`${m.icon.includes('brand') ? 'fa-brands fa-paypal' : 'fa-solid ' + m.icon}`}></i>{m.label}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* DIRECT BANK — details form, or the saved account */}
+                  {method === 'airwallex' && bankShown && (
+                    <BankPayoutForm
+                      details={bankDetails}
+                      country={payoutOptions?.country}
+                      onSaved={d => {
+                        setBankDetails({
+                          connected: true,
+                          account_name: bankDetails?.account_name ?? null,
+                          account_masked: d.account_masked,
+                          bank_name: d.bank_name,
+                          currency: d.currency,
+                          country: payoutOptions?.country ?? null,
+                        });
+                        loadBalance();
+                      }}
+                    />
                   )}
 
                   {/* STRIPE — needs bank connection */}
