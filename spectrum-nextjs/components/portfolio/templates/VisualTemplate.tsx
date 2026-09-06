@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { PortfolioProject } from '@/lib/api';
 import { formatMonthYear, projectCover } from '@/lib/portfolio';
@@ -20,12 +21,12 @@ export default function VisualTemplate({ projects, handle }: { projects: Portfol
           <article key={p.id} className="mb-6 group">
             <Link href={href} className={`relative ${aspect} rounded-2xl overflow-hidden bg-gray-100 block`}>
               {cover ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={cover}
                   alt={p.title}
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                  fill
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                  className="object-cover group-hover:scale-[1.03] transition-transform duration-500"
                 />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">

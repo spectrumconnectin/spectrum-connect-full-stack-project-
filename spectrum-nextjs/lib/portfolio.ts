@@ -45,6 +45,26 @@ export async function getPublicProject(username: string, projectSlug: string): P
   }
 }
 
+export interface PortfolioSitemapEntry {
+  handle: string;
+  updated_at: string | null;
+  projects: { slug: string; updated_at: string | null }[];
+}
+
+/** Enumerate published public portfolios (+ their projects) for the XML sitemap.
+ * Returns [] on any failure so a backend hiccup degrades the sitemap gracefully
+ * instead of breaking the whole route. */
+export async function getPortfolioSitemapEntries(): Promise<PortfolioSitemapEntry[]> {
+  try {
+    const res = await fetch(`${API}/portfolio-builder/sitemap`, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.portfolios) ? data.portfolios : [];
+  } catch {
+    return [];
+  }
+}
+
 /** "Mar 2026" style formatting for completion dates. */
 export function formatMonthYear(iso?: string): string {
   if (!iso) return '';

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { jobs, JobCreatePayload } from '@/lib/api';
 
@@ -53,7 +53,7 @@ const TEMPLATES: Template[] = [
     category: 'Film & Video',
     title: 'Promotional Video for [Product/Brand]',
     description: 'We need a high-quality promotional video to showcase our product/service. The video should be engaging, professional, and optimised for social media and our website.',
-    goals: ['Increase brand awareness', 'Drive product sales', 'Grow social media engagement'],
+    goals: ['Increase brand awareness', 'Sell more product', 'Grow social media engagement'],
     deliverables: ['60–90 second promo video', 'Social media cut (15s + 30s)', 'Raw footage files', 'Colour-graded master file'],
     skills: ['Videography', 'Video Editing', 'Motion Graphics', 'Colour Grading'],
     budgetType: 'fixed',
@@ -101,7 +101,7 @@ const TEMPLATES: Template[] = [
     category: 'Photography',
     title: 'Product/Brand Photography for [Company]',
     description: 'Professional photography session to create high-quality images for our website, social media, and marketing materials.',
-    goals: ['Create professional brand imagery', 'Build a content library', 'Elevate product presentation'],
+    goals: ['Create professional brand imagery', 'Build a content library', 'Make our products look their best'],
     deliverables: ['30+ edited, high-resolution photos', 'Web-optimised versions', 'Raw files', 'Rights transfer agreement'],
     skills: ['Photography', 'Photo Editing', 'Creative Direction'],
     budgetType: 'fixed',
@@ -148,8 +148,8 @@ const TEMPLATES: Template[] = [
     color: 'bg-orange-100 text-orange-600',
     category: 'Branding',
     title: 'Complete Brand Identity for [Company]',
-    description: 'We need a comprehensive brand identity system including logo, colour palette, typography, and brand guidelines to establish a consistent visual presence across all touchpoints.',
-    goals: ['Build a cohesive brand identity', 'Create consistent brand experience', 'Differentiate from competitors'],
+    description: 'We need a full brand identity — logo, colours, fonts, and brand guidelines — so everything looks consistent everywhere our brand shows up.',
+    goals: ['Build a strong, memorable brand', 'Keep the look consistent everywhere', 'Stand out from competitors'],
     deliverables: ['Primary + secondary logo', 'Colour system + typography', 'Brand guidelines document', 'Business card + letterhead design', 'Social media templates'],
     skills: ['Graphic Design', 'Brand Strategy', 'Creative Direction'],
     budgetType: 'fixed',
@@ -183,6 +183,32 @@ const CURRENCIES = [
 
 function currencySymbol(code: string): string {
   return CURRENCIES.find(c => c.code === code)?.symbol ?? code;
+}
+
+// Region → currency, for the subset of currencies this form supports. Most
+// clients never need to touch the picker at all if this guesses right.
+const REGION_CURRENCY: Record<string, string> = {
+  LK: 'LKR', GB: 'GBP', AU: 'AUD', IN: 'INR', SG: 'SGD', CA: 'CAD', AE: 'AED',
+  DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR',
+};
+
+const SECTIONS = [
+  { id: 'section-info', label: 'Info' },
+  { id: 'section-goals', label: 'Goals' },
+  { id: 'section-deliverables', label: 'Deliverables' },
+  { id: 'section-budget', label: 'Budget' },
+  { id: 'section-location', label: 'Location' },
+  { id: 'section-timeline', label: 'Timeline' },
+];
+
+function defaultCurrency(): string {
+  if (typeof window === 'undefined') return 'USD';
+  try {
+    const region = new Intl.Locale(navigator.language).maximize().region;
+    return (region && REGION_CURRENCY[region]) || 'USD';
+  } catch {
+    return 'USD';
+  }
 }
 
 const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt focus:border-transparent text-gray-900 placeholder-gray-400 text-sm';
@@ -283,7 +309,7 @@ export default function CreateProjectPage() {
 
   // ── Step 3: Budget (single fixed price, min $2) ─────────────────────────
   const [budget, setBudget] = useState('');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState(defaultCurrency);
 
   // ── Step 4: Timeline & Skills ──────────────────────────────────────────
   const [timeline, setTimeline]   = useState('');
@@ -300,6 +326,22 @@ export default function CreateProjectPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const publishRef = useRef<'open' | 'draft'>('open');
   const [appliedTemplate, setAppliedTemplate] = useState<string | null>(null);
+
+  // ── Section progress strip — orients the user inside the one long form ──
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
+  useEffect(() => {
+    const els = SECTIONS.map(s => document.getElementById(s.id)).filter((el): el is HTMLElement => !!el);
+    if (els.length === 0) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveSection(visible[0].target.id);
+      },
+      { rootMargin: '-100px 0px -70% 0px', threshold: 0 }
+    );
+    els.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
   // ── Apply a template ─────────────────────────────────────────────────────
   const applyTemplate = (tpl: Template) => {
@@ -563,8 +605,25 @@ export default function CreateProjectPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6 flex-1 min-w-0 w-full">
 
+        {/* ── Section progress — always know how much of the form is left ── */}
+        <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-3 bg-gray-50/95 backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-white border border-gray-200 rounded-2xl shadow-sm px-2 py-2">
+            {SECTIONS.map((s, i) => (
+              <a key={s.id} href={`#${s.id}`}
+                className={`flex-1 min-w-fit flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                  activeSection === s.id ? 'bg-cobalt text-white' : 'text-gray-500 hover:bg-gray-50'
+                }`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 ${
+                  activeSection === s.id ? 'bg-white/25' : 'bg-gray-100'
+                }`}>{i + 1}</span>
+                {s.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
         {/* ── 1. Project Information ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-info" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('circle-info', 'bg-blue-100 text-cobalt', 'Project Information', 'What are you working on?')}
           <div className="space-y-5">
             <div>
@@ -607,14 +666,14 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 2. Project Goals ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-goals" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('bullseye', 'bg-purple-100 text-purple-600', 'Project Goals', 'What are you trying to achieve?')}
           <div className="space-y-2">
             {tagInput(goalInput, setGoalInput, () => addItem(goalInput, goals, setGoals, setGoalInput), 'e.g. Increase brand awareness, Launch product — press Enter')}
             {chips(goals, v => removeItem(v, setGoals), 'bg-purple-50 text-purple-700 border-purple-100')}
             {goals.length === 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
-                {['Increase brand awareness', 'Launch a product', 'Drive website traffic', 'Grow social media', 'Tell our story'].map(s => (
+                {['Increase brand awareness', 'Launch a product', 'Get more website visitors', 'Grow social media', 'Tell our story'].map(s => (
                   <button key={s} type="button" onClick={() => addItem(s, goals, setGoals, setGoalInput)}
                     className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-purple-50 hover:text-purple-700 transition">
                     + {s}
@@ -626,7 +685,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 3. Deliverables ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-deliverables" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('box-open', 'bg-emerald-100 text-emerald-600', 'Deliverables', 'What should the creator produce?')}
           <div className="space-y-2">
             {tagInput(delivInput, setDelivInput, () => addItem(delivInput, deliverables, setDeliverables, setDelivInput), 'e.g. 60-second video, 3 logo concepts — press Enter')}
@@ -645,7 +704,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 4. Budget ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-budget" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Project Budget', 'Fixed price — what is this project worth?')}
           <div className="space-y-5">
 
@@ -721,7 +780,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 5. Location & Work Type ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-location" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('location-dot', 'bg-rose-100 text-rose-600', 'Location & Work Type', 'Is this an in-person, on-site, or remote project?')}
           <div className="space-y-5">
             {/* Work type */}
@@ -775,7 +834,7 @@ export default function CreateProjectPage() {
         </div>
 
         {/* ── 6. Timeline & Skills ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm">
+        <div id="section-timeline" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
           <div className="space-y-5">
             <div>

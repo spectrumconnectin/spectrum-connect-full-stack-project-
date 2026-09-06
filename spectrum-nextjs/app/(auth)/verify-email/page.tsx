@@ -64,7 +64,7 @@ function VerifyEmailContent() {
         </div>
         <div className="brand-hero">
           <h1>Verify your email address</h1>
-          <p>One quick step to unlock your full Spectrum Connect account and start collaborating.</p>
+          <p>One quick step to activate your Spectrum Connect account and get started.</p>
         </div>
         <div className="features">
           <div className="feature">

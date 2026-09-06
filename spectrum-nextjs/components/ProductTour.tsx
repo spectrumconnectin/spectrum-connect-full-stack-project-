@@ -35,7 +35,7 @@ const TOURS: Record<'client' | 'creator', Step[]> = {
       body: 'Browse open projects that match your skills, then send a proposal in a couple of taps. The more relevant your pitch, the better your odds.',
       cta: { label: 'Browse projects', href: '/creator/find-projects' } },
     { key: 'etf', icon: 'fa-medal', title: 'Earn Trust Framework (ETF)',
-      body: 'Trust is earned through completed projects, reliability, and professional collaboration. A higher ETF score surfaces you to more clients.' },
+      body: 'Trust is earned through completed projects, reliability, and professional collaboration. A higher ETF score means more clients see your profile.' },
     { key: 'messages', icon: 'fa-comment', title: 'Messages', selector: '[data-tour="messages"]',
       body: 'Every project gets a shared workspace and chat. Keep all communication here — it’s your record if a dispute ever comes up.' },
     { key: 'notifications', icon: 'fa-bell', title: 'Notifications', selector: '[data-tour="bell"]',

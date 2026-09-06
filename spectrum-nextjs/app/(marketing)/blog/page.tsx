@@ -1,5 +1,6 @@
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import DigestSignup from '@/components/blog/DigestSignup';
@@ -28,8 +29,7 @@ const PAGE_SIZE = 6;
 function Avatar({ name, url, size = 28 }: { name?: string; url?: string; size?: number }) {
   const s = { width: size, height: size };
   if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={name || ''} style={s} className="rounded-full object-cover border border-gray-200 flex-shrink-0" />;
+    return <Image src={url} alt={name || ''} width={size} height={size} className="rounded-full object-cover border border-gray-200 flex-shrink-0" />;
   }
   return (
     <div style={s} className="rounded-full bg-blue-100 text-cobalt font-bold flex items-center justify-center flex-shrink-0">

@@ -3,6 +3,7 @@ import PortfolioHero from './PortfolioHero';
 import PortfolioExperience from './PortfolioExperience';
 import PortfolioReviews from './PortfolioReviews';
 import PortfolioContact from './PortfolioContact';
+import StickyContactBar from './StickyContactBar';
 import VisualTemplate from './templates/VisualTemplate';
 import MotionTemplate from './templates/MotionTemplate';
 import MinimalTemplate from './templates/MinimalTemplate';
@@ -41,7 +42,7 @@ export default function PortfolioPublicView({ data }: { data: PublicPortfolio })
   }
 
   return (
-    <div className="portfolio-print-root bg-white min-h-screen">
+    <div className="portfolio-print-root bg-white min-h-screen pb-20 sm:pb-0">
       <PortfolioHero data={data} />
 
       {/* Featured work */}
@@ -61,6 +62,8 @@ export default function PortfolioPublicView({ data }: { data: PublicPortfolio })
       <PortfolioReviews reviews={data.reviews} />
 
       <PortfolioContact data={data} />
+
+      <StickyContactBar username={data.profile?.handle || data.user?.username || ''} userId={data.user?.id} />
     </div>
   );
 }

@@ -19,7 +19,7 @@ export default function PortfolioAnalyticsWidget({ refreshKey = 0 }: { refreshKe
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
       <h3 className="text-sm font-bold text-gray-900 mb-4">Portfolio analytics</h3>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="bg-blue-50/60 rounded-xl p-3.5">
           <p className="text-2xl font-extrabold text-gray-900 leading-none">{data.total_views.toLocaleString()}</p>
           <p className="text-xs text-gray-500 mt-1.5 font-semibold">Total views</p>
@@ -29,6 +29,24 @@ export default function PortfolioAnalyticsWidget({ refreshKey = 0 }: { refreshKe
           <p className="text-xs text-gray-500 mt-1.5 font-semibold">This week</p>
         </div>
       </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="bg-amber-50/60 rounded-xl p-3.5">
+          <p className="text-2xl font-extrabold text-gray-900 leading-none">{data.contact_clicks.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-1.5 font-semibold">Contact clicks</p>
+        </div>
+        <div className="bg-violet-50/60 rounded-xl p-3.5">
+          <p className="text-2xl font-extrabold text-gray-900 leading-none">{data.conversations_started.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-1.5 font-semibold">Conversations</p>
+        </div>
+      </div>
+
+      {data.total_views > 0 && (
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3.5 py-2.5 mb-4">
+          <span className="text-xs font-semibold text-gray-500">Portfolio → message conversion</span>
+          <span className="text-sm font-extrabold text-gray-900">{data.conversion_rate}%</span>
+        </div>
+      )}
 
       {data.top_projects.length > 0 ? (
         <div className="border-t border-gray-100 pt-4">

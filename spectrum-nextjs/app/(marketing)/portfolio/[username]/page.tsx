@@ -65,11 +65,12 @@ export default async function PublicPortfolioPage({ params }: { params: { userna
   }
 
   const name = data.profile.display_name || params.username;
+  const canonicalUrl = `${BASE}/portfolio/${encodeURIComponent(data.profile.handle || decodeParam(params.username))}`;
   const personJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name,
-    url: `${BASE}/portfolio/${encodeURIComponent(data.profile.handle || decodeParam(params.username))}`,
+    url: canonicalUrl,
     image: data.profile.profile_picture || undefined,
     jobTitle: data.profile.headline || data.profile.tagline || undefined,
     description: data.profile.bio || undefined,
@@ -89,9 +90,20 @@ export default async function PublicPortfolioPage({ params }: { params: { userna
       : {}),
   };
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE },
+      { '@type': 'ListItem', position: 2, name: 'Portfolios', item: `${BASE}/portfolios` },
+      { '@type': 'ListItem', position: 3, name, item: canonicalUrl },
+    ],
+  };
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <ViewBeacon username={params.username} />
       <PortfolioPublicView data={data} />
     </>

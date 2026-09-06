@@ -699,7 +699,7 @@ export default function DeliveryReviewPage() {
               {!driveOpened && (
                 <p className="text-xs text-cobalt font-semibold mt-3 flex items-center gap-1.5">
                   <i className="fa-solid fa-circle-info"></i>
-                  Click &ldquo;Open Drive Link&rdquo; above to view the deliverables and unlock the review process.
+                  Click &ldquo;Open Drive Link&rdquo; above to view the deliverables. Then you can start your review.
                 </p>
               )}
             </div>
@@ -796,7 +796,7 @@ export default function DeliveryReviewPage() {
               className="w-full py-3 bg-cobalt text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition disabled:opacity-40 flex items-center justify-center gap-2">
               {confirmingReview
                 ? <><i className="fa-solid fa-spinner animate-spin"></i>Confirming…</>
-                : <><i className="fa-solid fa-check"></i>Confirm Review — Proceed to Decision</>}
+                : <><i className="fa-solid fa-check"></i>Confirm Review</>}
             </button>
           </div>
         )}

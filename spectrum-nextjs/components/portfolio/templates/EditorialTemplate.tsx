@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { PortfolioProject } from '@/lib/api';
 import { formatMonthYear, projectCover } from '@/lib/portfolio';
@@ -25,10 +26,9 @@ export default function EditorialTemplate({ projects, handle }: { projects: Port
             {meta && <p className="text-sm text-gray-400 mt-3 font-medium">{meta}</p>}
 
             {cover && (
-              <Link href={href} className="block mt-7 rounded-2xl overflow-hidden bg-gray-100 aspect-[16/9] max-w-3xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={cover} alt={p.title} loading="lazy"
-                  className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+              <Link href={href} className="relative block mt-7 rounded-2xl overflow-hidden bg-gray-100 aspect-[16/9] max-w-3xl">
+                <Image src={cover} alt={p.title} fill sizes="(max-width: 768px) 100vw, 768px"
+                  className="object-cover group-hover:scale-[1.02] transition-transform duration-500" />
               </Link>
             )}
 

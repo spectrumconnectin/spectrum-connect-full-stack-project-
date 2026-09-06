@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getPublicProject, projectCover, decodeParam } from '@/lib/portfolio';
@@ -45,7 +46,7 @@ export default async function PublicProjectPage(
             <i className="fa-solid fa-lock text-2xl text-gray-300" />
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">This portfolio is private</h1>
-          <p className="text-sm text-gray-500 mb-6">Ask the creator to share access, or view the portfolio to unlock it.</p>
+          <p className="text-sm text-gray-500 mb-6">Ask the creator for access, or enter the passcode on the main portfolio page.</p>
           <Link href={`/portfolio/${encodeURIComponent(decodeParam(params.username))}`}
             className="inline-flex items-center gap-2 bg-cobalt text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-blue-700 transition">
             Go to portfolio
@@ -74,13 +75,14 @@ export default async function PublicProjectPage(
 
   const { project, owner } = data;
   const portfolioUrl = `/portfolio/${encodeURIComponent(owner.handle)}`;
+  const projectUrl = `${BASE}/portfolio/${encodeURIComponent(owner.handle)}/${encodeURIComponent(project.slug || project.id)}`;
 
   const creativeWorkJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CreativeWork',
     name: project.title,
     description: project.description || undefined,
-    url: `${BASE}/portfolio/${encodeURIComponent(owner.handle)}/${encodeURIComponent(project.slug || project.id)}`,
+    url: projectUrl,
     image: projectCover(project) || undefined,
     dateCreated: project.completion_date || undefined,
     author: {
@@ -91,9 +93,21 @@ export default async function PublicProjectPage(
     },
   };
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: BASE },
+      { '@type': 'ListItem', position: 2, name: 'Portfolios', item: `${BASE}/portfolios` },
+      { '@type': 'ListItem', position: 3, name: owner.display_name, item: `${BASE}${portfolioUrl}` },
+      { '@type': 'ListItem', position: 4, name: project.title, item: projectUrl },
+    ],
+  };
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(creativeWorkJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <ViewBeacon username={params.username} projectSlug={params.projectSlug} />
       <div className="bg-white min-h-screen">
         {/* Back to portfolio */}
@@ -101,8 +115,7 @@ export default async function PublicProjectPage(
           <div className="max-w-3xl mx-auto px-5 sm:px-6 py-4">
             <Link href={portfolioUrl} className="inline-flex items-center gap-2.5 text-sm font-semibold text-gray-500 hover:text-cobalt transition">
               {owner.profile_picture ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={owner.profile_picture} alt="" className="w-7 h-7 rounded-full object-cover" />
+                <Image src={owner.profile_picture} alt="" width={28} height={28} className="w-7 h-7 rounded-full object-cover" />
               ) : (
                 <span className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
                   <i className="fa-solid fa-arrow-left" />

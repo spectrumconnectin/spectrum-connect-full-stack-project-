@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { dashboard, jobs as jobsApi, profile as profileApi, escrow as escrowApi, type ClientDashboardResponse, type JobPostItem } from '@/lib/api';
 import EtfWidget from '@/components/EtfWidget';
 import SetupJourney from '@/components/SetupJourney';
+import { consumeContactIntent } from '@/lib/contactIntent';
 
 const STATUS_LABEL: Record<string, string> = {
   open:               'Open',
@@ -32,6 +34,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function ClientDashboardPage() {
+  const router = useRouter();
   const [data, setData]           = useState<ClientDashboardResponse | null>(null);
   const [myJobs, setMyJobs]       = useState<JobPostItem[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -39,6 +42,17 @@ export default function ClientDashboardPage() {
   const [totalInEscrow, setTotalInEscrow]       = useState(0);
   const [totalReleased, setTotalReleased]       = useState(0);
   const [activeEscrowCount, setActiveEscrowCount] = useState(0);
+
+  // A visitor who clicked "Contact Creator" while logged out lands here right
+  // after login/signup — send them straight into that conversation instead of
+  // making them find the creator again.
+  useEffect(() => {
+    const intent = consumeContactIntent();
+    if (intent) {
+      const qs = new URLSearchParams({ userId: intent.userId, msg: intent.message, source: 'portfolio' });
+      router.replace(`/client/messaging?${qs.toString()}`);
+    }
+  }, [router]);
 
   useEffect(() => {
     Promise.allSettled([

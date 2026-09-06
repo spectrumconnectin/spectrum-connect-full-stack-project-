@@ -12,7 +12,12 @@
       "Bash(node -e \"const p = require\\('./spectrum-nextjs/package.json'\\); console.log\\(p.dependencies?.next || p.devDependencies?.next\\)\")",
       "Bash(git ls-tree *)",
       "WebFetch(domain:spectrumconect.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(date +%s)",
+      "Bash(echo \"=== register ===\")",
+      "Bash(curl -s -X POST http://spectrum-connect-single.ap-south-1.elasticbeanstalk.com/auth/register -H 'Content-Type: application/json' -d '{\"email\":\"__TRACKED_VAR__\",\"username\":\"__TRACKED_VAR__\",\"password\":\"__TRACKED_VAR__\",\"account_type\":\"crew\"}')",
+      "Bash(echo \"\")",
+      "Bash(echo uname=__TRACKED_VAR__)"
     ]
   }
 }

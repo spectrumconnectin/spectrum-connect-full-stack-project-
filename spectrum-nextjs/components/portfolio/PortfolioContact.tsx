@@ -1,4 +1,5 @@
 import type { PublicPortfolio } from '@/lib/api';
+import ContactCreatorButton from './ContactCreatorButton';
 
 const LINK_META: Record<string, { icon: string; label: string }> = {
   linkedin: { icon: 'fa-brands fa-linkedin-in', label: 'LinkedIn' },
@@ -25,12 +26,7 @@ export default function PortfolioContact({ data }: { data: PublicPortfolio }) {
         </p>
 
         <div className="flex items-center justify-center gap-3 mt-8 flex-wrap">
-          <a
-            href={data.user?.id ? `/client/collaborators/${data.user.id}` : '/signup'}
-            className="inline-flex items-center gap-2 bg-cobalt text-white px-7 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-[0.98] transition shadow-sm"
-          >
-            <i className="fa-regular fa-paper-plane" /> Message on Spectrum
-          </a>
+          <ContactCreatorButton username={p.handle || data.user?.username || ''} userId={data.user?.id} variant="section" />
           {p.website && (
             <a
               href={p.website}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { PortfolioProject } from '@/lib/api';
 import { projectCover } from '@/lib/portfolio';
@@ -32,9 +33,8 @@ function GridCell({ project, href }: { project: PortfolioProject; href: string }
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : staticCover ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={staticCover} alt={project.title} loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <Image src={staticCover} alt={project.title} fill sizes="(max-width: 640px) 50vw, 33vw"
+          className="object-cover group-hover:scale-105 transition-transform duration-500" />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
           <i className="fa-regular fa-image text-2xl text-gray-300" />

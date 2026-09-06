@@ -15,7 +15,6 @@ const navLinks = [
   { href: '/client/smart-connect',   label: 'Smart Connect', icon: 'fa-bolt' },
   { href: '/client/projects/create', label: 'Post a Project',icon: 'fa-plus' },
   { href: '/client/projects',        label: 'My Projects',   icon: 'fa-briefcase' },
-  { href: '/client/disputes',        label: 'Disputes',      icon: 'fa-scale-balanced' },
   { href: '/client/ai-assistant',    label: 'Miya',          icon: 'fa-sparkles', isMiya: true },
 ];
 
@@ -132,6 +131,7 @@ function ClientHeader() {
                       { href: '/client/profile', icon: 'fa-user', label: 'My Profile' },
                       { href: '/client/payments', icon: 'fa-wallet', label: 'Payments' },
                       { href: '/client/etf', icon: 'fa-medal', label: 'ETF — Earn Trust' },
+                      { href: '/client/disputes', icon: 'fa-scale-balanced', label: 'Disputes' },
                       { href: '/creator/dashboard', icon: 'fa-arrow-right-arrow-left', label: 'Switch to Creator' },
                     ].map(({ href, icon, label }) => (
                       <Link key={href} href={href} onClick={() => setMenuOpen(false)}

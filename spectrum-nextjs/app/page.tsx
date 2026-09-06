@@ -65,7 +65,7 @@ const testimonials = [
   { name: 'Elena Rodriguez', role: 'Video Director', quote: 'The escrow system gave me confidence to take on bigger projects. I always get paid fairly.', rating: 5, initials: 'ER', color: '#ec4899' },
   { name: 'James Kim', role: 'Photographer', quote: 'The verification process sets this apart. Every client I work with is legitimate and professional.', rating: 5, initials: 'JK', color: '#10b981' },
   { name: 'Aisha Patel', role: 'Copywriter', quote: 'As a freelancer, reliable payments were always my biggest stress. Spectrum solved that completely.', rating: 5, initials: 'AP', color: '#3b82f6' },
-  { name: 'Tom Wright', role: 'Animator', quote: 'The team-building feature is next-level. I assembled a full creative crew for a major campaign in one day.', rating: 5, initials: 'TW', color: '#8b5cf6' },
+  { name: 'Tom Wright', role: 'Animator', quote: 'The team-building feature is amazing. I put together a full creative crew for a major campaign in one day.', rating: 5, initials: 'TW', color: '#8b5cf6' },
 ];
 
 function StarRating({ n = 5 }: { n?: number }) {
@@ -195,12 +195,6 @@ export default function HomePage() {
                 <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
               </div>
             ))}
-            <Link href="/portfolios" className="home-card"
-              style={{ background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: 20, padding: '28px 28px 24px', display: 'block', textDecoration: 'none' }}>
-              <div style={{ marginBottom: 12, color: '#4f46e5' }}><Icon.Images size={44} /></div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 10px', lineHeight: 1.35 }}>Show off your work</h3>
-              <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, margin: 0 }}>Build a free portfolio with rich case studies, 5 templates, and analytics — one link for your whole body of work.</p>
-            </Link>
           </div>
         </div>
       </section>
@@ -415,7 +409,7 @@ export default function HomePage() {
             {[
               { Ic: Icon.Cpu, hbg: 'linear-gradient(135deg,#eff6ff,#dbeafe)', hbd: '#e0e7ff', tfg: '#1e40af', sfg: '#3b82f6', cfg: '#2563eb', title: 'Smart Matchmaking', sub: 'AI surfaces the right people instantly — no endless scrolling.', items: ['Skill & style matching', 'Availability detection', 'Budget alignment', 'Project history weighting'] },
               { Ic: Icon.Users, hbg: 'linear-gradient(135deg,#fdf4ff,#f3e8ff)', hbd: '#e9d5ff', tfg: '#6b21a8', sfg: '#9333ea', cfg: '#9333ea', title: 'Team Building Made Easy', sub: 'Assemble full creative crews with one brief, not ten DMs.', items: ['Role-based team templates', 'Crew workload balancing', 'Shared workspace & files', 'Team performance tracking'] },
-              { Ic: Icon.Bolt, hbg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', hbd: '#bbf7d0', tfg: '#166534', sfg: '#16a34a', cfg: '#10b981', title: 'All-In-One Workflow', sub: 'Chat, files, milestones, and payments in one seamless place.', items: ['Integrated messaging', 'Milestone tracking', 'Secure escrow payments', 'Invoice & contract tools'] },
+              { Ic: Icon.Bolt, hbg: 'linear-gradient(135deg,#f0fdf4,#dcfce7)', hbd: '#bbf7d0', tfg: '#166534', sfg: '#16a34a', cfg: '#10b981', title: 'All-In-One Workflow', sub: 'Chat, files, milestones, and payments — all in one place.', items: ['Integrated messaging', 'Milestone tracking', 'Secure escrow payments', 'Invoice & contract tools'] },
             ].map(panel => (
               <div key={panel.title} className="home-card" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 22, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
                 <div style={{ background: panel.hbg, padding: '28px 28px 22px', borderBottom: `1px solid ${panel.hbd}` }}>

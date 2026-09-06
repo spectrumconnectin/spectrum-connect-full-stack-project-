@@ -1,5 +1,7 @@
+import Image from 'next/image';
 import type { PublicPortfolio } from '@/lib/api';
 import DownloadPdfButton from './DownloadPdfButton';
+import ContactCreatorButton from './ContactCreatorButton';
 
 /**
  * Portfolio hero — photo, name, title, bio, skills, quick facts.
@@ -28,10 +30,12 @@ export default function PortfolioHero({ data }: { data: PublicPortfolio }) {
         {/* Avatar overlapping the cover */}
         <div className="-mt-14 sm:-mt-16 mb-6">
           {p.profile_picture ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={p.profile_picture}
               alt={name}
+              width={128}
+              height={128}
+              priority
               className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl object-cover border-4 border-white shadow-lg bg-white"
             />
           ) : (
@@ -74,12 +78,7 @@ export default function PortfolioHero({ data }: { data: PublicPortfolio }) {
             {/* CTA */}
             <div data-no-print className="flex-shrink-0 flex items-center gap-2.5 flex-wrap">
               <DownloadPdfButton />
-              <a
-                href="#contact"
-                className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-black active:scale-[0.98] transition shadow-sm"
-              >
-                <i className="fa-regular fa-paper-plane" /> Get in touch
-              </a>
+              <ContactCreatorButton username={data.profile?.handle || u?.username || ''} userId={u?.id} variant="hero" />
             </div>
           </div>
 

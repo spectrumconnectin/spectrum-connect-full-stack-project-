@@ -217,7 +217,7 @@ export default function HowItWorksPage() {
 
       <div className="flow-steps">
         <Step tile="tile-blue" icon="Search" title="Smart Discovery"
-          desc="Our intelligent matching analyzes your project needs, work style, and goals to surface the people best suited to bring your vision to life."
+          desc="We match you with the right people by looking at your project, your work style, and your goals — not just a keyword search."
           bullets={['AI-driven skill and style matching','Filtered results by availability','Compatibility scoring for every match']}
           mockBg="mock-bg-blue" mock={<MockDiscovery/>}/>
         <Connector/>
@@ -227,12 +227,12 @@ export default function HowItWorksPage() {
           mockBg="mock-bg-green" mock={<MockTrust/>}/>
         <Connector/>
         <Step tile="tile-purple" icon="Users" title="Team Building"
-          desc="Assemble full creative teams — not just individuals. Mix and match specialists into a cohesive crew, or join an existing team that needs your skills."
-          bullets={['Curated multi-role teams','Clear roles and responsibilities','Full team chat and coordination']}
+          desc="Build a full creative team, not just hire one person. Bring specialists together into a team, or join a team that needs your skills."
+          bullets={['Teams with the right mix of roles','Clear roles and responsibilities','Full team chat and coordination']}
           mockBg="mock-bg-purple" mock={<MockTeam/>}/>
         <Connector/>
         <Step tile="tile-cyan" icon="Chat" title="Collaborate in One Place" reverse
-          desc="Chat, task management, file sharing, milestone tracking, invoicing — every tool you need is built in, so your work stays in flow, not in tabs."
+          desc="Chat, tasks, files, milestones, invoicing — every tool you need is built in, so you're not juggling ten different apps."
           bullets={['Integrated messaging and video','Milestones + task tracking','Secure file sharing and approvals']}
           mockBg="mock-bg-blue" mock={<MockCollab/>}/>
         <Connector/>
@@ -244,7 +244,7 @@ export default function HowItWorksPage() {
 
       <section className="flow-diff">
         <h2>Why This Flow Is Different</h2>
-        <div className="sub">Most marketplaces optimize for transactions. We optimize for trust, fairness, and long-term relationships.</div>
+        <div className="sub">Most marketplaces care about closing the deal. We care about trust, fairness, and relationships that last.</div>
         <div className="diff-grid">
           <div className="diff-card">
             <div className="ic tile-blue"><Ic.Users/></div>

@@ -131,7 +131,7 @@ export default function CallTheCeoPage() {
         <p className="text-xs font-bold uppercase tracking-widest text-cobalt mb-3">About the Founder</p>
         <p className="text-lg sm:text-xl text-slate-600 leading-relaxed">
           Pulindu is the founder of Spectrum Connect, a platform built to help creators and clients
-          collaborate more effectively. His vision is to create a trusted global ecosystem where creative
+          work together more easily. His goal is a trusted, global home where creative
           professionals and businesses can connect, build projects, and grow together.
         </p>
       </section>
@@ -142,7 +142,7 @@ export default function CallTheCeoPage() {
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Why Book a Call?</h2>
             <p className="mt-3 text-slate-500 max-w-xl mx-auto">
-              A direct line to leadership — reserved for opportunities that move the ecosystem forward.
+              A direct line to leadership — reserved for opportunities that move Spectrum Connect forward.
             </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -253,7 +253,7 @@ export default function CallTheCeoPage() {
                 <i className="fa-solid fa-circle-info mt-0.5 shrink-0" />
                 <p>
                   Due to the volume of requests, not all meeting requests can be accepted. Priority is given to
-                  partnerships, investors, enterprise clients, and opportunities that can help grow the Spectrum ecosystem.
+                  partnerships, investors, enterprise clients, and opportunities that can help Spectrum Connect grow.
                 </p>
               </div>
 

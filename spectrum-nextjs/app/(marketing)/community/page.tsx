@@ -147,7 +147,7 @@ export default function CommunityPage() {
           <div className="cm-head">
             <div className="ic-tile"><Ic.Shield /></div>
             <h2>How This Community Is Different</h2>
-            <p>We didn&apos;t build a forum. We built a living, working ecosystem.</p>
+            <p>We didn&apos;t build a forum. We built a place where real work happens.</p>
           </div>
           <div className="diff-grid">
             {[

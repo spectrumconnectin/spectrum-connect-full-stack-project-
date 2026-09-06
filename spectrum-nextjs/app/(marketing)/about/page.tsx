@@ -139,7 +139,7 @@ export default function AboutPage() {
               { grad: 'linear-gradient(135deg,#195ad7,#4178e7)', title: 'Creative work has real value', body: 'Design, video, writing, and production are skilled crafts. Platforms should amplify that value, not commoditize it.' },
               { grad: 'linear-gradient(135deg,#10b981,#059669)', title: 'Trust is built, not assumed', body: 'Verified identities, transparent histories, and two-way accountability create the foundation for great work.' },
               { grad: 'linear-gradient(135deg,#a855f7,#ec4899)', title: 'Fair access for everyone', body: 'Whether you\'re an up-and-coming creator or a large brand, the platform should work equitably for both sides.' },
-              { grad: 'linear-gradient(135deg,#f97316,#ef4444)', title: 'Collaboration should be seamless', body: 'Every tool you need — messaging, files, payments, milestones — belongs in one integrated workspace.' },
+              { grad: 'linear-gradient(135deg,#f97316,#ef4444)', title: 'Collaboration should be easy', body: 'Every tool you need — messaging, files, payments, milestones — belongs in one place.' },
             ].map(({ grad, title, body }) => (
               <div key={title} className="believe-row">
                 <div className="ic" style={{ background: grad }}><Ic.Check /></div>
@@ -163,7 +163,7 @@ export default function AboutPage() {
           </div>
           <div className="build-grid">
             {[
-              { c: 'blue', grad: 'linear-gradient(135deg,#195ad7,#4178e7)', icon: 'Bolt', title: 'Smart Connect AI', body: 'Our matching engine learns from every project to surface the right collaborators — not just keyword matches.' },
+              { c: 'blue', grad: 'linear-gradient(135deg,#195ad7,#4178e7)', icon: 'Bolt', title: 'Smart Connect AI', body: 'Our matching engine learns from every project to find the right collaborators — not just keyword matches.' },
               { c: 'green', grad: 'linear-gradient(135deg,#10b981,#059669)', icon: 'Shield', title: 'Escrow Payments', body: 'Funds held securely in escrow, released on milestone approval. No more invoice chasing.' },
               { c: 'pink', grad: 'linear-gradient(135deg,#a855f7,#ec4899)', icon: 'Users', title: 'Team Builder', body: 'Assemble full creative crews — directors, designers, editors — and manage them in one workspace.' },
               { c: 'orange', grad: 'linear-gradient(135deg,#f97316,#ef4444)', icon: 'Scale', title: 'Fair Pricing', body: 'Transparent 12% platform fee, split between both parties. No hidden charges, ever.' },
@@ -245,7 +245,7 @@ export default function AboutPage() {
         <div className="ic-tile"><Ic.Rocket /></div>
         <h2>What&apos;s Ahead</h2>
         <p className="lead">We&apos;re just getting started. Here&apos;s what we&apos;re building next.</p>
-        <p className="desc">Video collaboration rooms, AI-assisted creative briefs, team analytics, expanded payment methods, and a mentorship program for emerging creators. Spectrum Connect is growing into the complete creative OS.</p>
+        <p className="desc">Video collaboration rooms, AI-assisted creative briefs, team analytics, more payment options, and a mentorship program for emerging creators. We&apos;re growing Spectrum Connect into the one platform creative work runs on.</p>
       </section>
 
       {/* Final CTA */}

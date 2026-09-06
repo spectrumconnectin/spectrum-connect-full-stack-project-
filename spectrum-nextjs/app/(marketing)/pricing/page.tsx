@@ -77,7 +77,7 @@ export default function PricingPage() {
             <h2 style={s.h2}>How the Platform Fee Works</h2>
             <p style={s.sub}>A small fee keeps the platform running and ensures everyone gets matched fairly, verified, and supported.</p>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:20,marginBottom:40}}>
+          <div className="fee-grid">
             {[
               {ic:<Ic.Doc/>,bg:'#d1fae5',col:'#059669',t:'1. Project Agreed',d:'You and your collaborator agree on the project scope and budget.'},
               {ic:<Ic.CheckCircle/>,bg:'#dbeafe',col:'#195ad7',t:'2. Work Completed',d:'The project is delivered and both parties are satisfied.'},
@@ -94,7 +94,7 @@ export default function PricingPage() {
           {/* Fee breakdown */}
           <div style={{background:'#f9fafb',borderRadius:18,padding:32,border:'1px solid #eef0f3'}}>
             <h3 style={{textAlign:'center',fontSize:20,fontWeight:700,color:'#111827',margin:'0 0 24px'}}>The Platform Fee Breakdown</h3>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
+            <div className="fee-split">
               {[{bg:'#195ad7',ic:<Ic.User/>,lab:'Creator Pays',sub:'Of the project value',pct:'8%',col:'#195ad7'},
                 {bg:'#10b981',ic:<Ic.Briefcase/>,lab:'Client Pays',sub:'Of the project value',pct:'4%',col:'#10b981'}
               ].map(({bg,ic,lab,sub,pct,col})=>(
@@ -144,7 +144,7 @@ export default function PricingPage() {
             <h2 style={s.h2}>Optional Upgrades</h2>
             <p style={s.sub}>Helpful extras if you want them. Not required to succeed on the platform.</p>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:20}}>
+          <div className="up-grid">
             {[
               {grad:'linear-gradient(135deg,#a855f7,#ec4899)',ic:<Ic.Crown/>,badge:'Optional',badgeCol:'#9333ea',badgeBg:'#f3e8ff',name:'Pro',price:'$15',unit:'/month',
                items:['Unlimited outreach to creators and clients','Advanced matching preferences','Enhanced team building tools','Priority support'],ctaCol:'#9333ea'},

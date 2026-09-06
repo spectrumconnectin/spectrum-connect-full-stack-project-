@@ -162,6 +162,8 @@ function ProjectPanel({ jobId, onClose }: { jobId: string; onClose: () => void }
 function ClientMessagingPageInner() {
   const searchParams = useSearchParams();
   const targetUserId = searchParams.get('userId');
+  const prefillMsg = searchParams.get('msg');
+  const contactSource = searchParams.get('source') || undefined;
 
   const [myId, setMyId] = useState('');
   const [convos, setConvos] = useState<ConversationItem[]>([]);
@@ -209,11 +211,15 @@ function ClientMessagingPageInner() {
     }
     targetHandledRef.current = true;
     setCreatingConvo(true);
-    messaging.createConversation([targetUserId])
-      .then(newConvo => { setConvos(prev => [newConvo, ...prev]); setSelectedId(newConvo.id); })
+    messaging.createConversation([targetUserId], undefined, undefined, contactSource)
+      .then(newConvo => {
+        setConvos(prev => [newConvo, ...prev]);
+        setSelectedId(newConvo.id);
+        if (prefillMsg) setInput(prefillMsg); // editable in the composer, never auto-sent
+      })
       .catch(() => { if (convos.length > 0) setSelectedId(convos[0].id); })
       .finally(() => setCreatingConvo(false));
-  }, [targetUserId, loadingConvos, myId, convos]);
+  }, [targetUserId, loadingConvos, myId, convos, prefillMsg, contactSource]);
 
   useEffect(() => {
     loadConversations();

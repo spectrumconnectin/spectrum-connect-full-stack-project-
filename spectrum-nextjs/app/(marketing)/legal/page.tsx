@@ -94,7 +94,7 @@ export default function LegalIndexPage() {
 
       <section style={{ padding: '56px 24px 80px' }}>
         <div style={{ maxWidth: 840, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(360px, 100%), 1fr))', gap: 20 }}>
             {docs.map(doc => (
               <Link
                 key={doc.href}

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import type { PortfolioProject } from '@/lib/api';
 import { formatMonthYear, projectCover } from '@/lib/portfolio';
@@ -52,9 +53,8 @@ export default function MinimalTemplate({ projects, handle }: { projects: Portfo
                 </div>
               </div>
               {cover && (
-                <Link href={href} className="hidden sm:block w-32 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={cover} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500" />
+                <Link href={href} className="hidden sm:block relative w-32 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                  <Image src={cover} alt="" fill sizes="128px" className="object-cover group-hover:scale-[1.04] transition-transform duration-500" />
                 </Link>
               )}
             </div>

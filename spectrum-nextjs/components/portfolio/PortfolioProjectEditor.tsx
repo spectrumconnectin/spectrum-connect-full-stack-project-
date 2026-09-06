@@ -62,44 +62,20 @@ function blocksForApi(blocks: ContentBlock[]) {
   }));
 }
 
-/** "✨ Improve" — fetches suggestions and lets the user apply one. */
-function ImproveButton({ onFetch, onApply }: {
-  onFetch: () => Promise<{ suggestions: string[] }>;
-  onApply: (s: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-
-  const run = async () => {
-    if (open) { setOpen(false); return; }
-    setBusy(true);
-    try {
-      const r = await onFetch();
-      setSuggestions(r.suggestions || []);
-      setOpen(true);
-    } catch { /* ignore */ } finally { setBusy(false); }
-  };
-
+/** One suggestions list within the consolidated polish panel. */
+function PolishGroup({ label, suggestions, onApply }: { label: string; suggestions: string[]; onApply: (s: string) => void }) {
+  if (suggestions.length === 0) return null;
   return (
     <div>
-      <button type="button" onClick={run} disabled={busy}
-        className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-800 transition disabled:opacity-50">
-        <i className={`fa-solid ${busy ? 'fa-circle-notch animate-spin' : 'fa-wand-magic-sparkles'}`} />
-        {open ? 'Hide suggestions' : 'Improve'}
-      </button>
-      {open && suggestions.length > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {suggestions.map((s, i) => (
-            <button key={i} type="button"
-              onClick={() => { onApply(s); setOpen(false); }}
-              className="block w-full text-left text-xs text-gray-600 bg-purple-50/60 border border-purple-100 rounded-lg px-3 py-2 hover:border-purple-300 transition whitespace-pre-line">
-              {s}
-            </button>
-          ))}
-          <p className="text-[10px] text-gray-300">Tap a suggestion to use it — then tweak in your own voice.</p>
-        </div>
-      )}
+      <p className="text-[11px] font-bold text-purple-700 uppercase tracking-wide mb-1.5">{label}</p>
+      <div className="space-y-1.5">
+        {suggestions.map((s, i) => (
+          <button key={i} type="button" onClick={() => onApply(s)}
+            className="block w-full text-left text-xs text-gray-600 bg-white border border-purple-100 rounded-lg px-3 py-2 hover:border-purple-300 transition whitespace-pre-line">
+            {s}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -189,6 +165,49 @@ export default function PortfolioProjectEditor({
   useEffect(() => { load(); }, [load]);
 
   const set = (patch: Partial<Draft>) => setDraft(d => (d ? { ...d, ...patch } : d));
+
+  // "Polish this project" — one pass over every assist-able field instead of
+  // hunting for a separate "Improve" trigger next to each one.
+  const [polishOpen, setPolishOpen] = useState(false);
+  const [polishBusy, setPolishBusy] = useState(false);
+  const [polishSuggestions, setPolishSuggestions] = useState<{ title: string[]; description: string[] }>({ title: [], description: [] });
+
+  const runPolish = async () => {
+    if (!draft) return;
+    if (polishOpen) { setPolishOpen(false); return; }
+    setPolishBusy(true);
+    try {
+      const [t, d] = await Promise.all([
+        portfolioBuilder.assistProjectTitle({ current_text: draft.title, category: draft.category }),
+        portfolioBuilder.assistProjectDescription({
+          current_text: draft.description, project_title: draft.title,
+          category: draft.category, client: draft.client,
+        }),
+      ]);
+      setPolishSuggestions({ title: t.suggestions || [], description: d.suggestions || [] });
+      setPolishOpen(true);
+    } catch { /* ignore */ } finally { setPolishBusy(false); }
+  };
+
+  // Lets a content block upload straight into itself instead of the old
+  // upload-to-the-media-library-then-come-back-and-pick-it detour. Only works
+  // once the project has been saved at least once (a real project id is
+  // required to persist the media server-side and get a stable media_id back).
+  const uploadBlockMedia = async (file: File): Promise<string | null> => {
+    if (!draft?.id) return null;
+    try {
+      const isVideo = file.type.startsWith('video/');
+      const [uploaded] = isVideo
+        ? await portfolioBuilder.uploadVideos([file])
+        : await portfolioBuilder.uploadImages([file]);
+      if (!uploaded) return null;
+      const added = await portfolioBuilder.addMedia(draft.id, { url: uploaded.url });
+      setDraft(d => (d ? { ...d, media: [...d.media, { id: added.id, url: added.url, caption: added.caption || undefined }] } : d));
+      return added.id;
+    } catch {
+      return null;
+    }
+  };
 
   const save = async () => {
     if (!draft || !draft.title.trim()) { setError('Give your project a title.'); return; }
@@ -280,7 +299,7 @@ export default function PortfolioProjectEditor({
         </div>
         {projects.length < maxProjects && (
           <button
-            onClick={() => setDraft({ ...EMPTY })}
+            onClick={() => { setDraft({ ...EMPTY }); setPolishOpen(false); }}
             className="inline-flex items-center gap-2 bg-cobalt text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-[0.98] transition flex-shrink-0"
           >
             <i className="fa-solid fa-plus" /> Add project
@@ -305,7 +324,7 @@ export default function PortfolioProjectEditor({
             <ul className="space-y-3">
               {projects.map(p => (
                 <SortableProjectRow key={p.id} project={p} compact={compact}
-                  onEdit={() => setDraft(toDraft(p))} onDelete={() => remove(p.id)} />
+                  onEdit={() => { setDraft(toDraft(p)); setPolishOpen(false); }} onDelete={() => remove(p.id)} />
               ))}
             </ul>
           </SortableContext>
@@ -328,16 +347,32 @@ export default function PortfolioProjectEditor({
             <div className="px-6 py-5 space-y-5">
               {/* Title */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Title *</label>
-                  <ImproveButton
-                    onFetch={() => portfolioBuilder.assistProjectTitle({ current_text: draft.title, category: draft.category })}
-                    onApply={s => set({ title: s })}
-                  />
-                </div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">Title *</label>
                 <input value={draft.title} onChange={e => set({ title: e.target.value })} maxLength={120}
                   placeholder="e.g. Brand Launch Film for Acme Co"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-cobalt" />
+              </div>
+
+              {/* Polish this project — one pass over title + description together */}
+              <div>
+                <button type="button" onClick={runPolish} disabled={polishBusy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-purple-50 border border-purple-200 text-purple-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-purple-100 transition disabled:opacity-50">
+                  <i className={`fa-solid ${polishBusy ? 'fa-circle-notch animate-spin' : 'fa-wand-magic-sparkles'}`} />
+                  {polishBusy ? 'Polishing…' : polishOpen ? 'Hide suggestions' : 'Polish this project'}
+                </button>
+                {polishOpen && (
+                  <div className="mt-3 bg-purple-50/50 border border-purple-100 rounded-xl p-4 space-y-4">
+                    {polishSuggestions.title.length === 0 && polishSuggestions.description.length === 0 ? (
+                      <p className="text-xs text-gray-400">No suggestions right now — try adding a category first.</p>
+                    ) : (
+                      <>
+                        <PolishGroup label="Title" suggestions={polishSuggestions.title} onApply={s => set({ title: s })} />
+                        <PolishGroup label="Description" suggestions={polishSuggestions.description} onApply={s => set({ description: s })} />
+                        <p className="text-[10px] text-gray-400">Tap a suggestion to use it — then tweak in your own voice.</p>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Project URL slug — only shown once a project exists (auto-generated on first save) */}
@@ -387,16 +422,7 @@ export default function PortfolioProjectEditor({
 
               {/* Description */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Description</label>
-                  <ImproveButton
-                    onFetch={() => portfolioBuilder.assistProjectDescription({
-                      current_text: draft.description, project_title: draft.title,
-                      category: draft.category, client: draft.client,
-                    })}
-                    onApply={s => set({ description: s })}
-                  />
-                </div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">Description</label>
                 <textarea value={draft.description} onChange={e => set({ description: e.target.value })}
                   rows={4} maxLength={2000}
                   placeholder="What was the brief? What did you do? What was the result?"
@@ -415,7 +441,7 @@ export default function PortfolioProjectEditor({
                   Case study <span className="text-gray-300 normal-case">(optional)</span>
                 </label>
                 <ContentBlockEditor blocks={draft.content_blocks} media={draft.media}
-                  onChange={content_blocks => set({ content_blocks })} />
+                  onChange={content_blocks => set({ content_blocks })} onUploadMedia={uploadBlockMedia} />
               </div>
 
               {/* Featured */}

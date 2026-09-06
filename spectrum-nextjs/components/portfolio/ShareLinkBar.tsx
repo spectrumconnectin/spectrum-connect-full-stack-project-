@@ -40,7 +40,7 @@ export default function ShareLinkBar({
   // Handle editor state
   const [editing, setEditing] = useState(emailLike && !initialSlug);
   const [draft, setDraft] = useState(initialSlug || (emailLike ? normalizeSlug(username.split('@')[0]) : ''));
-  const [check, setCheck] = useState<{ available: boolean; reason?: string | null } | null>(null);
+  const [check, setCheck] = useState<{ available: boolean; reason?: string | null; suggestions?: string[] } | null>(null);
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,7 +59,7 @@ export default function ShareLinkBar({
     debounce.current = setTimeout(async () => {
       try {
         const r = await portfolioBuilder.checkSlug(norm);
-        setCheck({ available: r.available, reason: r.reason });
+        setCheck({ available: r.available, reason: r.reason, suggestions: r.suggestions });
       } catch { setCheck(null); } finally { setChecking(false); }
     }, 400);
     return () => { if (debounce.current) clearTimeout(debounce.current); };
@@ -194,6 +194,17 @@ export default function ShareLinkBar({
               <span className="text-red-400"><i className="fa-solid fa-xmark mr-1" />{check.reason || 'Not available'}</span>
             )}
           </div>
+          {normDraft.length >= 3 && !checking && check && !check.available && (check.suggestions?.length ?? 0) > 0 && (
+            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs text-gray-500">Try:</span>
+              {check.suggestions!.map(s => (
+                <button key={s} type="button" onClick={() => setDraft(s)}
+                  className="text-xs font-mono bg-white/10 hover:bg-white/20 border border-white/20 text-gray-200 px-2.5 py-1 rounded-lg transition">
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

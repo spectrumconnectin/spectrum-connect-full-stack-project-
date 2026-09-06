@@ -32,6 +32,7 @@ const nextConfig = {
       'lh3.googleusercontent.com',     // Google OAuth profile pictures
       'randomuser.me',                 // Realistic portrait avatars (seed creators)
       'images.unsplash.com',           // Portfolio sample imagery (seed creators)
+      'images.pexels.com',             // Blog post cover images
     ],
   },
   // Don't broadcast the framework version in the X-Powered-By header.

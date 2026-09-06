@@ -1,5 +1,6 @@
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import ReadingProgress from '@/components/blog/ReadingProgress';
@@ -38,8 +39,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 function Avatar({ name, url, size = 44 }: { name?: string; url?: string; size?: number }) {
   const s = { width: size, height: size };
   if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={name || ''} style={s} className="rounded-full object-cover border border-gray-200 flex-shrink-0" />;
+    return <Image src={url} alt={name || ''} width={size} height={size} className="rounded-full object-cover border border-gray-200 flex-shrink-0" />;
   }
   return (
     <div style={s} className="rounded-full bg-blue-100 text-cobalt font-bold flex items-center justify-center flex-shrink-0">
@@ -133,8 +133,16 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
         {/* Cover */}
         {post.cover_image && (
           <div className="max-w-[860px] mx-auto px-5 sm:px-6 mt-8">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={post.cover_image} alt={post.title} className="w-full rounded-2xl border border-gray-100 shadow-[0_10px_40px_-12px_rgba(15,23,42,0.18)] object-cover" style={{ maxHeight: 460 }} />
+            <div className="relative w-full h-[240px] sm:h-[340px] md:h-[460px] rounded-2xl border border-gray-100 shadow-[0_10px_40px_-12px_rgba(15,23,42,0.18)] overflow-hidden">
+              <Image
+                src={post.cover_image}
+                alt={post.title}
+                fill
+                sizes="(max-width: 860px) 100vw, 860px"
+                className="object-cover"
+                priority
+              />
+            </div>
           </div>
         )}
 

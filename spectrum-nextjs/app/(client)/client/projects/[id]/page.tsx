@@ -770,7 +770,7 @@ export default function ClientProjectDetailPage() {
                 <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
                   <i className="fa-solid fa-triangle-exclamation text-amber-500 mt-0.5 flex-shrink-0 text-sm"></i>
                   <p className="text-xs text-amber-800 leading-relaxed">
-                    <span className="font-semibold">Release payment</span> to unlock project completion.
+                    <span className="font-semibold">Release payment</span> to complete this project.
                   </p>
                 </div>
               )}

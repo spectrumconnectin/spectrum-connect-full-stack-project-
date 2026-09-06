@@ -356,6 +356,28 @@ export const notifications = {
 export const profile = {
   getMe: (): Promise<MeResponse> => request<MeResponse>('/profiles/me'),
 
+  // Same lookup, but never redirects and never throws — returns null instead.
+  // Public marketing pages need to ask "is anyone signed in?" without the
+  // global 401 handler punting a visitor with a stale token over to /login.
+  getMeQuiet: async (): Promise<MeResponse | null> => {
+    const token = tokenStore.get();
+    if (!token) return null;
+    try {
+      const res = await fetch(`${BASE_URL}/profiles/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Stale/expired token — drop it so the nav shows logged-out state, but
+      // leave the visitor where they are.
+      if (!res.ok) {
+        if (res.status === 401) tokenStore.clear();
+        return null;
+      }
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
   updateMe: (data: UserProfileUpdate): Promise<MeResponse> =>
     request<MeResponse>('/profiles/me', { method: 'PUT', body: JSON.stringify(data) }),
 
@@ -1595,6 +1617,9 @@ export interface PortfolioAnalytics {
   total_views: number;
   this_week_views: number;
   top_projects: { title: string; slug?: string; view_count: number }[];
+  contact_clicks: number;
+  conversations_started: number;
+  conversion_rate: number;
 }
 
 /** Next may hand route params already URL-encoded (e.g. an email-based
@@ -1645,6 +1670,11 @@ export const portfolioBuilder = {
       method: 'POST', body: JSON.stringify({ project_slug: projectSlug || null }),
     }, false),
 
+  recordContactClick: (username: string): Promise<{ ok: boolean }> =>
+    request(`/portfolio-builder/public/${encodeURIComponent(decodeParam(username))}/contact-click`, {
+      method: 'POST',
+    }, false),
+
   getAnalytics: (): Promise<PortfolioAnalytics> =>
     request('/portfolio-builder/analytics'),
 
@@ -1659,7 +1689,7 @@ export const portfolioBuilder = {
   getQualityScore: (): Promise<QualityScore> =>
     request('/portfolio-builder/quality-score'),
 
-  checkSlug: (slug: string): Promise<{ slug: string; available: boolean; reason?: string | null }> =>
+  checkSlug: (slug: string): Promise<{ slug: string; available: boolean; reason?: string | null; suggestions?: string[] }> =>
     request(`/portfolio-builder/slug/check?slug=${encodeURIComponent(slug)}`),
 
   setSlug: (slug: string): Promise<{ slug: string }> =>
@@ -1978,10 +2008,10 @@ export const messaging = {
       body: JSON.stringify({ conversation_id: conversationId, content }),
     }),
 
-  createConversation: (participantIds: string[], jobId?: string, initialMessage?: string): Promise<ConversationItem> =>
+  createConversation: (participantIds: string[], jobId?: string, initialMessage?: string, source?: string): Promise<ConversationItem> =>
     request<ConversationItem>('/messages/conversations', {
       method: 'POST',
-      body: JSON.stringify({ participant_ids: participantIds, job_id: jobId, initial_message: initialMessage }),
+      body: JSON.stringify({ participant_ids: participantIds, job_id: jobId, initial_message: initialMessage, source }),
     }),
 
   markAsRead: (conversationId: string): Promise<void> =>
