@@ -29,12 +29,14 @@ from pydantic import BaseModel, Field
 from app.models.schema import User
 from app.auth.auth import get_current_user, get_admin_user
 from app.services.escrow_service import EscrowService
+from app.services import project_escrow_service
 from app.services.dispute_service import DisputeService
 from app.services.audit_service import log_event
 from app.core.rate_limit import rate_limiter
 from app.api.schemas.escrow_schemas import (
     # Escrow
     CreateEscrowRequest,
+    AllocateProjectEscrowRequest,
     FundMilestoneRequest,
     ReleaseMilestoneRequest,
     RefundEscrowRequest,
@@ -84,6 +86,94 @@ async def create_escrow(
         currency=request.currency,
     )
     return result
+
+
+# ── Project-level allocation (multi-role projects) ────────────────────────────
+
+async def _owned_job(job_id: str, current_user: User):
+    """Fetch a job the caller owns, or raise. Allocation moves money, so the
+    ownership check is not optional."""
+    from app.models.schema import JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        job = await JobPost.get(PydanticObjectId(job_id))
+    except Exception:
+        job = None
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You do not own this project")
+    return job
+
+
+@escrow_router.get(
+    "/project/{job_id}/plan",
+    summary="Preview how a project budget would be split across the hired team",
+)
+async def get_project_allocation_plan(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    What each hired creator **would** be allocated, without creating anything.
+
+    Amounts come from the creator's role budget divided by that role's seats,
+    falling back to the budget they proposed. Members who already hold an escrow
+    for this project are flagged so they are not allocated twice.
+
+    **Who:** Client (project owner)
+    """
+    job = await _owned_job(job_id, current_user)
+    return await project_escrow_service.build_allocation_plan(job)
+
+
+@escrow_router.post(
+    "/project/{job_id}/allocate",
+    summary="Create per-member escrow allocations for a project",
+)
+async def allocate_project_escrows(
+    job_id: str,
+    request: AllocateProjectEscrowRequest = None,
+    current_user: User = Depends(get_current_user),
+    _rl: None = Depends(rate_limiter("escrow_allocate", limit=20, window_seconds=60)),
+):
+    """
+    Split the project budget into one escrow per hired creator.
+
+    Each member then funds, delivers, is approved and is paid independently —
+    approving the editor's work releases only the editor's money.
+
+    Safe to call again after hiring more people: members who already have an
+    escrow are skipped rather than given a second one.
+
+    **Who:** Client (project owner)
+    """
+    job = await _owned_job(job_id, current_user)
+    return await project_escrow_service.allocate_project_escrows(
+        job,
+        client_id=str(current_user.id),
+        overrides=(request.overrides if request else None),
+        allow_over_budget=(request.allow_over_budget if request else False),
+    )
+
+
+@escrow_router.get(
+    "/project/{job_id}/overview",
+    summary="Funding and payout state for a whole project team",
+)
+async def get_project_escrow_overview(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Per-member escrow state for the project, plus totals: allocated, funded,
+    released and still unallocated.
+
+    **Who:** Client (project owner)
+    """
+    job = await _owned_job(job_id, current_user)
+    return await project_escrow_service.project_escrow_overview(job)
 
 
 @escrow_router.get(

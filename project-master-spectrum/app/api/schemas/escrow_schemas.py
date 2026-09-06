@@ -58,6 +58,21 @@ class CreateEscrowRequest(BaseModel):
     currency: str = Field("USD", description="ISO 4217 currency code")
 
 
+class AllocateProjectEscrowRequest(BaseModel):
+    """Options for splitting a project budget across the hired team."""
+    overrides: Optional[dict] = Field(
+        None,
+        description=(
+            "Per-creator amounts, keyed by creator_id, overriding the amount "
+            "derived from that creator's role budget."
+        ),
+    )
+    allow_over_budget: bool = Field(
+        False,
+        description="Allocate even when the total exceeds the project budget.",
+    )
+
+
 class FundMilestoneRequest(BaseModel):
     """POST /escrow/{escrow_id}/fund-milestone"""
     milestone_id: str

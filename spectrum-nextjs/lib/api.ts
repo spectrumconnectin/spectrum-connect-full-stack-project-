@@ -1229,6 +1229,78 @@ export interface JobProposalsResponse {
   roles?: ProjectRole[];     // staffing breakdown, for the per-role tabs
 }
 
+// ── Project-level escrow allocation (multi-role projects) ───────────────────
+
+/** One hired member's slice of the project budget. */
+export interface EscrowAllocationMember {
+  application_id: string;
+  creator_id: string;
+  creator_name: string;
+  role_id?: string | null;
+  role?: string | null;
+  amount: number | null;
+  /** Where the amount came from: their role's budget, an override, or their bid. */
+  amount_source: 'override' | 'role_budget' | 'proposed_budget' | null;
+  milestones: { title: string; amount: number }[];
+  /** True when no amount could be derived — needs an explicit override. */
+  needs_amount: boolean;
+  already_allocated: boolean;
+  escrow_id?: string | null;
+}
+
+export interface EscrowAllocationPlan {
+  job_id: string;
+  title: string;
+  currency: string;
+  project_budget: number | null;
+  planned_total: number;
+  already_committed: number;
+  grand_total: number;
+  over_budget: boolean;
+  members: EscrowAllocationMember[];
+  allocatable_count: number;
+  needs_amount_count: number;
+}
+
+export interface ProjectEscrowMember {
+  creator_id: string;
+  creator_name: string;
+  creator_avatar?: string | null;
+  role_id?: string | null;
+  role?: string | null;
+  role_budget_per_seat?: number | null;
+  escrow: {
+    escrow_id: string;
+    status: string;
+    total_amount: number;
+    funded_amount: number;
+    released_amount: number;
+    milestones: {
+      milestone_id: string;
+      title: string;
+      amount: number;
+      status: string;
+      delivered_at?: string | null;
+      released_at?: string | null;
+    }[];
+  } | null;
+}
+
+export interface ProjectEscrowOverview {
+  job_id: string;
+  title: string;
+  currency: string;
+  project_budget: number | null;
+  team_size: number;
+  allocated_total: number;
+  funded_total: number;
+  released_total: number;
+  refunded_total: number;
+  unallocated: number | null;
+  awaiting_allocation: number;
+  members: ProjectEscrowMember[];
+}
+
 export interface ProposalSubmitPayload {
   cover_letter: string;
   proposed_budget?: number;
@@ -1377,6 +1449,37 @@ export interface EscrowListResponse {
 export const escrow = {
   list: (params?: { role?: string; status_filter?: string; limit?: number; offset?: number }): Promise<EscrowListResponse> =>
     request<EscrowListResponse>(`/escrow/my-escrows${buildQS(params as Record<string, string | number | undefined> || {})}`),
+
+  // ── Project-level allocation (multi-role projects) ────────────────────────
+
+  /** Preview how the project budget would split across the hired team. */
+  allocationPlan: (jobId: string): Promise<EscrowAllocationPlan> =>
+    request<EscrowAllocationPlan>(`/escrow/project/${jobId}/plan`),
+
+  /**
+   * Create one escrow per hired creator. Safe to call again after hiring more
+   * people — members who already hold an escrow are skipped.
+   */
+  allocateProject: (
+    jobId: string,
+    data?: { overrides?: Record<string, number>; allow_over_budget?: boolean },
+  ): Promise<{
+    success: boolean;
+    job_id: string;
+    created: { creator_id: string; creator_name: string; role?: string; escrow_id: string; total_amount: number; milestone_count: number }[];
+    created_count: number;
+    skipped_existing: number;
+    skipped_no_amount: number;
+    message: string;
+  }> =>
+    request(`/escrow/project/${jobId}/allocate`, {
+      method: 'POST',
+      body: JSON.stringify(data ?? {}),
+    }),
+
+  /** Funding and payout state for the whole team, member by member. */
+  projectOverview: (jobId: string): Promise<ProjectEscrowOverview> =>
+    request<ProjectEscrowOverview>(`/escrow/project/${jobId}/overview`),
 
   getById: (id: string): Promise<EscrowDetail> =>
     request<EscrowDetail>(`/escrow/${id}`),
