@@ -16,6 +16,7 @@ from datetime import datetime
 
 from app.models.schema import User, Application, JobPost
 from app.auth.auth import get_current_user
+from app.services import role_service
 
 router = APIRouter(prefix="/proposals", tags=["Proposals"])
 
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/proposals", tags=["Proposals"])
 class ProposalSubmit(BaseModel):
     cover_letter: str
     proposed_budget: Optional[float] = None
+    role_id: Optional[str] = None            # which role slot this applies to
     role: Optional[str] = None
     proposed_duration: Optional[int] = None  # days
     portfolio_url: Optional[str] = None      # Google Drive or portfolio link
@@ -65,7 +67,8 @@ def _oid(raw: str) -> ObjectId:
 class DirectHireRequest(BaseModel):
     job_id: str
     creator_id: str
-    note: Optional[str] = None  # optional message to creator
+    role_id: Optional[str] = None  # which role slot the creator is hired into
+    note: Optional[str] = None     # optional message to creator
 
 @router.post(
     "/direct-hire",
@@ -98,27 +101,48 @@ async def direct_hire(
     if data.creator_id == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot hire yourself")
 
-    # Prevent duplicate — if already hired, return existing
-    existing = await Application.find_one(
+    # Resolve and validate the role slot before creating the hire.
+    target_role = role_service.resolve_role(job, data.role_id)
+    if target_role:
+        await role_service.assert_seat_available(job, target_role)
+
+    # Prevent duplicate — if already hired, return existing. Scoped to the role
+    # so a creator can hold two different roles on the same project.
+    dup_query = [
         Application.project_id == _oid(data.job_id),
         Application.crew_id == _oid(data.creator_id),
-    )
+    ]
+    if target_role:
+        dup_query.append(Application.role_id == target_role.role_id)
+    existing = await Application.find_one(*dup_query)
     if existing:
         if existing.status == "accepted":
             return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id, "already_hired": True}
         existing.status = "accepted"
         await existing.save()
+        if job.roles:
+            await role_service.recount_fills(job)
         return {"id": str(existing.id), "status": "accepted", "job_id": data.job_id}
 
     app = Application(
         project_id=_oid(data.job_id),
         crew_id=_oid(data.creator_id),
         cover_letter=data.note or f"Directly hired by client for: {job.title}",
+        role_id=target_role.role_id if target_role else None,
+        role=target_role.title if target_role else None,
         status="accepted",
     )
     await app.insert()
 
-    await job.update({"$inc": {"proposal_count": 1}, "$set": {"status": "pending_funding"}})
+    await job.update({"$inc": {"proposal_count": 1}})
+    if job.roles:
+        # Only move to pending_funding once every seat is filled.
+        job = await JobPost.get(job.id)
+        await role_service.recount_fills(job, save=False)
+        job.status = role_service.derive_job_status(job, job.status)
+        await job.save()
+    else:
+        await job.update({"$set": {"status": "pending_funding"}})
 
     # Notify creator
     try:
@@ -171,19 +195,40 @@ async def submit_proposal(
     if str(job.client_id) == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot apply to your own job post")
 
-    existing = await Application.find_one(
-        Application.project_id == _oid(job_id),
-        Application.crew_id == current_user.id,
-    )
-    if existing:
-        raise HTTPException(status_code=409, detail="You have already applied to this job")
+    # Bind the application to a specific role slot on multi-role projects.
+    target_role = role_service.resolve_role(job, data.role_id)
+    if target_role:
+        role_service.assert_open_for_applications(target_role)
+
+    # One application per creator per role — a creator may legitimately apply
+    # for two different roles on the same project (shooting and editing it),
+    # so uniqueness is scoped to the role, not the project.
+    if target_role:
+        existing = await Application.find_one(
+            Application.project_id == _oid(job_id),
+            Application.crew_id == current_user.id,
+            Application.role_id == target_role.role_id,
+        )
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"You have already applied for the {target_role.title} role on this project.",
+            )
+    else:
+        existing = await Application.find_one(
+            Application.project_id == _oid(job_id),
+            Application.crew_id == current_user.id,
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="You have already applied to this job")
 
     app = Application(
         project_id=_oid(job_id),
         crew_id=current_user.id,
         cover_letter=data.cover_letter,
         proposed_budget=data.proposed_budget,
-        role=data.role,
+        role_id=target_role.role_id if target_role else None,
+        role=target_role.title if target_role else data.role,
         proposed_duration=data.proposed_duration,
         portfolio_url=data.portfolio_url,
         status="submitted",
@@ -387,6 +432,7 @@ async def get_job_proposals(
     limit: int = Query(default=50, ge=1, le=200),
     skip: int = Query(default=0, ge=0),
     sort_by: str = Query(default="newest", description="newest | price_asc | price_desc"),
+    role_id: Optional[str] = Query(default=None, description="Only applicants for this role"),
     current_user: User = Depends(get_current_user),
 ):
     job = await JobPost.get(_oid(job_id))
@@ -395,7 +441,17 @@ async def get_job_proposals(
     if str(job.client_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorised")
 
-    query = Application.find(Application.project_id == _oid(job_id))
+    # Clients review applicants one role at a time — "who applied for editor?"
+    # — so the listing is filterable by role slot.
+    if role_id:
+        if not job.get_role(role_id):
+            raise HTTPException(status_code=404, detail="Role not found on this project")
+        query = Application.find(
+            Application.project_id == _oid(job_id),
+            Application.role_id == role_id,
+        )
+    else:
+        query = Application.find(Application.project_id == _oid(job_id))
     if sort_by == "price_asc":
         query = query.sort(+Application.proposed_budget)
     elif sort_by == "price_desc":
@@ -403,7 +459,13 @@ async def get_job_proposals(
     else:
         query = query.sort(-Application.submitted_at)
 
-    total = await Application.find(Application.project_id == _oid(job_id)).count()
+    if role_id:
+        total = await Application.find(
+            Application.project_id == _oid(job_id),
+            Application.role_id == role_id,
+        ).count()
+    else:
+        total = await Application.find(Application.project_id == _oid(job_id)).count()
     apps = await query.skip(skip).limit(limit).to_list()
 
     results = []
@@ -429,6 +491,7 @@ async def get_job_proposals(
             "cover_letter": app.cover_letter,
             "proposed_budget": app.proposed_budget,
             "portfolio_url": app.portfolio_url,
+            "role_id": app.role_id,
             "role": app.role,
             "status": app.status,
             "client_viewed": app.client_viewed,
@@ -446,7 +509,14 @@ async def get_job_proposals(
             {"$set": {"client_viewed": True}}
         )
 
-    return {"proposals": results, "total": total, "skip": skip, "limit": limit}
+    return {
+        "proposals": results,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "role_id": role_id,
+        "roles": await role_service.role_breakdown(job),
+    }
 
 
 @router.patch(
@@ -476,20 +546,35 @@ async def update_proposal_status(
     if data.status == "accepted" and str(app.crew_id) == str(current_user.id):
         raise HTTPException(status_code=400, detail="You cannot hire yourself")
 
-    # For single-creator jobs (individual / no crew_size set), block duplicate hires.
-    # For crew-based jobs (small_crew, full_crew), multiple creators can be accepted.
     if data.status == "accepted":
-        is_crew_job = (job.crew_size or "individual") in ("small_crew", "full_crew")
-        if not is_crew_job:
-            already_accepted = await Application.find_one(
-                Application.project_id == job.id,
-                Application.status == "accepted",
-            )
-            if already_accepted and str(already_accepted.id) != proposal_id:
+        if job.roles:
+            # Multi-role project: the seat is scoped to the applicant's role, so
+            # hiring an editor never blocks hiring a camera operator.
+            target_role = job.get_role(app.role_id) if app.role_id else None
+            if not target_role:
                 raise HTTPException(
-                    status_code=409,
-                    detail="This project already has an accepted proposal. Withdraw or reject it first.",
+                    status_code=400,
+                    detail=(
+                        "This application is not attached to a role on this project "
+                        "and cannot be hired. Ask the creator to re-apply to a specific role."
+                    ),
                 )
+            await role_service.assert_seat_available(
+                job, target_role, exclude_application_id=app.id
+            )
+        else:
+            # Legacy single-creator job: one accepted proposal, as before.
+            is_crew_job = (job.crew_size or "individual") in ("small_crew", "full_crew")
+            if not is_crew_job:
+                already_accepted = await Application.find_one(
+                    Application.project_id == job.id,
+                    Application.status == "accepted",
+                )
+                if already_accepted and str(already_accepted.id) != proposal_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This project already has an accepted proposal. Withdraw or reject it first.",
+                    )
 
     # Guard: cannot reject a creator who already has a funded escrow — client must
     # refund the escrow first (to protect creator from sudden de-hire mid-work).
@@ -534,7 +619,14 @@ async def update_proposal_status(
     await app.save()
 
     # Update job status based on accepted / rejected decision
-    if data.status == "accepted":
+    if job.roles:
+        # Seat counts drive the project's state. A partially staffed project
+        # stays in review so the unfilled roles keep attracting applicants;
+        # it only moves to pending_funding once every seat is filled.
+        await role_service.recount_fills(job, save=False)
+        job.status = role_service.derive_job_status(job, job.status)
+        await job.save()
+    elif data.status == "accepted":
         job.status = "pending_funding"
         await job.save()
     elif data.status == "rejected" and job.status in ("in_review", "pending_funding"):
@@ -625,6 +717,10 @@ async def withdraw_proposal(
     if job and (job.proposal_count or 0) > 0:
         job.proposal_count -= 1
         await job.save()
+
+    # Free the seat if this withdrawal changed the role's fill state.
+    if job and job.roles:
+        await role_service.recount_fills(job)
 
 
 @router.post(

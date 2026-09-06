@@ -5,9 +5,10 @@ Film Industry specific job postings
 from fastapi import APIRouter, Depends, HTTPException, status, Path, Query
 from typing import List, Optional
 
-from app.models.schema import User, JobPost
+from app.models.schema import User, JobPost, ProjectRole
 from app.auth.auth import get_current_user
 from app.services.job_service import JobService
+from app.services import role_service
 from app.api.schemas.job_schemas import (
     JobPostCreate,
     JobPostUpdate,
@@ -15,6 +16,7 @@ from app.api.schemas.job_schemas import (
     JobPostListRead,
     JobPostStatusUpdate,
     JobPostSearchFilters,
+    ProjectRoleCreate,
 )
 
 
@@ -34,6 +36,12 @@ def job_to_dict(job: JobPost) -> dict:
         job_dict['invited_crew'] = [str(id) for id in job.invited_crew]
     if job.hired_crew:
         job_dict['hired_crew'] = [str(id) for id in job.hired_crew]
+
+    # Roles carry derived fields the model computes rather than stores.
+    if job.roles:
+        for role, role_dict in zip(job.roles, job_dict.get('roles') or []):
+            role_dict['seats_remaining'] = role.seats_remaining
+            role_dict['budget_per_seat'] = role.budget_per_seat()
 
     return job_dict
 
@@ -210,6 +218,137 @@ async def get_job(
     return job_to_dict(job)
 
 
+@router.get(
+    "/{job_id}/roles",
+    summary="Get role staffing for a project",
+    description=(
+        "Per-role breakdown: seats needed, seats filled, applicant counts and "
+        "budget allocation. Creators use this to pick a role to apply for; "
+        "clients use it for the staffing header."
+    ),
+)
+async def get_job_roles(
+    job_id: str = Path(..., description="Job Post ID"),
+):
+    """Role staffing for a project.
+
+    Legacy job posts with no explicit roles fall back to roles derived from
+    their crew_call / role fields, so callers can render a role list for any
+    project. Derived roles are marked so the UI can hide "apply to this role"
+    on posts that predate role-based hiring.
+    """
+    job = await JobService.get_job_by_id(job_id)
+
+    if job.roles:
+        return {
+            "job_id": str(job.id),
+            "title": job.title,
+            "multi_role": True,
+            "summary": job.roles_summary(),
+            "roles": await role_service.role_breakdown(job),
+        }
+
+    derived = job.effective_roles()
+    return {
+        "job_id": str(job.id),
+        "title": job.title,
+        "multi_role": False,
+        "summary": {
+            "total_roles": len(derived),
+            "total_seats": sum(r.count for r in derived),
+            "filled_seats": 0,
+            "open_seats": sum(r.count for r in derived),
+            "fully_staffed": False,
+            "allocated_budget": 0,
+        },
+        "roles": [
+            {
+                "role_id": None,  # not persisted — cannot be applied to directly
+                "title": r.title,
+                "count": r.count,
+                "filled_count": 0,
+                "seats_remaining": r.count,
+                "status": "open",
+                "skills": r.skills or [],
+                "description": r.description,
+                "derived": True,
+            }
+            for r in derived
+        ],
+    }
+
+
+@router.post(
+    "/{job_id}/roles",
+    response_model=JobPostRead,
+    summary="Add a role to a project",
+    description="Append a new staffed role to an existing project (owner only).",
+)
+async def add_job_role(
+    job_id: str = Path(..., description="Job Post ID"),
+    role_data: ProjectRoleCreate = ...,
+    current_user: User = Depends(get_current_user),
+):
+    """Add a role after the project is live — e.g. the shoot grew and now needs
+    a second camera operator."""
+    job = await JobService.get_job_by_id(job_id)
+    if job.client_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this job post",
+        )
+    if job.status in ("completed", "cancelled"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot add roles to a {job.status} project",
+        )
+
+    new_role = ProjectRole(**role_data.model_dump(exclude={"role_id"}))
+    roles = list(job.roles or [])
+    roles.append(new_role)
+    role_service.validate_role_budgets(roles, job.budget.max if job.budget else None)
+
+    job.roles = roles
+    await job.save()
+    await role_service.recount_fills(job)
+    return job_to_dict(job)
+
+
+@router.patch(
+    "/{job_id}/roles/{role_id}/close",
+    response_model=JobPostRead,
+    summary="Stop recruiting for a role",
+    description="Close a role to new applications without removing existing hires.",
+)
+async def close_job_role(
+    job_id: str = Path(..., description="Job Post ID"),
+    role_id: str = Path(..., description="Role ID"),
+    current_user: User = Depends(get_current_user),
+):
+    """Close a role the client no longer wants to fill.
+
+    Existing hires on the role keep their applications, escrow and milestones —
+    this only stops new applications.
+    """
+    job = await JobService.get_job_by_id(job_id)
+    if job.client_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this job post",
+        )
+
+    role = job.get_role(role_id)
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found on this project",
+        )
+
+    role.status = "closed"
+    await job.save()
+    return job_to_dict(job)
+
+
 @router.put(
     "/{job_id}",
     response_model=JobPostRead,
@@ -326,6 +465,11 @@ async def get_job_team(
         creator = await User.get(app.crew_id)
         profile = creator.profile if creator else None
 
+        # Budget the client earmarked for this seat — the default amount to fund
+        # this member's escrow with on a multi-role project.
+        member_role = job.get_role(app.role_id) if app.role_id else None
+        role_budget = member_role.budget_per_seat() if member_role else None
+
         # Find escrow for this (job, creator) pair
         escrow = await EscrowDoc.find_one({
             "job_post_id": job.id,
@@ -342,7 +486,9 @@ async def get_job_team(
             "creator_username": creator.username if creator else None,
             "creator_avatar": profile.profile_picture if profile else None,
             "creator_title": profile.headline if profile else None,
+            "role_id": app.role_id,
             "role": app.role,
+            "role_budget_per_seat": role_budget,
             "proposed_budget": app.proposed_budget,
             "escrow": {
                 "escrow_id": str(escrow.id),

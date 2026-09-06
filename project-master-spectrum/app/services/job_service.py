@@ -10,7 +10,10 @@ from typing import List, Optional
 from fastapi import HTTPException, status
 from beanie import PydanticObjectId
 
-from app.models.schema import User, JobPost, Budget, Rate, CrewCall, ProposalSettings, ScreeningQuestion
+from app.models.schema import (
+    User, JobPost, Budget, Rate, CrewCall, ProjectRole, ProposalSettings, ScreeningQuestion
+)
+from app.services import role_service
 from app.api.schemas.job_schemas import (
     JobPostCreate,
     JobPostUpdate,
@@ -48,6 +51,18 @@ class JobService:
         if job_data.crew_call:
             for cc in job_data.crew_call:
                 crew_calls.append(CrewCall(**cc.model_dump()))
+
+        # Convert project roles. Each gets a fresh role_id — a client-supplied id
+        # on create would let one project reference another project's role slot.
+        roles = None
+        if job_data.roles:
+            roles = []
+            for r in job_data.roles:
+                fields = r.model_dump(exclude={"role_id"})
+                roles.append(ProjectRole(**fields))
+            role_service.validate_role_budgets(
+                roles, budget.max if budget else None
+            )
 
         # Convert proposal settings
         proposal_settings = None
@@ -93,6 +108,7 @@ class JobService:
             deliverables=job_data.deliverables if hasattr(job_data, 'deliverables') else None,
             currency=getattr(job_data, 'currency', 'USD') or 'USD',
             crew_call=crew_calls if crew_calls else None,
+            roles=roles,
             visibility=job_data.visibility,
             invited_crew=invited_crew_ids,
             proposal_settings=proposal_settings,
@@ -338,6 +354,58 @@ class JobService:
         }
 
     @staticmethod
+    def _merge_roles(job: JobPost, incoming: List[dict]) -> List[ProjectRole]:
+        """Apply a role edit without losing people who are already hired.
+
+        Roles are matched by role_id: a role the client sends back keeps its id,
+        its filled_count, and therefore its hires. Roles omitted from the payload
+        are removed — but removing a role with hires would orphan those
+        creators' applications and escrows, so that is rejected. Likewise a role
+        cannot be shrunk below the number of people already working it.
+        """
+        existing = {r.role_id: r for r in (job.roles or [])}
+        merged: List[ProjectRole] = []
+
+        for item in incoming:
+            role_id = item.get("role_id")
+            prior = existing.get(role_id) if role_id else None
+
+            if prior:
+                if item.get("count", prior.count) < prior.filled_count:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"Cannot reduce {prior.title} to {item.get('count')} — "
+                            f"{prior.filled_count} creator(s) are already hired for it."
+                        ),
+                    )
+                # Preserve staffing state; the client only edits the definition.
+                updated = prior.model_copy(update={
+                    k: v for k, v in item.items()
+                    if k not in ("role_id", "filled_count", "status", "created_at")
+                })
+                updated.sync_status()
+                merged.append(updated)
+            else:
+                merged.append(ProjectRole(**{k: v for k, v in item.items() if k != "role_id"}))
+
+        kept_ids = {r.role_id for r in merged}
+        for role_id, prior in existing.items():
+            if role_id not in kept_ids and prior.filled_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Cannot remove the {prior.title} role — {prior.filled_count} "
+                        "creator(s) are hired for it. Reject those hires first."
+                    ),
+                )
+
+        role_service.validate_role_budgets(
+            merged, job.budget.max if job.budget else None
+        )
+        return merged
+
+    @staticmethod
     async def update_job(job: JobPost, user: User, update_data: JobPostUpdate) -> JobPost:
         """Update job post (owner only)"""
         # Verify ownership
@@ -369,6 +437,9 @@ class JobService:
 
         if 'crew_call' in update_dict and update_dict['crew_call']:
             update_dict['crew_call'] = [CrewCall(**cc) for cc in update_dict['crew_call']]
+
+        if 'roles' in update_dict and update_dict['roles'] is not None:
+            update_dict['roles'] = JobService._merge_roles(job, update_dict['roles'])
 
         if 'proposal_settings' in update_dict and update_dict['proposal_settings']:
             update_dict['proposal_settings'] = ProposalSettings(**update_dict['proposal_settings'])

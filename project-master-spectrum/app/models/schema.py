@@ -589,6 +589,68 @@ class CrewCall(BaseModel):
     count: int = 1
     description: Optional[str] = None
 
+
+class ProjectRole(BaseModel):
+    """
+    A single staffed position on a multi-role project.
+
+    A project ("Short Film Production") is made up of roles ("Camera Operator"),
+    and a role has `count` seats — two camera operators are one ProjectRole with
+    count=2, filled independently. Creators apply to a specific role_id rather
+    than to the project as a whole, and each hired creator gets their own escrow,
+    milestones, approval, payout, review and ETF award.
+
+    Supersedes CrewCall, which stays for backward compatibility with job posts
+    created before roles existed (see JobPost.effective_roles()).
+    """
+    role_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str                                    # "Video Editor"
+    count: int = 1                                # seats needed for this role
+    filled_count: int = 0                         # seats currently accepted
+
+    # What the client is offering / expecting for this role
+    budget_allocation: Optional[float] = None     # total across all seats in the role
+    skills: Optional[List[str]] = None
+    deliverables: Optional[List[str]] = None
+    description: Optional[str] = None
+
+    # Per-role timeline — a role may run shorter than the project
+    # (an editor starts after the shoot wraps).
+    duration_days: Optional[int] = None
+    start_date: Optional[datetime] = None
+    deadline: Optional[datetime] = None
+
+    # open → partially_filled → filled; closed = client stopped recruiting
+    status: str = "open"
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    @property
+    def seats_remaining(self) -> int:
+        return max(self.count - self.filled_count, 0)
+
+    @property
+    def is_full(self) -> bool:
+        return self.filled_count >= self.count
+
+    def budget_per_seat(self) -> Optional[float]:
+        """Even split of the role budget across its seats — the default
+        allocation when the client hasn't set a per-creator amount."""
+        if self.budget_allocation is None or self.count <= 0:
+            return None
+        return round(self.budget_allocation / self.count, 2)
+
+    def sync_status(self) -> None:
+        """Recompute status from fill counts. Never overrides 'closed'."""
+        if self.status == "closed":
+            return
+        if self.filled_count <= 0:
+            self.status = "open"
+        elif self.filled_count >= self.count:
+            self.status = "filled"
+        else:
+            self.status = "partially_filled"
+
 class Attachment(BaseModel):
     file_name: str
     file_url: str
@@ -644,6 +706,7 @@ class JobPost(Document):
     goals: Optional[List[str]] = None        # project goals
     deliverables: Optional[List[str]] = None # what will be delivered
     crew_call: Optional[List[CrewCall]] = None
+    roles: Optional[List[ProjectRole]] = None  # structured, hireable role slots
     attachments: Optional[List[Attachment]] = None
     visibility: str = "public" # public, private, invited_only
     invited_crew: Optional[List[PydanticObjectId]] = None
@@ -670,7 +733,62 @@ class JobPost(Document):
             "skills",
             "budget.min",
             "budget.max",
+            "roles.role_id",
         ]
+
+    # ── Role helpers ──────────────────────────────────────────────────────────
+
+    def is_multi_role(self) -> bool:
+        """True when this project is staffed by explicit role slots."""
+        return bool(self.roles)
+
+    def effective_roles(self) -> List[ProjectRole]:
+        """Roles for this job, falling back to legacy data.
+
+        Job posts created before the multi-role system have no `roles` — they
+        carry either a `crew_call` list or a single `role` string. Deriving
+        ProjectRoles on read means every consumer (matching, applications,
+        hiring) can assume roles exist without a data migration. Derived roles
+        are ephemeral: their role_ids are not persisted, so they are only safe
+        for display, never for binding an application.
+        """
+        if self.roles:
+            return self.roles
+        if self.crew_call:
+            return [
+                ProjectRole(
+                    title=cc.role,
+                    count=cc.count,
+                    skills=cc.skills,
+                    description=cc.description,
+                )
+                for cc in self.crew_call
+            ]
+        if self.role:
+            return [ProjectRole(title=self.role, count=1, skills=self.skills)]
+        return []
+
+    def get_role(self, role_id: str) -> Optional[ProjectRole]:
+        for r in (self.roles or []):
+            if r.role_id == role_id:
+                return r
+        return None
+
+    def roles_summary(self) -> dict:
+        """Aggregate fill state, for dashboards and the project header."""
+        roles = self.roles or []
+        total_seats = sum(r.count for r in roles)
+        filled_seats = sum(min(r.filled_count, r.count) for r in roles)
+        return {
+            "total_roles": len(roles),
+            "total_seats": total_seats,
+            "filled_seats": filled_seats,
+            "open_seats": max(total_seats - filled_seats, 0),
+            "fully_staffed": total_seats > 0 and filled_seats >= total_seats,
+            "allocated_budget": sum(
+                r.budget_allocation for r in roles if r.budget_allocation is not None
+            ),
+        }
 
 # ============================================================================
 # APPLICATIONS (Bids on Projects)
@@ -687,7 +805,8 @@ class Application(Document):
     project_id: PydanticObjectId
     crew_id: PydanticObjectId
     team_id: Optional[PydanticObjectId] = None
-    role: Optional[str] = None  # Role the creator is playing (e.g., "Video Editor", "UI/UX Designer", "Sound Engineer")
+    role_id: Optional[str] = None  # JobPost.roles[].role_id this application is for
+    role: Optional[str] = None  # Role title, denormalized for display (e.g., "Video Editor")
     cover_letter: str
     proposed_budget: Optional[float] = None
     proposed_duration: Optional[int] = None # in days
@@ -718,8 +837,10 @@ class Application(Document):
             "project_id",
             "crew_id",
             "team_id",
+            "role_id",
             "status",
             "submitted_at",
+            [("project_id", ASCENDING), ("role_id", ASCENDING)],
         ]
 
 # ============================================================================

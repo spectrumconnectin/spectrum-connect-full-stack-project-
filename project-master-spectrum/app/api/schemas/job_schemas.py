@@ -55,6 +55,46 @@ class CrewCallRead(BaseModel):
 
 
 # ============================================================================
+# PROJECT ROLE SCHEMAS (multi-role staffing)
+# ============================================================================
+
+class ProjectRoleCreate(BaseModel):
+    """One staffed position on a project. `count` seats are filled independently."""
+    role_id: Optional[str] = Field(
+        None,
+        description="Omit when creating. Pass the existing id to update a role in place.",
+    )
+    title: str = Field(..., min_length=1, max_length=120, description="e.g. Camera Operator")
+    count: int = Field(1, ge=1, le=100, description="How many people are needed for this role")
+    budget_allocation: Optional[float] = Field(
+        None, ge=0, description="Total budget for this role, across all its seats"
+    )
+    skills: Optional[List[str]] = Field(None, max_items=30)
+    deliverables: Optional[List[str]] = Field(None, max_items=30)
+    description: Optional[str] = Field(None, max_length=1000)
+    duration_days: Optional[int] = Field(None, ge=1, le=3650)
+    start_date: Optional[datetime] = None
+    deadline: Optional[datetime] = None
+
+
+class ProjectRoleRead(BaseModel):
+    role_id: str
+    title: str
+    count: int
+    filled_count: int = 0
+    seats_remaining: Optional[int] = None
+    status: str = "open"
+    budget_allocation: Optional[float] = None
+    budget_per_seat: Optional[float] = None
+    skills: Optional[List[str]] = None
+    deliverables: Optional[List[str]] = None
+    description: Optional[str] = None
+    duration_days: Optional[int] = None
+    start_date: Optional[datetime] = None
+    deadline: Optional[datetime] = None
+
+
+# ============================================================================
 # ATTACHMENT SCHEMAS
 # ============================================================================
 
@@ -177,6 +217,11 @@ class JobPostCreate(BaseModel):
 
     # Crew calls
     crew_call: Optional[List[CrewCallCreate]] = Field(None, max_items=20)
+    roles: Optional[List[ProjectRoleCreate]] = Field(
+        None,
+        max_items=30,
+        description="Staffed roles for this project. Creators apply per role.",
+    )
 
     # Visibility
     visibility: str = Field("public", description="public, private, or invited_only")
@@ -274,6 +319,11 @@ class JobPostUpdate(BaseModel):
     experience_level: Optional[str] = None
 
     crew_call: Optional[List[CrewCallCreate]] = Field(None, max_items=20)
+    roles: Optional[List[ProjectRoleCreate]] = Field(
+        None,
+        max_items=30,
+        description="Staffed roles for this project. Creators apply per role.",
+    )
 
     visibility: Optional[str] = None
     invited_crew: Optional[List[str]] = None
@@ -326,6 +376,7 @@ class JobPostRead(BaseModel):
     experience_level: Optional[str] = None
 
     crew_call: Optional[List[CrewCallRead]] = None
+    roles: Optional[List[ProjectRoleRead]] = None
     attachments: Optional[List[AttachmentRead]] = None
 
     visibility: Optional[str] = "public"
