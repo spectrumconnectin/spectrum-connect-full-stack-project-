@@ -8,7 +8,7 @@ from typing import List, Optional
 from app.models.schema import User, JobPost, ProjectRole
 from app.auth.auth import get_current_user
 from app.services.job_service import JobService
-from app.services import role_service
+from app.services import role_service, workspace_service
 from app.api.schemas.job_schemas import (
     JobPostCreate,
     JobPostUpdate,
@@ -216,6 +216,44 @@ async def get_job(
     await JobService.increment_views(job_id)
 
     return job_to_dict(job)
+
+
+@router.get(
+    "/{job_id}/workspace",
+    summary="Team workspace for a project",
+    description=(
+        "Roster, per-member milestones, the viewer's own tasks, shared "
+        "deliveries, progress and the team conversation id."
+    ),
+)
+async def get_job_workspace(
+    job_id: str = Path(..., description="Job Post ID"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    The shared workspace for everyone hired onto a project.
+
+    Open to the client **and** every hired creator — a camera operator needs the
+    roster and the team chat as much as the client does. Creators see the full
+    team and their own tasks, but not teammates' payment amounts.
+    """
+    job = await JobService.get_job_by_id(job_id)
+    workspace = await workspace_service.get_workspace(job, str(current_user.id))
+
+    # Convene the team chat on first visit, so a project hired before this
+    # existed still gets one, and late hires are added to it.
+    if workspace["team_size"] > 0 and not workspace["conversation_id"]:
+        conversation = await workspace_service.ensure_team_conversation(
+            job,
+            initial_message=(
+                f"Welcome to the team for **{job.title}**. "
+                "Use this chat to coordinate, share files and discuss deliverables."
+            ),
+        )
+        if conversation:
+            workspace["conversation_id"] = str(conversation.id)
+
+    return workspace
 
 
 @router.get(

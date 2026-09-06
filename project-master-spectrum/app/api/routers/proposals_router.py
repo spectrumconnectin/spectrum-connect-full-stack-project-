@@ -13,12 +13,14 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict
 from bson import ObjectId
 from datetime import datetime
+import logging
 
 from app.models.schema import User, Application, JobPost
 from app.auth.auth import get_current_user
 from app.services import role_service
 
 router = APIRouter(prefix="/proposals", tags=["Proposals"])
+logger = logging.getLogger(__name__)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -157,20 +159,20 @@ async def direct_hire(
         pass
 
     # Open a conversation with the creator
+    # Put the new hire into the project's team conversation. Everyone hired onto
+    # the project shares one chat rather than a separate thread per person.
     try:
-        from app.services.messaging_service import MessagingService
-        welcome = data.note or (
-            f"Hi! I've hired you directly for my project: **{job.title}**. "
-            "Looking forward to working with you!"
-        )
-        await MessagingService.create_or_get_conversation(
-            participants=[str(current_user.id), data.creator_id],
-            job_id=data.job_id,
-            initial_message=welcome,
-            sender_id=str(current_user.id),
+        from app.services import workspace_service
+        job = await JobPost.get(job.id)
+        await workspace_service.ensure_team_conversation(
+            job,
+            initial_message=data.note or (
+                f"Hi! I've hired you directly for my project: **{job.title}**. "
+                "Looking forward to working with you!"
+            ),
         )
     except Exception:
-        pass
+        logger.exception("Could not open the team conversation after a direct hire")
 
     return {"id": str(app.id), "status": "accepted", "job_id": data.job_id}
 
@@ -659,22 +661,20 @@ async def update_proposal_status(
     except Exception:
         pass
 
-    # Auto-create project conversation when creator is hired
+    # Add the new hire to the project's team conversation.
     if data.status == "accepted":
         try:
-            from app.services.messaging_service import MessagingService
-            welcome = (
-                f"🎉 You've been hired for **{job.title}**!\n\n"
-                "This is your project workspace. Use this chat to coordinate, share files, and discuss deliverables."
-            )
-            await MessagingService.create_or_get_conversation(
-                participants=[str(current_user.id), str(app.crew_id)],
-                job_id=str(job.id),
-                initial_message=welcome,
-                sender_id=str(current_user.id),
+            from app.services import workspace_service
+            await workspace_service.ensure_team_conversation(
+                await JobPost.get(job.id),
+                initial_message=(
+                    f"🎉 You've been hired for **{job.title}**!\n\n"
+                    "This is your project workspace. Use this chat to coordinate, "
+                    "share files, and discuss deliverables."
+                ),
             )
         except Exception:
-            pass
+            logger.exception("Could not open the team conversation after hiring")
 
     # ETF: award client points for hiring a creator
     if data.status == "accepted":

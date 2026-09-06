@@ -723,6 +723,13 @@ export const jobs = {
   roles: (id: string): Promise<RoleStaffing> =>
     request<RoleStaffing>(`/jobs/${id}/roles`),
 
+  /**
+   * Team workspace. Open to the client and every hired creator — creators get
+   * the full roster and their own tasks, but not teammates' payment amounts.
+   */
+  workspace: (id: string): Promise<ProjectWorkspaceResponse> =>
+    request<ProjectWorkspaceResponse>(`/jobs/${id}/workspace`),
+
   addRole: (id: string, role: ProjectRoleInput): Promise<JobPostItem> =>
     request<JobPostItem>(`/jobs/${id}/roles`, { method: 'POST', body: JSON.stringify(role) }),
 
@@ -1227,6 +1234,77 @@ export interface JobProposalsResponse {
   limit: number;
   role_id?: string | null;   // echoes the filter that was applied
   roles?: ProjectRole[];     // staffing breakdown, for the per-role tabs
+}
+
+// ── Team workspace ──────────────────────────────────────────────────────────
+
+export interface WorkspaceMilestone {
+  milestone_id: string;
+  title: string;
+  status: string;
+  /** Omitted for teammates' milestones — you only see your own amounts. */
+  amount?: number;
+  delivered_at?: string | null;
+  released_at?: string | null;
+  google_drive_link?: string | null;
+  revision_count?: number;
+}
+
+export interface WorkspaceMember {
+  creator_id: string;
+  application_id: string;
+  name: string;
+  avatar?: string | null;
+  headline?: string | null;
+  role_id?: string | null;
+  role?: string | null;
+  is_you: boolean;
+  hired_at?: string | null;
+  deadline_at?: string | null;
+  deliverables: string[];
+  progress: { percent: number; done: number; in_flight: number; total: number };
+  milestones: WorkspaceMilestone[];
+  /** Null for teammates — escrow amounts are private to the client and owner. */
+  escrow: {
+    escrow_id: string;
+    status: string;
+    total_amount: number;
+    funded_amount: number;
+    released_amount: number;
+  } | null;
+  review_given: boolean;
+}
+
+export interface ProjectWorkspaceResponse {
+  job_id: string;
+  title: string;
+  description: string;
+  status: string;
+  currency: string;
+  deadline?: string | null;
+  viewer: { user_id: string; is_client: boolean; role?: string | null };
+  roles_summary: {
+    total_roles: number;
+    total_seats: number;
+    filled_seats: number;
+    open_seats: number;
+    fully_staffed: boolean;
+    allocated_budget: number;
+  } | null;
+  team: WorkspaceMember[];
+  team_size: number;
+  /** The viewer's own milestones, pulled out of the team view. */
+  my_tasks: (WorkspaceMilestone & { role?: string | null; escrow_id?: string | null })[];
+  progress: { percent: number; done: number; in_flight: number; total: number };
+  conversation_id: string | null;
+  deliveries: {
+    milestone_id: string;
+    title: string;
+    google_drive_link?: string | null;
+    delivered_at?: string | null;
+    status: string;
+    creator_id: string;
+  }[];
 }
 
 // ── Project-level escrow allocation (multi-role projects) ───────────────────
