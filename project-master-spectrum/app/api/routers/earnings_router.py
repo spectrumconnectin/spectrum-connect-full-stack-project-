@@ -217,6 +217,19 @@ async def withdraw(
 
 # ── Stripe Connect (bank cash-out) ──────────────────────────────────────────
 
+@router.get("/payout-options", summary="Which payout rails this creator can use")
+async def get_payout_options(current_user: User = Depends(get_current_user)):
+    """
+    Which payout methods can actually reach this creator, and what to tell them.
+
+    Stripe Connect does not cover every country — Sri Lanka among them — so a
+    creator there must be pointed at PayPal rather than sent into a bank
+    onboarding flow that ends in an error.
+    """
+    from app.services import payout_regions
+    return payout_regions.payout_options(current_user)
+
+
 @router.post("/connect/onboard", summary="Start/continue Stripe bank onboarding")
 async def connect_onboard(
     request: Request,
@@ -225,9 +238,22 @@ async def connect_onboard(
 ):
     """Create (or reuse) the creator's Stripe Express account and return a hosted
     onboarding URL where they add their bank + identity details."""
-    from app.services import stripe_connect_service
+    from app.services import stripe_connect_service, payout_regions
     if not stripe_connect_service.is_enabled():
         raise HTTPException(status_code=503, detail="Bank payouts are not configured yet.")
+
+    # Stop a creator in an unsupported country before Stripe does. Reaching the
+    # hosted form and failing there is a worse way to learn this, and Stripe
+    # would create a dead account on the way.
+    country = payout_regions.creator_country(current_user)
+    if payout_regions.stripe_supports(country) is False:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Direct bank transfer isn't supported in your country ({country}) yet. "
+                "Use PayPal instead — you can withdraw from PayPal into your own bank account."
+            ),
+        )
     try:
         account_id = await stripe_connect_service.create_or_get_account(current_user)
         url = stripe_connect_service.create_account_link(account_id)

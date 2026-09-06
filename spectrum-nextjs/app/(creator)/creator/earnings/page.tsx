@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { earnings, EarningTransaction, EarningsStats, PayoutBalance } from '@/lib/api';
+import { earnings, EarningTransaction, EarningsStats, PayoutBalance, PayoutOptions } from '@/lib/api';
 
 const TXN_STATUS_STYLE: Record<string, string> = {
   completed:  'bg-emerald-50 text-emerald-700',
@@ -69,17 +69,28 @@ export default function EarningsPage() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
   const [method, setMethod] = useState<'stripe' | 'paypal'>('stripe');
+  const [payoutOptions, setPayoutOptions] = useState<PayoutOptions | null>(null);
   const [connecting, setConnecting] = useState(false);
 
   const loadBalance = useCallback(async () => {
     try {
-      const b = await earnings.getBalance();
+      const [b, opts] = await Promise.all([
+        earnings.getBalance(),
+        // Best-effort: if this fails we fall back to showing both rails rather
+        // than hiding one a creator might be able to use.
+        earnings.payoutOptions().catch(() => null),
+      ]);
       setBalance(b);
+      setPayoutOptions(opts);
       setPaypalEmail(b.paypal_email ?? '');
       setEditingEmail(!b.paypal_email);
       setWithdrawAmount(b.available > 0 ? b.available.toFixed(2) : '');
-      // Default to whichever rail is ready: bank if connected, else PayPal.
-      setMethod(b.stripe_payouts_enabled ? 'stripe' : (b.paypal_email ? 'paypal' : 'stripe'));
+      // Default to the rail that can actually reach this creator, then to
+      // whichever is ready.
+      setMethod(
+        opts?.recommended
+        ?? (b.stripe_payouts_enabled ? 'stripe' : (b.paypal_email ? 'paypal' : 'stripe')),
+      );
     } catch { /* balance is best-effort */ }
   }, []);
 
@@ -392,7 +403,12 @@ export default function EarningsPage() {
             </div>
 
             {(() => {
-              const stripeShown = !!balance?.stripe_enabled;
+              // Stripe Connect doesn't operate everywhere — a creator in an
+              // unsupported country (Sri Lanka, for one) shouldn't be offered a
+              // bank flow that fails at Stripe's door. PayPal reaches them, and
+              // they can withdraw from PayPal into their own bank.
+              const stripeShown = !!balance?.stripe_enabled
+                && (payoutOptions?.bank_via_stripe.available ?? true);
               const paypalShown = !!balance?.payouts_enabled;
               const stripeReady = !!balance?.stripe_payouts_enabled;
               const noRails = balance && !stripeShown && !paypalShown;
@@ -446,9 +462,30 @@ export default function EarningsPage() {
                     </div>
                   )}
 
+                  {/* Why the bank option isn't here, for creators in countries
+                      Stripe doesn't cover. Without this they'd just wonder. */}
+                  {payoutOptions?.bank_via_stripe.unsupported_country && payoutOptions.bank_via_stripe.note && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+                      <p className="text-[13px] text-amber-900 leading-relaxed">
+                        <i className="fa-solid fa-circle-info mr-1.5"></i>
+                        {payoutOptions.bank_via_stripe.note}
+                      </p>
+                    </div>
+                  )}
+
                   {/* PAYPAL — email */}
                   {method === 'paypal' && paypalShown && (
                     <div>
+                      {/* Country-specific steps — e.g. Sri Lanka's partner banks,
+                          without which the money can't reach their account. */}
+                      {payoutOptions?.paypal.note && (
+                        <div className="rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 mb-3">
+                          <p className="text-[13px] text-blue-900 leading-relaxed">
+                            <i className="fa-solid fa-building-columns mr-1.5"></i>
+                            {payoutOptions.paypal.note}
+                          </p>
+                        </div>
+                      )}
                       <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">PayPal email</label>
                       {editingEmail ? (
                         <div className="flex gap-2">

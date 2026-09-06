@@ -1091,6 +1091,27 @@ export interface WithdrawResult {
   message: string;
 }
 
+/** Which payout rails can reach a given creator, and what to tell them. */
+export interface PayoutOptions {
+  /** ISO country code, when we can determine it. */
+  country: string | null;
+  bank_via_stripe: {
+    available: boolean;
+    connected: boolean;
+    payouts_enabled: boolean;
+    /** True when Stripe Connect does not operate in their country at all. */
+    unsupported_country: boolean;
+    note: string | null;
+  };
+  paypal: {
+    available: boolean;
+    email_on_file: boolean;
+    /** Country-specific guidance, e.g. Sri Lanka's partner-bank requirement. */
+    note: string | null;
+  };
+  recommended: 'stripe' | 'paypal' | null;
+}
+
 export const earnings = {
   getTransactions: (params?: { status?: string; type?: string; limit?: number; skip?: number }): Promise<EarningTransaction[]> =>
     request<EarningTransaction[]>(`/earnings/me${buildQS(params as Record<string, string | number | undefined> || {})}`),
@@ -1111,6 +1132,14 @@ export const earnings = {
     request('/earnings/withdraw', { method: 'POST', body: JSON.stringify({ amount, method }) }),
 
   /** Start/continue Stripe bank onboarding — returns a hosted URL to redirect to. */
+  /**
+   * Which payout rails can actually reach this creator. Stripe Connect doesn't
+   * cover every country (Sri Lanka among them), so the UI asks rather than
+   * offering a bank flow that would fail at Stripe's door.
+   */
+  payoutOptions: (): Promise<PayoutOptions> =>
+    request<PayoutOptions>('/earnings/payout-options'),
+
   connectOnboard: (): Promise<{ url: string; account_id: string }> =>
     request('/earnings/connect/onboard', { method: 'POST' }),
 
