@@ -429,8 +429,17 @@ class CrewProfile(Document):
     portfolio: Optional[Portfolio] = None
     production_preferences: Optional[ProductionPreferences] = None
     rating: Optional[Rating] = None
-    trust_tier_override: Optional[str] = None 
+    trust_tier_override: Optional[str] = None
     last_review_date: Optional[datetime] = None
+
+    # Workforce balance. WorkforceBalanceService reads these to score workload
+    # fairness and writes them when recounting a creator's live projects; they
+    # were previously only declared on the API schema, not here, so every read
+    # raised AttributeError and Smart Connect silently returned no matches at
+    # all. Defaults match the API schema so profiles saved before this field
+    # existed load as "no active projects, capacity 3".
+    active_project_count: int = 0
+    workload_capacity: int = 3
     # NOTE: skills, experience, education, certifications are in User.profile
 
     class Settings:

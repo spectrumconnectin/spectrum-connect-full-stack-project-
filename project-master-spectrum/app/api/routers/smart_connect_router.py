@@ -131,6 +131,73 @@ async def match_for_project(
         )
 
 
+@router.get("/match-by-role/{job_id}")
+async def match_by_role(
+    job_id: str,
+    limit_per_role: int = Query(default=8, ge=1, le=25),
+    include_filled: bool = Query(default=False, description="Also rank roles that are already fully staffed"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Smart Connect matches ranked separately for each role on a project.
+
+    Camera operators are ranked for the camera seats, editors for the editing
+    seat, and so on — one blended list would bury specialists under generalists
+    who partly fit every role.
+
+    Falls back to the whole-project match for projects that have no explicit
+    roles, so the client can call this for any project.
+    """
+    from app.models.schema import JobPost
+    from beanie import PydanticObjectId
+
+    try:
+        job = await JobPost.get(PydanticObjectId(job_id))
+    except Exception:
+        job = None
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if str(job.client_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorised")
+
+    # Single-creator project — there are no seats to rank separately, so return
+    # the project-wide ranking in the same envelope.
+    if not job.roles:
+        result = await SmartConnectService.smart_match(
+            project_description=job.description,
+            project_type=job.department or "",
+            roles_needed=[job.role] if job.role else [],
+            timeline=job.duration,
+            skills_required=job.skills or [],
+            location=getattr(job, "location", None),
+            is_remote=bool(getattr(job, "is_remote", False)),
+            workload_aware=True,
+            limit=limit_per_role,
+        )
+        return {
+            "job_id": str(job.id),
+            "title": job.title,
+            "multi_role": False,
+            "roles": [{
+                "role_id": None,
+                "title": job.role or "Project",
+                "count": 1,
+                "filled_count": 0,
+                "seats_remaining": 1,
+                "status": "open",
+                "matches": result.get("matches", []),
+                "total_matches": result.get("total_matches", 0),
+            }],
+        }
+
+    return await SmartConnectService.smart_match_for_roles(
+        job,
+        limit_per_role=limit_per_role,
+        include_filled=include_filled,
+    )
+
+
 # ── Search ─────────────────────────────────────────────────────────────────────
 
 @router.post("/search", response_model=CreativeSearchResponse)

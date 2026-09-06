@@ -2129,6 +2129,31 @@ export interface SmartMatchApiResponse {
   search_criteria: Record<string, unknown>;
 }
 
+/** One role's own ranked shortlist on a multi-role project. */
+export interface RoleMatchBlock {
+  role_id: string | null;
+  title: string;
+  count: number;
+  filled_count: number;
+  seats_remaining: number;
+  status: string;
+  budget_per_seat?: number | null;
+  skills?: string[];
+  matches: SmartMatchResultItem[];
+  total_matches: number;
+  /** Set when a role was not ranked, e.g. "filled". */
+  skipped_reason?: string;
+}
+
+export interface RoleMatchApiResponse {
+  job_id: string;
+  title?: string;
+  /** False for single-creator projects, which return one project-wide block. */
+  multi_role: boolean;
+  candidate_pool?: number;
+  roles: RoleMatchBlock[];
+}
+
 export interface CreativeSearchApiResponse {
   creatives: SmartCreativeProfile[];
   total: number;
@@ -2177,6 +2202,22 @@ export const smartConnect = {
 
   matchForProject: (jobId: string, limit = 12): Promise<SmartMatchApiResponse> =>
     request<SmartMatchApiResponse>(`/smart-connect/match-for-project/${jobId}?limit=${limit}`),
+
+  /**
+   * Matches ranked separately per role. Single-creator projects come back as
+   * one project-wide block with multi_role: false, so this is safe to call for
+   * any project.
+   */
+  matchByRole: (
+    jobId: string,
+    opts?: { limitPerRole?: number; includeFilled?: boolean },
+  ): Promise<RoleMatchApiResponse> =>
+    request<RoleMatchApiResponse>(
+      `/smart-connect/match-by-role/${jobId}${buildQS({
+        limit_per_role: opts?.limitPerRole,
+        include_filled: opts?.includeFilled ? 'true' : undefined,
+      })}`,
+    ),
 
   getFeatured: (limit = 6): Promise<SavedProfilesApiResponse> =>
     request<SavedProfilesApiResponse>(`/smart-connect/featured?limit=${limit}`, {}, false),

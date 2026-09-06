@@ -65,11 +65,331 @@ def _tier_order(tier: str) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# Scoring components                                                           #
+# --------------------------------------------------------------------------- #
+# Split into "role-specific" (role title + required skills) and "role-agnostic"
+# (everything else). Only the first two change between roles on the same
+# project, so a multi-role match scores the expensive half once per creator and
+# re-scores just these two per role — instead of re-running the whole scan.
+
+def _score_role_match(crew_profile, roles_needed: List[str]) -> tuple:
+    """Role match, max 35. Title hit scores 35; a department hit scores 25."""
+    role_score = 0
+    reasons: List[str] = []
+    if crew_profile.title:
+        for role in roles_needed:
+            if role.lower() in crew_profile.title.lower():
+                role_score = 35
+                reasons.append(f"Role match: {crew_profile.title}")
+                break
+            elif crew_profile.departments:
+                for dept in crew_profile.departments:
+                    if role.lower() in dept.lower():
+                        role_score = 25
+                        reasons.append(f"Department match: {dept}")
+                        break
+    return role_score, reasons
+
+
+def _score_skills_match(user, skills_required: Optional[List[str]]) -> tuple:
+    """Skills match, max 25 — 8 points per required skill the creator lists."""
+    skill_score = 0
+    reasons: List[str] = []
+    if skills_required and user.profile.skills:
+        user_skill_names = _extract_skill_names(user.profile.skills)
+        matching = [s for s in skills_required if s.lower() in user_skill_names]
+        if matching:
+            skill_score = min(25, len(matching) * 8)
+            reasons.append(f"Skills: {', '.join(matching[:3])}")
+    return skill_score, reasons
+
+
+# --------------------------------------------------------------------------- #
 # Service                                                                      #
 # --------------------------------------------------------------------------- #
 
 class SmartConnectService:
     """Service for smart matching and creative discovery."""
+
+    @staticmethod
+    async def _load_candidates(min_trust_tier: Optional[str] = None) -> List[tuple]:
+        """Every crew profile paired with its user, above the trust-tier floor.
+
+        Loading this once is what makes multi-role matching affordable: the
+        candidate pool is identical for every role on a project, so a five-role
+        project would otherwise re-read every crew profile and user five times.
+        """
+        crew_profiles = await CrewProfile.find_all().to_list()
+        min_tier_rank = _tier_order(min_trust_tier) if min_trust_tier else 1
+
+        candidates: List[tuple] = []
+        for crew_profile in crew_profiles:
+            user = await User.get(crew_profile.user_id)
+            if not user or not user.profile:
+                continue
+
+            user_tier = (
+                user.spectrum_id.tier
+                if user.spectrum_id and user.spectrum_id.tier
+                else "bronze"
+            )
+            if _tier_order(user_tier) < min_tier_rank:
+                continue
+
+            candidates.append((user, crew_profile))
+        return candidates
+
+    @staticmethod
+    async def _score_candidate(
+        user,
+        crew_profile,
+        *,
+        project_type: str,
+        roles_needed: List[str],
+        skills_required: Optional[List[str]] = None,
+        location: Optional[str] = None,
+        is_remote: bool = False,
+        timeline: Optional[str] = None,
+        workload_aware: bool = True,
+        etf: Optional[tuple] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Score one creator against one set of role/skill requirements.
+
+        Returns None when the creator falls below the match threshold.
+
+        `etf` lets a caller pass an already-resolved (bonus, level_name) pair.
+        Multi-role matching scores the same creator once per role, and the ETF
+        badge lookup hits the database — resolving it once per creator instead
+        of once per creator per role keeps that cost flat as roles are added.
+        """
+        score = 0
+        reasons: List[str] = []
+        score_breakdown: Dict[str, int] = {}
+
+        # 1. Role match (max 35 pts)
+        role_score, role_reasons = _score_role_match(crew_profile, roles_needed)
+        reasons.extend(role_reasons)
+        score += role_score
+        score_breakdown["role"] = role_score
+
+        # 2. Skills match (max 25 pts)
+        skill_score, skill_reasons = _score_skills_match(user, skills_required)
+        reasons.extend(skill_reasons)
+        score += skill_score
+        score_breakdown["skills"] = skill_score
+
+        # 3. Specialization (max 10 pts)
+        spec_score = 0
+        if crew_profile.specializations:
+            for spec in crew_profile.specializations:
+                if project_type.lower() in spec.lower():
+                    spec_score = 10
+                    reasons.append(f"Specialization: {spec}")
+                    break
+        score += spec_score
+        score_breakdown["specialization"] = spec_score
+
+        # 4. Location (max 10 pts)
+        loc_score = 0
+        if not is_remote and location and user.profile.location:
+            location_str = (
+                user.profile.location
+                if isinstance(user.profile.location, str)
+                else str(user.profile.location)
+            )
+            if location.lower() in location_str.lower():
+                loc_score = 10
+                reasons.append("Location match")
+        elif is_remote:
+            loc_score = 5
+            reasons.append("Remote-ready")
+        score += loc_score
+        score_breakdown["location"] = loc_score
+
+        # 5. Rating bonus (max 5 pts)
+        # Primary: CrewProfile.rating (synced by proposals_router on submission).
+        # Fallback: User.profile.rating (where review writes it).
+        rating_score = 0
+        _rating_val = (
+            (crew_profile.rating.overall if crew_profile.rating else None)
+            or (user.profile.rating if user.profile else None)
+            or 0.0
+        )
+        if _rating_val:
+            rating_score = min(5, int(_rating_val))
+            if _rating_val >= 4.5:
+                reasons.append(f"Highly rated ({_rating_val:.1f})")
+        score += rating_score
+        score_breakdown["rating"] = rating_score
+
+        # 6. Workload fairness (max 10 pts)
+        workload_score = 0
+        workload_reason = ""
+        if workload_aware:
+            workload_score, workload_reason = (
+                WorkforceBalanceService.calculate_workload_fairness_score(crew_profile)
+            )
+            if workload_score > 0:
+                reasons.append(f"Availability: {workload_reason}")
+        score += workload_score
+        score_breakdown["workload_fairness"] = workload_score
+
+        # 7. Trust tier bonus (max 5 pts)
+        trust_score_bonus = 0
+        tier_label = "Bronze"
+        if workload_aware:
+            trust_score_bonus, tier_label = WorkforceBalanceService.get_trust_tier_score(user)
+            if trust_score_bonus >= 3:
+                reasons.append(f"Trust tier: {tier_label}")
+        score += trust_score_bonus
+        score_breakdown["trust_tier"] = trust_score_bonus
+
+        # 8. ETF Points level bonus (max 8 pts) — earned loyalty.
+        # Bronze 0 / Silver 3 / Gold 5 / Platinum 8.
+        etf_bonus = 0
+        etf_level_name = "bronze"
+        if etf is not None:
+            etf_bonus, etf_level_name, etf_label = etf
+            if etf_bonus >= 3:
+                reasons.append(f"ETF: {etf_label}")
+        else:
+            try:
+                from app.services.etf_points_service import EtfPointsService
+                etf_level = await EtfPointsService.badge_for(user.id)
+                etf_level_name = etf_level.name
+                etf_bonus = {"bronze": 0, "silver": 3, "gold": 5, "platinum": 8}.get(
+                    etf_level_name, 0
+                )
+                if etf_bonus >= 3:
+                    reasons.append(f"ETF: {etf_level.label}")
+            except Exception:
+                pass
+        score += etf_bonus
+        score_breakdown["etf_level"] = etf_bonus
+
+        # 9. Portfolio completeness bonus (max 5 pts).
+        # +2 for any portfolio item, +3 for both videos and images present.
+        portfolio_bonus = 0
+        items = user.profile.portfolio_items if user.profile.portfolio_items else []
+        if items:
+            has_video = any(i.type == "video" for i in items)
+            has_image = any(i.type == "image" for i in items)
+            portfolio_bonus = 5 if (has_video and has_image) else 2
+            reasons.append("Portfolio showcased")
+        score += portfolio_bonus
+        score_breakdown["portfolio"] = portfolio_bonus
+
+        # 10. Previous Projects / track record (max 10 pts).
+        # Rewards creators who have successfully completed projects on the platform.
+        prev_score = 0
+        if user.stats and user.stats.projects_completed:
+            completed = user.stats.projects_completed
+            if completed >= 10:
+                prev_score = 10
+                reasons.append(f"Experienced: {completed} projects completed")
+            elif completed >= 5:
+                prev_score = 7
+                reasons.append(f"{completed} projects completed")
+            elif completed >= 1:
+                prev_score = 3
+        score += prev_score
+        score_breakdown["previous_projects"] = prev_score
+
+        # 11. Response Rate / speed (max 5 pts).
+        # Faster responders score higher — response_time is in hours.
+        response_score = 0
+        if user.stats and user.stats.response_time is not None:
+            rt = user.stats.response_time
+            if rt <= 2:
+                response_score = 5
+                reasons.append("Fast responder (<2h)")
+            elif rt <= 12:
+                response_score = 3
+                reasons.append(f"~{rt}h response time")
+            elif rt <= 24:
+                response_score = 1
+        score += response_score
+        score_breakdown["response_rate"] = response_score
+
+        # 12. Category / department experience (max 10 pts).
+        # Bonus when the project's type aligns with the creator's listed departments.
+        category_score = 0
+        if project_type and crew_profile.departments:
+            for dept in crew_profile.departments:
+                if project_type.lower() in dept.lower() or dept.lower() in project_type.lower():
+                    category_score = 10
+                    reasons.append(f"Category match: {dept}")
+                    break
+        score += category_score
+        score_breakdown["category_experience"] = category_score
+
+        # Threshold and match level
+        if score < 20:
+            return None
+
+        if score >= 80:
+            match_level = "Perfect Fit"
+        elif score >= 60:
+            match_level = "Great Fit"
+        else:
+            match_level = "Good Fit"
+
+        if timeline and crew_profile.availability:
+            reasons.append("Timeline available")
+
+        return {
+            "profile": {
+                "user_id": str(user.id),
+                "name": user.profile.display_name or user.username,
+                "title": crew_profile.title or "Creative Professional",
+                "role": crew_profile.title,
+                "avatar": user.profile.profile_picture,
+                "location": user.profile.location,
+                "rating": (
+                    (crew_profile.rating.overall if crew_profile.rating else None)
+                    or getattr(user, "rating", None)
+                    or 0.0
+                ),
+                "total_reviews": (
+                    (crew_profile.rating.total_reviews if crew_profile.rating else None)
+                    or getattr(user, "review_count", None)
+                    or 0
+                ),
+                "skills": [
+                    s.name if hasattr(s, "name") else s
+                    for s in (user.profile.skills[:5] if user.profile.skills else [])
+                ],
+                "specializations": (
+                    crew_profile.specializations[:3]
+                    if crew_profile.specializations else []
+                ),
+                "bio": user.profile.bio,
+                "daily_rate": crew_profile.daily_rate,
+                "availability": (user.settings.availability_status if user.settings and user.settings.availability_status else ("available" if crew_profile.availability else None)),
+                "active_project_count": crew_profile.active_project_count,
+                "workload_capacity": crew_profile.workload_capacity,
+                "trust_tier": tier_label,
+                "workload_score": workload_score,
+                "trust_score": (
+                    user.spectrum_id.trust_score if user.spectrum_id else 0.0
+                ),
+                # ETF level for the card badge — never exposes USD value.
+                "etf_level": etf_level_name,
+                # Portfolio summary for the card (first item of each type).
+                "portfolio_item_count": len(items),
+                "portfolio_has_video": any(i.type == "video" for i in items),
+            },
+            "match_score": min(100, score),
+            "match_level": match_level,
+            "match_reasons": reasons[:4],
+            "score_breakdown": score_breakdown,
+            "workload_info": {
+                "active_projects": crew_profile.active_project_count,
+                "capacity": crew_profile.workload_capacity,
+                "fairness_score": workload_score,
+                "fairness_label": workload_reason,
+            },
+        }
 
     @staticmethod
     async def smart_match(
@@ -94,264 +414,24 @@ class SmartConnectService:
         min_trust_tier  - filter out creators below this tier.
         """
         try:
-            crew_profiles = await CrewProfile.find_all().to_list()
-            min_tier_rank = _tier_order(min_trust_tier) if min_trust_tier else 1
+            candidates = await SmartConnectService._load_candidates(min_trust_tier)
 
             matches = []
 
-            for crew_profile in crew_profiles:
-                user = await User.get(crew_profile.user_id)
-                if not user or not user.profile:
-                    continue
-
-                # Trust tier filter
-                user_tier = (
-                    user.spectrum_id.tier
-                    if user.spectrum_id and user.spectrum_id.tier
-                    else "bronze"
+            for user, crew_profile in candidates:
+                match = await SmartConnectService._score_candidate(
+                    user,
+                    crew_profile,
+                    project_type=project_type,
+                    roles_needed=roles_needed,
+                    skills_required=skills_required,
+                    location=location,
+                    is_remote=is_remote,
+                    timeline=timeline,
+                    workload_aware=workload_aware,
                 )
-                if _tier_order(user_tier) < min_tier_rank:
-                    continue
-
-                score = 0
-                reasons: List[str] = []
-                score_breakdown: Dict[str, int] = {}
-
-                # 1. Role match (max 35 pts)
-                role_score = 0
-                if crew_profile.title:
-                    for role in roles_needed:
-                        if role.lower() in crew_profile.title.lower():
-                            role_score = 35
-                            reasons.append(f"Role match: {crew_profile.title}")
-                            break
-                        elif crew_profile.departments:
-                            for dept in crew_profile.departments:
-                                if role.lower() in dept.lower():
-                                    role_score = 25
-                                    reasons.append(f"Department match: {dept}")
-                                    break
-                score += role_score
-                score_breakdown["role"] = role_score
-
-                # 2. Skills match (max 25 pts)
-                skill_score = 0
-                if skills_required and user.profile.skills:
-                    user_skill_names = _extract_skill_names(user.profile.skills)
-                    matching = [s for s in skills_required if s.lower() in user_skill_names]
-                    if matching:
-                        skill_score = min(25, len(matching) * 8)
-                        reasons.append(f"Skills: {', '.join(matching[:3])}")
-                score += skill_score
-                score_breakdown["skills"] = skill_score
-
-                # 3. Specialization (max 10 pts)
-                spec_score = 0
-                if crew_profile.specializations:
-                    for spec in crew_profile.specializations:
-                        if project_type.lower() in spec.lower():
-                            spec_score = 10
-                            reasons.append(f"Specialization: {spec}")
-                            break
-                score += spec_score
-                score_breakdown["specialization"] = spec_score
-
-                # 4. Location (max 10 pts)
-                loc_score = 0
-                if not is_remote and location and user.profile.location:
-                    location_str = (
-                        user.profile.location
-                        if isinstance(user.profile.location, str)
-                        else str(user.profile.location)
-                    )
-                    if location.lower() in location_str.lower():
-                        loc_score = 10
-                        reasons.append("Location match")
-                elif is_remote:
-                    loc_score = 5
-                    reasons.append("Remote-ready")
-                score += loc_score
-                score_breakdown["location"] = loc_score
-
-                # 5. Rating bonus (max 5 pts)
-                # Primary: CrewProfile.rating (synced by proposals_router on submission).
-                # Fallback: User.profile.rating (where review writes it).
-                rating_score = 0
-                _rating_val = (
-                    (crew_profile.rating.overall if crew_profile.rating else None)
-                    or (user.profile.rating if user.profile else None)
-                    or 0.0
-                )
-                if _rating_val:
-                    rating_score = min(5, int(_rating_val))
-                    if _rating_val >= 4.5:
-                        reasons.append(f"Highly rated ({_rating_val:.1f})")
-                score += rating_score
-                score_breakdown["rating"] = rating_score
-
-                # 6. Workload fairness (max 10 pts)
-                workload_score = 0
-                workload_reason = ""
-                if workload_aware:
-                    workload_score, workload_reason = (
-                        WorkforceBalanceService.calculate_workload_fairness_score(crew_profile)
-                    )
-                    if workload_score > 0:
-                        reasons.append(f"Availability: {workload_reason}")
-                score += workload_score
-                score_breakdown["workload_fairness"] = workload_score
-
-                # 7. Trust tier bonus (max 5 pts)
-                trust_score_bonus = 0
-                tier_label = "Bronze"
-                if workload_aware:
-                    trust_score_bonus, tier_label = WorkforceBalanceService.get_trust_tier_score(user)
-                    if trust_score_bonus >= 3:
-                        reasons.append(f"Trust tier: {tier_label}")
-                score += trust_score_bonus
-                score_breakdown["trust_tier"] = trust_score_bonus
-
-                # 8. ETF Points level bonus (max 8 pts) — earned loyalty.
-                # Bronze 0 / Silver 3 / Gold 5 / Platinum 8.
-                etf_bonus = 0
-                etf_level_name = "bronze"
-                try:
-                    from app.services.etf_points_service import EtfPointsService
-                    etf_level = await EtfPointsService.badge_for(user.id)
-                    etf_level_name = etf_level.name
-                    etf_bonus = {"bronze": 0, "silver": 3, "gold": 5, "platinum": 8}.get(
-                        etf_level_name, 0
-                    )
-                    if etf_bonus >= 3:
-                        reasons.append(f"ETF: {etf_level.label}")
-                except Exception:
-                    pass
-                score += etf_bonus
-                score_breakdown["etf_level"] = etf_bonus
-
-                # 9. Portfolio completeness bonus (max 5 pts).
-                # +2 for any portfolio item, +3 for both videos and images present.
-                portfolio_bonus = 0
-                items = user.profile.portfolio_items if user.profile.portfolio_items else []
-                if items:
-                    has_video = any(i.type == "video" for i in items)
-                    has_image = any(i.type == "image" for i in items)
-                    portfolio_bonus = 5 if (has_video and has_image) else 2
-                    reasons.append("Portfolio showcased")
-                score += portfolio_bonus
-                score_breakdown["portfolio"] = portfolio_bonus
-
-                # 10. Previous Projects / track record (max 10 pts).
-                # Rewards creators who have successfully completed projects on the platform.
-                prev_score = 0
-                if user.stats and user.stats.projects_completed:
-                    completed = user.stats.projects_completed
-                    if completed >= 10:
-                        prev_score = 10
-                        reasons.append(f"Experienced: {completed} projects completed")
-                    elif completed >= 5:
-                        prev_score = 7
-                        reasons.append(f"{completed} projects completed")
-                    elif completed >= 1:
-                        prev_score = 3
-                score += prev_score
-                score_breakdown["previous_projects"] = prev_score
-
-                # 11. Response Rate / speed (max 5 pts).
-                # Faster responders score higher — response_time is in hours.
-                response_score = 0
-                if user.stats and user.stats.response_time is not None:
-                    rt = user.stats.response_time
-                    if rt <= 2:
-                        response_score = 5
-                        reasons.append("Fast responder (<2h)")
-                    elif rt <= 12:
-                        response_score = 3
-                        reasons.append(f"~{rt}h response time")
-                    elif rt <= 24:
-                        response_score = 1
-                score += response_score
-                score_breakdown["response_rate"] = response_score
-
-                # 12. Category / department experience (max 10 pts).
-                # Bonus when the project's type aligns with the creator's listed departments.
-                category_score = 0
-                if project_type and crew_profile.departments:
-                    for dept in crew_profile.departments:
-                        if project_type.lower() in dept.lower() or dept.lower() in project_type.lower():
-                            category_score = 10
-                            reasons.append(f"Category match: {dept}")
-                            break
-                score += category_score
-                score_breakdown["category_experience"] = category_score
-
-                # Threshold and match level
-                if score < 20:
-                    continue
-
-                if score >= 80:
-                    match_level = "Perfect Fit"
-                elif score >= 60:
-                    match_level = "Great Fit"
-                else:
-                    match_level = "Good Fit"
-
-                if timeline and crew_profile.availability:
-                    reasons.append("Timeline available")
-
-                matches.append({
-                    "profile": {
-                        "user_id": str(user.id),
-                        "name": user.profile.display_name or user.username,
-                        "title": crew_profile.title or "Creative Professional",
-                        "role": crew_profile.title,
-                        "avatar": user.profile.profile_picture,
-                        "location": user.profile.location,
-                        "rating": (
-                            (crew_profile.rating.overall if crew_profile.rating else None)
-                            or getattr(user, "rating", None)
-                            or 0.0
-                        ),
-                        "total_reviews": (
-                            (crew_profile.rating.total_reviews if crew_profile.rating else None)
-                            or getattr(user, "review_count", None)
-                            or 0
-                        ),
-                        "skills": [
-                            s.name if hasattr(s, "name") else s
-                            for s in (user.profile.skills[:5] if user.profile.skills else [])
-                        ],
-                        "specializations": (
-                            crew_profile.specializations[:3]
-                            if crew_profile.specializations else []
-                        ),
-                        "bio": user.profile.bio,
-                        "daily_rate": crew_profile.daily_rate,
-                        "availability": (user.settings.availability_status if user.settings and user.settings.availability_status else ("available" if crew_profile.availability else None)),
-                        "active_project_count": crew_profile.active_project_count,
-                        "workload_capacity": crew_profile.workload_capacity,
-                        "trust_tier": tier_label,
-                        "workload_score": workload_score,
-                        "trust_score": (
-                            user.spectrum_id.trust_score if user.spectrum_id else 0.0
-                        ),
-                        # ETF level for the card badge — never exposes USD value.
-                        "etf_level": etf_level_name,
-                        # Portfolio summary for the card (first item of each type).
-                        "portfolio_item_count": len(items),
-                        "portfolio_has_video": any(i.type == "video" for i in items),
-                    },
-                    "match_score": min(100, score),
-                    "match_level": match_level,
-                    "match_reasons": reasons[:4],
-                    "score_breakdown": score_breakdown,
-                    "workload_info": {
-                        "active_projects": crew_profile.active_project_count,
-                        "capacity": crew_profile.workload_capacity,
-                        "fairness_score": workload_score,
-                        "fairness_label": workload_reason,
-                    },
-                })
+                if match:
+                    matches.append(match)
 
             # Sort by score then fewest active projects as tiebreak
             matches.sort(
@@ -374,6 +454,121 @@ class SmartConnectService:
         except Exception as e:
             logger.error("[SmartConnectService] smart_match error: %s", e)
             return {"matches": [], "total_matches": 0, "search_criteria": {}}
+
+    @staticmethod
+    async def smart_match_for_roles(
+        job,
+        limit_per_role: int = 10,
+        min_trust_tier: Optional[str] = None,
+        workload_aware: bool = True,
+        include_filled: bool = False,
+    ) -> Dict[str, Any]:
+        """Rank creators separately for each role on a multi-role project.
+
+        Editors are ranked for the editing seat, camera operators for the camera
+        seat — matching the whole project against one blended list would bury a
+        specialist sound engineer beneath generalists who partly fit everything.
+
+        A creator can legitimately appear under several roles (someone who both
+        shoots and edits); they are ranked independently in each, because the
+        client hires per seat.
+
+        Roles that are already fully staffed are skipped unless `include_filled`,
+        since there is no seat left to hire into.
+        """
+        roles = job.roles or []
+        if not roles:
+            return {"job_id": str(job.id), "multi_role": False, "roles": []}
+
+        try:
+            candidates = await SmartConnectService._load_candidates(min_trust_tier)
+
+            # Resolve each creator's ETF badge once, not once per role.
+            etf_by_user: Dict[str, tuple] = {}
+            if candidates:
+                try:
+                    from app.services.etf_points_service import EtfPointsService
+                    for user, _ in candidates:
+                        try:
+                            badge = await EtfPointsService.badge_for(user.id)
+                            bonus = {"bronze": 0, "silver": 3, "gold": 5, "platinum": 8}.get(
+                                badge.name, 0
+                            )
+                            etf_by_user[str(user.id)] = (bonus, badge.name, badge.label)
+                        except Exception:
+                            etf_by_user[str(user.id)] = (0, "bronze", "Bronze")
+                except Exception:
+                    pass
+
+            project_type = job.department or ""
+            location = getattr(job, "location", None)
+            is_remote = bool(getattr(job, "is_remote", False))
+
+            role_blocks = []
+            for role in roles:
+                if not include_filled and role.is_full:
+                    role_blocks.append({
+                        "role_id": role.role_id,
+                        "title": role.title,
+                        "count": role.count,
+                        "filled_count": role.filled_count,
+                        "seats_remaining": role.seats_remaining,
+                        "status": role.status,
+                        "matches": [],
+                        "total_matches": 0,
+                        "skipped_reason": "filled",
+                    })
+                    continue
+
+                # A role's own skills are the requirement; fall back to the
+                # project-wide skill list when the role doesn't name any.
+                role_skills = role.skills or job.skills or []
+
+                matches = []
+                for user, crew_profile in candidates:
+                    match = await SmartConnectService._score_candidate(
+                        user,
+                        crew_profile,
+                        project_type=project_type,
+                        roles_needed=[role.title],
+                        skills_required=role_skills,
+                        location=location,
+                        is_remote=is_remote,
+                        timeline=job.duration,
+                        workload_aware=workload_aware,
+                        etf=etf_by_user.get(str(user.id)),
+                    )
+                    if match:
+                        matches.append(match)
+
+                matches.sort(
+                    key=lambda x: (-x["match_score"], x["workload_info"]["active_projects"])
+                )
+
+                role_blocks.append({
+                    "role_id": role.role_id,
+                    "title": role.title,
+                    "count": role.count,
+                    "filled_count": role.filled_count,
+                    "seats_remaining": role.seats_remaining,
+                    "status": role.status,
+                    "budget_per_seat": role.budget_per_seat(),
+                    "skills": role_skills,
+                    "matches": matches[:limit_per_role],
+                    "total_matches": len(matches),
+                })
+
+            return {
+                "job_id": str(job.id),
+                "title": job.title,
+                "multi_role": True,
+                "candidate_pool": len(candidates),
+                "roles": role_blocks,
+            }
+
+        except Exception as e:
+            logger.error("[SmartConnectService] smart_match_for_roles error: %s", e)
+            return {"job_id": str(job.id), "multi_role": True, "roles": []}
 
     @staticmethod
     async def search_creatives(
