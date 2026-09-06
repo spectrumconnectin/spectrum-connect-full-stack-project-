@@ -109,6 +109,7 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
         status = stripe_connect_service.get_account_status(user.stripe_account_id)
         if not status["payouts_enabled"]:
             raise HTTPException(status_code=400, detail="Finish connecting your bank before withdrawing.")
+
         destination_label = "your bank (via Stripe)"
 
     amount = round(float(amount), 2)
@@ -134,6 +135,29 @@ async def request_withdrawal(user: User, amount: float, method: str = "paypal") 
     }).count()
     if inflight:
         raise HTTPException(status_code=409, detail="You already have a withdrawal in progress.")
+
+    # Preflight the platform balance for bank payouts. A Stripe transfer draws
+    # from the balance held in the payout currency — Stripe will not convert a
+    # EUR balance to settle a USD transfer. Without this the transfer fails
+    # *after* the creator's funds have been reserved, and they see a raw Stripe
+    # error. Checking first leaves their balance untouched and says something
+    # they can act on. A balance we cannot read is not treated as empty: a
+    # failed status call must not block an otherwise valid payout.
+    if method == "stripe":
+        pb = stripe_connect_service.platform_balance()
+        if pb.get("ok") and pb["available"] < amount:
+            logger.error(
+                "Bank payout blocked — platform holds %.2f %s (currencies held: %s), "
+                "need %.2f. Check STRIPE_PAYOUT_CURRENCY matches a funded balance.",
+                pb["available"], pb["currency"], pb.get("held_currencies"), amount,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Bank payouts are temporarily unavailable. Your balance is safe — "
+                    "use PayPal, or try again shortly."
+                ),
+            )
 
     now = datetime.utcnow()
     tx_id = str(uuid.uuid4())

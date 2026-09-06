@@ -75,6 +75,40 @@ def get_account_status(account_id: str) -> Dict[str, Any]:
     }
 
 
+def platform_balance(currency: Optional[str] = None) -> Dict[str, Any]:
+    """Available platform balance in the payout currency.
+
+    A Stripe transfer draws from the balance held *in the currency requested* —
+    Stripe will not convert a EUR balance to settle a USD transfer. If the
+    platform settles in a different currency than STRIPE_PAYOUT_CURRENCY, every
+    cash-out fails at the Stripe call with an insufficient-funds error that
+    tells the creator nothing. Checking first lets us say something useful.
+
+    Returns {"ok": True, "available": float, "currency": str} or
+    {"ok": False, "error": str} when the balance could not be read (in which
+    case callers should proceed rather than block a legitimate payout on a
+    failed status call).
+    """
+    want = (currency or settings.STRIPE_PAYOUT_CURRENCY or "usd").lower()
+    try:
+        bal = stripe.Balance.retrieve()
+        entry = next(
+            (b for b in bal.get("available", []) if b.get("currency") == want), None
+        )
+        return {
+            "ok": True,
+            "currency": want,
+            "available": (entry["amount"] / 100) if entry else 0.0,
+            # Which currencies the platform actually holds — the useful detail
+            # when the payout currency isn't one of them.
+            "held_currencies": [b.get("currency") for b in bal.get("available", [])],
+        }
+    except stripe.StripeError as e:
+        msg = getattr(e, "user_message", None) or str(e)
+        logger.error("Could not read platform balance: %s", msg)
+        return {"ok": False, "error": msg, "currency": want}
+
+
 def create_transfer(account_id: str, amount: float, idempotency_key: str,
                     description: str = "Spectrum Connect creator payout") -> Dict[str, Any]:
     """

@@ -256,7 +256,19 @@ async def connect_status(current_user: User = Depends(get_current_user)):
     if current_user.stripe_payouts_enabled != status["payouts_enabled"]:
         current_user.stripe_payouts_enabled = status["payouts_enabled"]
         await current_user.save()
-    return {"connected": True, **status}
+
+    # A creator can be perfectly onboarded and still be unable to cash out if
+    # the platform holds no balance in the payout currency. Report that here so
+    # the UI can warn them up front rather than at the moment they try to
+    # withdraw. Not knowing (a failed balance read) is reported as available.
+    pb = stripe_connect_service.platform_balance()
+    payouts_available = (not pb.get("ok")) or pb.get("available", 0) > 0
+
+    return {
+        "connected": True,
+        **status,
+        "payouts_available": payouts_available,
+    }
 
 
 @router.get("/invoice/csv", summary="Download earnings report as CSV")
