@@ -354,13 +354,10 @@ export const profile = {
   // Public marketing pages need to ask "is anyone signed in?" without the
   // global 401 handler punting a visitor with a stale token over to /login.
   getMeQuiet: async (): Promise<MeResponse | null> => {
-    const token = tokenStore.get();
-    if (!token) return null;
+    if (!tokenStore.isLoggedIn()) return null;
     try {
-      const res = await fetch(`${BASE_URL}/profiles/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Stale/expired token — drop it so the nav shows logged-out state, but
+      const res = await fetch(`${BASE_URL}/profiles/me`, { credentials: 'include' });
+      // Stale/expired session — drop it so the nav shows logged-out state, but
       // leave the visitor where they are.
       if (!res.ok) {
         if (res.status === 401) tokenStore.clear();

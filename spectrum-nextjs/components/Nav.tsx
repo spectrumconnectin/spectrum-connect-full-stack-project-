@@ -34,7 +34,7 @@ export default function Nav() {
   // coming back to a marketing page from a dashboard looked like being signed
   // out even though the token was still valid.
   useEffect(() => {
-    if (!tokenStore.get()) return;
+    if (!tokenStore.isLoggedIn()) return;
     setHasToken(true);
     let cancelled = false;
     profileApi.getMeQuiet().then(u => {
