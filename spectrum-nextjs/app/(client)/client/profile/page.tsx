@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import OnlineStatusBadge from '@/components/OnlineStatusBadge';
+import CurrencySelector from '@/components/CurrencySelector';
 import { useRouter } from 'next/navigation';
 import {
   profile as profileApi,
@@ -534,6 +535,12 @@ export default function ClientProfilePage() {
               {notifSaving ? 'Saving…' : 'Save Preferences'}
             </button>
           </div>
+        </div>
+
+        {/* Display currency — clients read budgets and payments in their own
+            currency just as creators do. */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8">
+          <CurrencySelector />
         </div>
 
         {/* Danger Zone */}

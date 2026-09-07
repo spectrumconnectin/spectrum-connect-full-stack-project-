@@ -109,32 +109,21 @@ class EscrowService:
             ))
             total += amount
 
-        # Lock the exchange rate now, while the creator can still see the figure
-        # they are agreeing to. Recalculating at payout time would mean the
-        # amount they were shown when they took the job is not the amount they
-        # receive, which is exactly the confusion this is meant to remove.
+        # Record which currency this creator is paid in, but do NOT fix a rate
+        # yet. The rate is locked when the client actually funds the escrow —
+        # see lock_fx_rate_on_funding. An escrow can sit unfunded for days after
+        # it is created, and a rate attached to money nobody has committed is a
+        # promise the platform is carrying for free.
         payout_currency = None
         locked_rate = None
         fx_locked_at = None
         fx_source = None
         try:
-            from app.services import fx_service
-
             payout_currency = (getattr(creator, "preferred_currency", None) or currency).upper()
-            if payout_currency != currency.upper():
-                locked_rate = await fx_service.rate_for(currency, payout_currency)
-                if locked_rate:
-                    fx_locked_at = datetime.utcnow()
-                    snapshot = await fx_service.current_snapshot()
-                    fx_source = str(snapshot.id) if snapshot else None
-                else:
-                    # No rate available: leave it unlocked rather than invent
-                    # one. Display falls back to the project currency.
-                    logger.warning(
-                        "No FX rate to lock for escrow %s->%s", currency, payout_currency
-                    )
+            if payout_currency == currency.upper():
+                payout_currency = None      # nothing to convert
         except Exception:
-            logger.exception("Could not lock an FX rate for this escrow")
+            logger.exception("Could not determine a payout currency for this escrow")
 
         escrow = Escrow(
             client_id=PydanticObjectId(client_id),
@@ -165,6 +154,49 @@ class EscrowService:
     # ------------------------------------------------------------------ #
     # Fund milestone                                                       #
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    async def lock_fx_rate_on_funding(escrow, when=None) -> Optional[float]:
+        """Fix the exchange rate for an escrow at the moment it is funded.
+
+        Idempotent: once a rate is locked it is never changed, so a project with
+        several milestones funded over weeks settles every one of them at the
+        rate agreed when the first payment landed.
+
+        Returns the locked rate, or None when there is nothing to convert or no
+        rate could be obtained. A missing rate leaves the escrow unlocked rather
+        than inventing one — release then falls back to the project currency,
+        which is honest, where a made-up rate would not be.
+        """
+        payout_currency = getattr(escrow, "payout_currency", None)
+        if not payout_currency or getattr(escrow, "locked_fx_rate", None):
+            return getattr(escrow, "locked_fx_rate", None)
+
+        try:
+            from app.services import fx_service
+
+            rate = await fx_service.rate_for(escrow.currency, payout_currency)
+            if not rate:
+                logger.warning(
+                    "No FX rate to lock at funding for escrow %s (%s->%s)",
+                    escrow.id, escrow.currency, payout_currency,
+                )
+                return None
+
+            snapshot = await fx_service.current_snapshot()
+            escrow.locked_fx_rate = rate
+            escrow.fx_locked_at = when or datetime.utcnow()
+            escrow.fx_rate_source = str(snapshot.id) if snapshot else None
+            await escrow.save()
+
+            logger.info(
+                "Locked FX for escrow %s at funding: 1 %s = %s %s",
+                escrow.id, escrow.currency, rate, payout_currency,
+            )
+            return rate
+        except Exception:
+            logger.exception("Could not lock an FX rate at funding for escrow %s", escrow.id)
+            return None
 
     @staticmethod
     async def fund_milestone(
@@ -262,6 +294,14 @@ class EscrowService:
         milestone.status = "funded"
         milestone.funded_at = now
         escrow.funded_amount = round(escrow.funded_amount + float(milestone.amount), 2)
+
+        # The client's money has actually arrived, so this is the moment the
+        # exchange rate is fixed for the project. Locking earlier, at escrow
+        # creation, would attach a rate to funds nobody had committed yet and
+        # leave the platform carrying that promise for however long the escrow
+        # sat unfunded. Locked once, on the first funded milestone, so later
+        # milestones on the same project settle at the same rate.
+        await EscrowService.lock_fx_rate_on_funding(escrow, when=now)
 
         # ETF Points — client funded a milestone (engagement signal).
         # Blocked when client and creator are the same account (self-job).

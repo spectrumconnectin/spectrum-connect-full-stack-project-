@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem, stripeApi, commission, CommissionBreakdown } from '@/lib/api';
+import { escrow, jobs, earnings as earningsApi, EscrowDetail, EscrowMilestone, JobPostItem, stripeApi, commission, CommissionBreakdown, formatMoney } from '@/lib/api';
 
 // ── Status mapping (milestone status → display) ──────────────────────────────
 const MILESTONE_STATUS_LABEL: Record<string, string> = {
@@ -573,8 +573,8 @@ function FundProjectModal({
                       </div>
                       {job.budget?.min && job.budget?.max && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Project budget: ${job.budget.min.toLocaleString()}
-                          {job.budget.min !== job.budget.max && `–$${job.budget.max.toLocaleString()}`}
+                          Project budget: {formatMoney(job.budget.min, job.budget.currency, { withCode: true })}
+                          {job.budget.min !== job.budget.max && ` – ${formatMoney(job.budget.max, job.budget.currency)}`}
                         </p>
                       )}
                     </div>
@@ -704,8 +704,8 @@ function PendingFundingSection({
                   </p>
                   {(job.budget?.min || job.budget?.max) && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Budget: ${job.budget.min?.toLocaleString()}
-                      {job.budget.max ? `–$${job.budget.max.toLocaleString()}` : '+'}
+                      Budget: {formatMoney(job.budget.min, job.budget.currency, { withCode: true })}
+                      {job.budget.max ? ` – ${formatMoney(job.budget.max, job.budget.currency)}` : '+'}
                     </p>
                   )}
                 </div>
@@ -727,7 +727,7 @@ function PendingFundingSection({
                       className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-xl font-semibold text-sm hover:bg-orange-700 transition">
                       <i className="fa-solid fa-lock text-xs"></i>
                       Fund {member.creator_name.split(' ')[0]}
-                      {member.proposed_budget ? ` ($${member.proposed_budget.toLocaleString()})` : ''}
+                      {member.proposed_budget ? ` (${formatMoney(member.proposed_budget, job?.budget?.currency)})` : ''}
                     </button>
                   ))}
                 </div>

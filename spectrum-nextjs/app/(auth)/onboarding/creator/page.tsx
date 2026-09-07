@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile } from '@/lib/api';
+import { profile, currency as currencyApi } from '@/lib/api';
 import PortfolioProjectEditor from '@/components/portfolio/PortfolioProjectEditor';
 
 const SKILLS = [
@@ -19,6 +19,31 @@ const RATES = ['< $25/hr', '$25–$50/hr', '$50–$100/hr', '$100–$150/hr', '$
 const AVAILABILITY = ['Full-time (40+ hrs/week)', 'Part-time (20–40 hrs/week)', 'Flexible (10–20 hrs/week)', 'Project-based only'];
 
 const steps = ['Profile', 'Skills', 'Availability', 'Portfolio', 'Done'];
+
+// Offered up front so a creator knows from the start what they will be paid in.
+// The full list stays available in settings.
+const CURRENCY_CHOICES = [
+  { code: 'USD', label: '$ USD' },
+  { code: 'LKR', label: 'Rs LKR' },
+  { code: 'EUR', label: '€ EUR' },
+  { code: 'GBP', label: '£ GBP' },
+  { code: 'AUD', label: 'A$ AUD' },
+];
+
+const LOCALE_CURRENCY: Record<string, string> = {
+  LK: 'LKR', GB: 'GBP', AU: 'AUD', US: 'USD',
+  IE: 'EUR', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR',
+};
+
+function guessCurrency(): string {
+  if (typeof navigator === 'undefined') return 'USD';
+  try {
+    const region = new Intl.Locale(navigator.language).maximize().region;
+    return (region && LOCALE_CURRENCY[region]) || 'USD';
+  } catch {
+    return 'USD';
+  }
+}
 
 export default function CreatorOnboardingPage() {
   const router = useRouter();
@@ -39,6 +64,9 @@ export default function CreatorOnboardingPage() {
   // Step 2 — Availability
   const [rate, setRate] = useState('');
   const [availability, setAvailability] = useState('');
+  // Guessed from locale; a creator in Colombo should not have to
+  // discover later that they were being quoted in dollars.
+  const [payCurrency, setPayCurrency] = useState(() => guessCurrency());
   const [remoteOnly, setRemoteOnly] = useState(false);
 
   // Step 3 — Portfolio (handled by PortfolioSection component)
@@ -104,6 +132,10 @@ export default function CreatorOnboardingPage() {
       if (selectedSkills.length > 0) {
         await Promise.all(selectedSkills.map(s => profile.addSkill({ name: s })));
       }
+      // Best-effort: never block finishing signup on this.
+      try {
+        await currencyApi.setMine(payCurrency);
+      } catch { /* keeps the platform default */ }
       setStep(4); // Done
       setTimeout(() => router.push('/creator/dashboard'), 2000);
     } catch (e) {
@@ -247,6 +279,17 @@ export default function CreatorOnboardingPage() {
                           <button key={r} type="button" onClick={() => setRate(r)}
                             style={{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${rate === r ? '#195ad7' : '#e5e7eb'}`, background: rate === r ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: rate === r ? '#195ad7' : '#374151', cursor: 'pointer' }}>
                             {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label>Currency you want to be paid in</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {CURRENCY_CHOICES.map(c => (
+                          <button key={c.code} type="button" onClick={() => setPayCurrency(c.code)}
+                            style={{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${payCurrency === c.code ? '#195ad7' : '#e5e7eb'}`, background: payCurrency === c.code ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: payCurrency === c.code ? '#195ad7' : '#374151', cursor: 'pointer' }}>
+                            {c.label}
                           </button>
                         ))}
                       </div>

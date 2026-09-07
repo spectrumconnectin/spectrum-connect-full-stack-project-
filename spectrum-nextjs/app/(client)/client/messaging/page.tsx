@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { messaging, jobs, ConversationItem, MessageItem, auth, JobPostItem } from '@/lib/api';
+import { messaging, jobs, ConversationItem, MessageItem, auth, JobPostItem, formatMoney } from '@/lib/api';
 
 function relTime(iso?: string): string {
   if (!iso) return '';
@@ -116,8 +116,8 @@ function ProjectPanel({ jobId, onClose }: { jobId: string; onClose: () => void }
             {
               icon: 'fa-dollar-sign', label: 'Budget', color: 'text-green-600',
               value: job.budget_type === 'negotiable' ? 'Negotiable' :
-                     job.budget?.min && job.budget?.max ? `$${job.budget.min.toLocaleString()}–$${job.budget.max.toLocaleString()}` :
-                     job.budget?.min ? `From $${job.budget.min.toLocaleString()}` :
+                     job.budget?.min && job.budget?.max ? `${formatMoney(job.budget.min, job.budget.currency)}–${formatMoney(job.budget.max, job.budget.currency)}` :
+                     job.budget?.min ? `From ${formatMoney(job.budget.min, job.budget.currency)}` :
                      'Not specified',
             },
             {

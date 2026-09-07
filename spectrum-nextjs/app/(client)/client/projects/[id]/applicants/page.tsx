@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { proposals, profile as profileApi, JobProposalItem, ProjectRole } from '@/lib/api';
+import { proposals, profile as profileApi, jobs, JobProposalItem, ProjectRole, formatMoney } from '@/lib/api';
 import ProjectRoleTabs from '@/components/ProjectRoleTabs';
 
 const STATUS_FILTERS = ['All', 'submitted', 'shortlisted', 'interviewing', 'accepted', 'rejected'];
@@ -45,17 +45,21 @@ export default function ApplicantsPage() {
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  // Bids are quoted in the project's currency, not dollars.
+  const [projectCurrency, setProjectCurrency] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!id) return;
     Promise.all([
       proposals.getForJob(id),
       profileApi.getMe(),
+      jobs.getById(id).catch(() => null),
     ])
-      .then(([data, me]) => {
+      .then(([data, me, job]) => {
         setApplicants((data?.proposals ?? data ?? []) as JobProposalItem[]);
         setRoles(data?.roles ?? []);
         setMyUserId(me.id ?? null);
+        setProjectCurrency(job?.budget?.currency ?? job?.currency ?? undefined);
       })
       .catch(e => setError((e as Error).message))
       .finally(() => setLoading(false));
@@ -211,7 +215,7 @@ export default function ApplicantsPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       {a.proposed_budget && (
-                        <div className="text-xl font-bold text-gray-900">${a.proposed_budget.toLocaleString()}</div>
+                        <div className="text-xl font-bold text-gray-900">{formatMoney(a.proposed_budget, projectCurrency, { withCode: true })}</div>
                       )}
                       <div className="text-xs text-gray-400 mt-0.5">{formatDate(a.submitted_at)}</div>
                     </div>

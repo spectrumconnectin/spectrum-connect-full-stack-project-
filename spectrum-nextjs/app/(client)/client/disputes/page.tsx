@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { disputes, escrow, DisputeListItem, EscrowListItem } from '@/lib/api';
+import { disputes, escrow, DisputeListItem, EscrowListItem, formatMoney } from '@/lib/api';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   open:                   { label: 'Open',         color: 'bg-blue-50 text-blue-700',       icon: 'fa-circle-dot' },
@@ -105,7 +105,7 @@ function NewDisputeModal({ onClose, onCreated }: {
                 <option value="">Select a project</option>
                 {escrows.map(e => (
                   <option key={e.escrow_id} value={e.escrow_id}>
-                    Escrow #{e.escrow_id.slice(-8)} — ${e.total_amount.toLocaleString()} · {e.milestone_count} milestone{e.milestone_count !== 1 ? 's' : ''}
+                    Escrow #{e.escrow_id.slice(-8)} — {formatMoney(e.total_amount, e.currency, { withCode: true })} · {e.milestone_count} milestone{e.milestone_count !== 1 ? 's' : ''}
                   </option>
                 ))}
               </select>

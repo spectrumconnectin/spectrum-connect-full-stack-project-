@@ -4,10 +4,35 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile } from '@/lib/api';
+import { profile, currency as currencyApi } from '@/lib/api';
 
 const CATEGORIES = ['Video Production', 'Photography', 'Graphic Design', 'Motion & Animation', 'Copywriting & Content', 'Music & Audio', 'Social Media', 'Branding', 'Web & App Design', 'Other'];
 const BUDGETS = ['< $500', '$500–$2,000', '$2,000–$10,000', '$10,000–$50,000', '$50,000+'];
+
+// The currencies offered up front. Everything else is still available later in
+// settings; this is just the short list most people will want.
+const CURRENCY_CHOICES = [
+  { code: 'USD', label: '$ USD' },
+  { code: 'LKR', label: 'Rs LKR' },
+  { code: 'EUR', label: '€ EUR' },
+  { code: 'GBP', label: '£ GBP' },
+  { code: 'AUD', label: 'A$ AUD' },
+];
+
+const LOCALE_CURRENCY: Record<string, string> = {
+  LK: 'LKR', GB: 'GBP', AU: 'AUD', US: 'USD',
+  IE: 'EUR', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR',
+};
+
+function guessCurrency(): string {
+  if (typeof navigator === 'undefined') return 'USD';
+  try {
+    const region = new Intl.Locale(navigator.language).maximize().region;
+    return (region && LOCALE_CURRENCY[region]) || 'USD';
+  } catch {
+    return 'USD';
+  }
+}
 
 const steps = ['About You', 'What You Need', 'Budget', 'Done'];
 
@@ -29,6 +54,10 @@ export default function ClientOnboardingPage() {
   // Step 2 — Budget
   const [budget, setBudget] = useState('');
   const [timeline, setTimeline] = useState('');
+  // Guess from the browser's locale so most people never have to think about
+  // it, while anyone in a different market can correct it here rather than
+  // discovering the platform is priced in dollars later.
+  const [currency, setCurrency] = useState(() => guessCurrency());
 
   const toggleCat = (c: string) => setSelectedCategories(prev =>
     prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
@@ -57,6 +86,11 @@ export default function ClientOnboardingPage() {
           bio: projectDesc.trim() || undefined,
         },
       });
+      // Best-effort: a failure here shouldn't block someone from finishing
+      // signup — they can still change it in settings.
+      try {
+        await currencyApi.setMine(currency);
+      } catch { /* keeps the platform default */ }
       setStep(3);
       setTimeout(() => router.push('/client/dashboard'), 2000);
     } catch (e) {
@@ -184,6 +218,18 @@ export default function ClientOnboardingPage() {
                           <button key={b} type="button" onClick={() => setBudget(b)}
                             style={{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${budget === b ? '#195ad7' : '#e5e7eb'}`, background: budget === b ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: budget === b ? '#195ad7' : '#374151', cursor: 'pointer' }}>
                             {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <label>Currency you work in</label>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {CURRENCY_CHOICES.map(c => (
+                          <button key={c.code} type="button" onClick={() => setCurrency(c.code)}
+                            style={{ padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${currency === c.code ? '#195ad7' : '#e5e7eb'}`, background: currency === c.code ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: currency === c.code ? '#195ad7' : '#374151', cursor: 'pointer' }}>
+                            {c.label}
                           </button>
                         ))}
                       </div>
