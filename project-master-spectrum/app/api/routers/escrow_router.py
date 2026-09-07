@@ -290,12 +290,14 @@ async def release_milestone(
                 client_id=str(current_user.id),
                 milestone_title=m_title,
                 amount=m_amount,
+                currency=esc.currency,
             )
             await NotificationService.payment_released_client(
                 client_id=str(current_user.id),
                 creator_id=str(esc.creator_id),
                 milestone_title=m_title,
                 amount=m_amount,
+                currency=esc.currency,
             )
 
             # Update job to 'completed' + stamp completed_at once ALL escrows for the

@@ -179,17 +179,30 @@ class NotificationService:
             actor_name=client_name,
         )
 
+def _money(amount: float, currency: str = "USD") -> str:
+    """Amount with its currency, for notification copy.
+
+    A creator on an LKR project being told "Payment released — $165000.00" is
+    the exact confusion the multi-currency work exists to remove, and a
+    notification is often the first place they see the number.
+    """
+    try:
+        from app.services import fx_service
+        return fx_service.format_money(amount, currency)
+    except Exception:
+        return f"{amount:,.2f} {(currency or 'USD').upper()}"
+
     # ── Escrow / Payments ──────────────────────────────────────────────────────
 
     @staticmethod
-    async def milestone_funded(*, creator_id: str, client_id: str, milestone_title: str, amount: float, escrow_id: str) -> None:
+    async def milestone_funded(*, creator_id: str, client_id: str, milestone_title: str, amount: float, escrow_id: str, currency: str = "USD") -> None:
         """Notify creator that a milestone has been funded."""
         client_name, client_avatar = await _get_user_name(client_id)
         await send(
             user_id=creator_id,
             type="payment",
             category="success",
-            title=f"Milestone funded — ${amount:.2f}",
+            title=f"Milestone funded — {_money(amount, currency)}",
             message=f"{client_name} funded '{milestone_title}'. Funds are held in escrow — start working!",
             action_url=f"/creator/projects",
             action_text="View project",
@@ -199,14 +212,14 @@ class NotificationService:
         )
 
     @staticmethod
-    async def milestone_released(*, creator_id: str, client_id: str, milestone_title: str, amount: float) -> None:
+    async def milestone_released(*, creator_id: str, client_id: str, milestone_title: str, amount: float, currency: str = "USD") -> None:
         """Notify creator that payment was released to them."""
         client_name, client_avatar = await _get_user_name(client_id)
         await send(
             user_id=creator_id,
             type="payment",
             category="success",
-            title=f"💰 Payment released — ${amount:.2f}",
+            title=f"💰 Payment released — {_money(amount, currency)}",
             message=f"{client_name} approved your work on '{milestone_title}'. Payment is on its way.",
             action_url="/creator/earnings",
             action_text="View earnings",
@@ -216,14 +229,14 @@ class NotificationService:
         )
 
     @staticmethod
-    async def payment_released_client(*, client_id: str, creator_id: str, milestone_title: str, amount: float) -> None:
+    async def payment_released_client(*, client_id: str, creator_id: str, milestone_title: str, amount: float, currency: str = "USD") -> None:
         """Confirm to client that they released payment."""
         creator_name, creator_avatar = await _get_user_name(creator_id)
         await send(
             user_id=client_id,
             type="payment",
             category="info",
-            title=f"Payment sent — ${amount:.2f}",
+            title=f"Payment sent — {_money(amount, currency)}",
             message=f"You released payment for '{milestone_title}' to {creator_name}.",
             action_url="/client/payments",
             action_text="View payments",

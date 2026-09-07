@@ -292,6 +292,7 @@ async def _on_checkout_completed(session: dict) -> None:
                 milestone_title=m_title,
                 amount=m_amount,
                 escrow_id=escrow_id,
+                currency=esc.currency,
             )
             if esc.job_post_id:
                 job = await JobPost.get(esc.job_post_id)

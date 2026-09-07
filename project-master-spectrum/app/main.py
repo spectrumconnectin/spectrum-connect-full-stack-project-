@@ -262,6 +262,23 @@ async def startup_db_client():
         asyncio.create_task(_scheduler_loop())
         logger.info("Auto-release scheduler started")
 
+        # Warm the exchange-rate cache. The micro-project fee threshold is an
+        # absolute amount in the base currency, so pricing a non-base charge
+        # correctly needs a rate. On a cold cache the commission code falls back
+        # to comparing raw numbers, which charges a small LKR project the full
+        # rate — so whether a fee is right would otherwise depend on how recently
+        # the process restarted. Non-blocking: a failure here just leaves the
+        # cache cold, exactly as before.
+        async def _warm_fx() -> None:
+            try:
+                from app.services import fx_service
+                await fx_service.current_snapshot()
+                logger.info("Exchange-rate cache warmed")
+            except Exception:
+                logger.warning("Could not warm the exchange-rate cache at startup", exc_info=True)
+
+        asyncio.create_task(_warm_fx())
+
 
     except Exception as e:
         err = str(e)

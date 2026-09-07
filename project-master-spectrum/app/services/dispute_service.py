@@ -27,11 +27,44 @@ from typing import Any, Dict, List, Optional
 from beanie import PydanticObjectId
 from fastapi import HTTPException, status
 
+import logging
+
 from app.core.config import settings
 from app.models.escrow import Escrow, Dispute, DisputeEvidence, GuaranteeFund
 from app.models.schema import User, Transaction
 from app.services.commission_service import calc_commission
 import uuid
+
+
+logger = logging.getLogger(__name__)
+
+
+def _locked_payout(escrow, creator_payout: float):
+    """What a disputed payout is worth in the creator's own currency.
+
+    A dispute resolution is still a payment for the project, so it must carry
+    the rate locked when that project was funded. Without this the earning
+    lands with no locked value and converts at the rate on the day the creator
+    withdraws — quietly undoing the promise for exactly the projects that
+    already went wrong for them.
+
+    Returns (payout_currency, locked_rate, payout_amount), all None when the
+    escrow has no locked rate.
+    """
+    payout_currency = getattr(escrow, "payout_currency", None)
+    locked_rate = getattr(escrow, "locked_fx_rate", None)
+    if not payout_currency or not locked_rate:
+        return None, None, None
+    try:
+        from app.services import fx_service
+        return (
+            payout_currency,
+            locked_rate,
+            fx_service.round_money(creator_payout * locked_rate, payout_currency),
+        )
+    except Exception:
+        logger.exception("Could not apply a locked rate to a dispute payout")
+        return None, None, None
 
 
 class DisputeService:
@@ -414,6 +447,7 @@ class DisputeService:
 
         # Apply v1 8/4 commission split to the aggregate released amount.
         fees = calc_commission(released, currency=escrow.currency).to_dict()
+        p_ccy, p_rate, p_amt = _locked_payout(escrow, fees["creator_payout"])
 
         transaction = Transaction(
             transaction_id=tx_id,
@@ -428,6 +462,9 @@ class DisputeService:
             commission_version=fees["commission_version"],
             payment_processing_fee=0.0,
             net_amount=fees["creator_payout"],
+            payout_currency=p_ccy,
+            payout_fx_rate=p_rate,
+            payout_currency_amount=p_amt,
             status="completed",
             initiated_at=now,
             processed_at=now,
@@ -470,6 +507,7 @@ class DisputeService:
 
         if creator_amount > 0:
             fees = calc_commission(creator_amount, currency=escrow.currency).to_dict()
+            p_ccy, p_rate, p_amt = _locked_payout(escrow, fees["creator_payout"])
             await Transaction(
                 transaction_id=tx_id,
                 from_user_id=escrow.client_id,
@@ -483,6 +521,9 @@ class DisputeService:
                 commission_version=fees["commission_version"],
                 payment_processing_fee=0.0,
                 net_amount=fees["creator_payout"],
+                payout_currency=p_ccy,
+                payout_fx_rate=p_rate,
+                payout_currency_amount=p_amt,
                 status="completed",
                 initiated_at=now,
                 processed_at=now,
