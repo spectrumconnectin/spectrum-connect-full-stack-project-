@@ -325,6 +325,20 @@ body {
 .pr-foot-bottom .links { display: flex; gap: 18px; }
 .pr-foot-bottom .links a { color: #64748b; text-decoration: none; }
 
+/* On a phone this row stayed a space-between flex row: the copyright got
+   squeezed into a ~90px column and broke across four lines, while the link row
+   ran off the right edge with "Help" cut in half. Stack it and let the links
+   wrap. */
+@media (max-width: 640px) {
+  .pr-foot-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 36px;
+  }
+  .pr-foot-bottom .links { flex-wrap: wrap; gap: 14px 18px; }
+}
+
 /* ---- Dashboard UI (app.css polish) ---- */
 @keyframes sc-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 /* `backwards`, not `both` — see the identical fix on .page-enter further down

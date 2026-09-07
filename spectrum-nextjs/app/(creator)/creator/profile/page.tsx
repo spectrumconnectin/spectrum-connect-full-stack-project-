@@ -1,5 +1,6 @@
 'use client';
 import OnlineStatusBadge from '@/components/OnlineStatusBadge';
+import { normaliseUrl, invalidUrlLabels } from '@/lib/urls';
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -49,7 +50,7 @@ const emptyCert: CertEntry = { name: '', issuing_organization: '', issue_date: '
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <button onClick={onToggle}
-      className={`relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-cobalt' : 'bg-gray-200'}`}>
+      className={`relative w-11 h-6 shrink-0 rounded-full transition-colors ${on ? 'bg-cobalt' : 'bg-gray-200'}`}>
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
   );
@@ -204,6 +205,22 @@ export default function ProfilePage() {
   }, []);
 
   const saveProfile = async () => {
+    // type="url" only validates on a native form submit; this saves from a
+    // click handler, so nothing was checking these. A creator's public profile
+    // is their shopfront — a dead link there costs them work.
+    const bad = invalidUrlLabels({
+      Website: website, LinkedIn: linkedin, IMDb: imdb,
+      Vimeo: vimeo, Portfolio: portfolio,
+    });
+    if (bad.length) {
+      const list = bad.length === 1
+        ? bad[0]
+        : `${bad.slice(0, -1).join(', ')} and ${bad[bad.length - 1]}`;
+      setProfileMsg(`${list} ${bad.length === 1 ? 'is' : 'are'} not a valid web address.`);
+      setTimeout(() => setProfileMsg(''), 5000);
+      return;
+    }
+
     setProfileSaving(true); setProfileMsg('');
     try {
       await profileApi.updateMe({
@@ -213,13 +230,13 @@ export default function ProfilePage() {
           display_name: displayName || undefined,
           tagline: tagline || undefined,
           bio: bio || undefined,
-          website: website || undefined,
+          website: normaliseUrl(website) ?? undefined,
           location: { city: city || undefined, country: country || undefined },
           social_links: {
-            linkedin: linkedin || undefined,
-            imdb: imdb || undefined,
-            vimeo: vimeo || undefined,
-            portfolio: portfolio || undefined,
+            linkedin: normaliseUrl(linkedin) ?? undefined,
+            imdb: normaliseUrl(imdb) ?? undefined,
+            vimeo: normaliseUrl(vimeo) ?? undefined,
+            portfolio: normaliseUrl(portfolio) ?? undefined,
           },
           hourly_rate_min: hourlyMin ? parseFloat(hourlyMin) : undefined,
           hourly_rate_max: hourlyMax ? parseFloat(hourlyMax) : undefined,

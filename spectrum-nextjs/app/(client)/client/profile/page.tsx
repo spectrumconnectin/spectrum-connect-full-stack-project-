@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import OnlineStatusBadge from '@/components/OnlineStatusBadge';
 import CurrencySelector from '@/components/CurrencySelector';
+import { normaliseUrl, invalidUrlLabels } from '@/lib/urls';
 import { useRouter } from 'next/navigation';
 import {
   profile as profileApi,
@@ -25,14 +26,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <button onClick={onToggle}
-      className={`relative w-11 h-6 rounded-full transition-colors ${on ? 'bg-cobalt' : 'bg-gray-300'}`}>
+      className={`relative w-11 h-6 shrink-0 rounded-full transition-colors ${on ? 'bg-cobalt' : 'bg-gray-300'}`}>
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
   );
 }
 
 const notifDefs = [
-  { key: 'email_notifications',  label: 'New job matches',       desc: 'Get notified when Smart Connect finds a project for you' },
+  { key: 'email_notifications',  label: 'New creator matches',   desc: 'Get notified when Smart Connect finds a creator for your project' },
   { key: 'push_notifications',   label: 'Application updates',   desc: 'Status changes on projects you posted' },
   { key: 'sms_notifications',    label: 'Messages',              desc: 'New messages from creators' },
   { key: 'marketing_emails',     label: 'Weekly digest',         desc: 'A summary of your activity each Monday' },
@@ -136,6 +137,18 @@ export default function ClientProfilePage() {
 
   // ── Save profile ─────────────────────────────────────────────────────────
   const saveProfile = async () => {
+    // type="url" on the inputs does nothing here — that only fires on a native
+    // form submit, and this saves from a click handler. Without this check
+    // "hhshshsh" saved happily and rendered as a dead link on the profile.
+    const bad = invalidUrlLabels({ Website: website, LinkedIn: linkedin });
+    if (bad.length) {
+      setProfileMsg(
+        `${bad.join(' and ')} ${bad.length === 1 ? 'is' : 'are'} not a valid web address.`,
+      );
+      setTimeout(() => setProfileMsg(''), 5000);
+      return;
+    }
+
     setProfileSaving(true); setProfileMsg('');
     try {
       await profileApi.updateMe({
@@ -144,9 +157,9 @@ export default function ClientProfilePage() {
           last_name:    lastName   || undefined,
           display_name: displayName || undefined,
           bio:          bio        || undefined,
-          website:      website    || undefined,
+          website:      normaliseUrl(website) ?? undefined,
           location: { city: city || undefined, country: country || undefined },
-          social_links: { linkedin: linkedin || undefined },
+          social_links: { linkedin: normaliseUrl(linkedin) ?? undefined },
         },
       });
       setProfileMsg('Saved successfully!');
