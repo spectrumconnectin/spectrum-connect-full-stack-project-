@@ -344,7 +344,10 @@ async def add_job_role(
     new_role = ProjectRole(**role_data.model_dump(exclude={"role_id"}))
     roles = list(job.roles or [])
     roles.append(new_role)
-    role_service.validate_role_budgets(roles, job.budget.max if job.budget else None)
+    role_service.validate_role_budgets(
+        roles, job.budget.max if job.budget else None,
+        currency=(job.budget.currency if job.budget else None) or job.currency or "USD",
+    )
 
     job.roles = roles
     await job.save()

@@ -65,8 +65,12 @@ export default function ProjectRolesEditor({
 
   const totalSeats = roles.reduce((sum, r) => sum + (r.count || 0), 0);
   const allocated = roles.reduce((sum, r) => sum + (r.budget_allocation || 0), 0);
-  const remaining = totalBudget !== null ? totalBudget - allocated : null;
-  const overAllocated = remaining !== null && remaining < 0;
+  const remaining = totalBudget !== null ? Math.round((totalBudget - allocated) * 100) / 100 : null;
+  const overAllocated = remaining !== null && remaining < -0.01;
+  // The whole budget has to reach the roles: each hire is escrowed from their
+  // own allocation, so anything left over can never be paid to anyone.
+  const underAllocated = remaining !== null && remaining > 0.01;
+  const balanced = remaining !== null && !overAllocated && !underAllocated;
 
   const update = (i: number, patch: Partial<ProjectRoleInput>) =>
     onChange(roles.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -318,34 +322,55 @@ export default function ProjectRolesEditor({
           {/* Budget reconciliation — the backend rejects over-allocation, so
               surface the shortfall here rather than at submit time. */}
           <div
-            className={`rounded-xl border px-4 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 ${
-              overAllocated ? 'border-rose-200 bg-rose-50' : 'border-gray-200 bg-gray-50'
+            className={`rounded-xl border px-4 py-3 ${
+              overAllocated || underAllocated
+                ? 'border-amber-200 bg-amber-50'
+                : balanced
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-gray-200 bg-gray-50'
             }`}
           >
-            <p className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{roles.length}</span>
-              {roles.length === 1 ? ' role' : ' roles'}
-              <span className="text-gray-300 mx-2">·</span>
-              <span className="font-semibold text-gray-900">{totalSeats}</span>
-              {totalSeats === 1 ? ' person to hire' : ' people to hire'}
-            </p>
-            {totalBudget !== null && allocated > 0 && (
-              <p className={`text-sm ${overAllocated ? 'text-rose-700' : 'text-gray-600'}`}>
-                {currencySymbol}
-                {allocated.toLocaleString()} allocated
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold text-gray-900">{roles.length}</span>
+                {roles.length === 1 ? ' role' : ' roles'}
                 <span className="text-gray-300 mx-2">·</span>
-                {overAllocated ? (
-                  <span className="font-semibold">
-                    {currencySymbol}
-                    {Math.abs(remaining!).toLocaleString()} over budget
-                  </span>
+                <span className="font-semibold text-gray-900">{totalSeats}</span>
+                {totalSeats === 1 ? ' person to hire' : ' people to hire'}
+              </p>
+              {totalBudget !== null && (
+                <p className="text-sm text-gray-600">
+                  {currencySymbol}
+                  {allocated.toLocaleString()} of {currencySymbol}
+                  {totalBudget.toLocaleString()} assigned
+                  {balanced && (
+                    <span className="text-emerald-700 font-semibold ml-2">
+                      <i className="fa-solid fa-check text-xs mr-1"></i>
+                      all assigned
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+
+            {/* The budget has to land entirely on the roles before this can be
+                published, so say what is still wrong while it can be fixed. */}
+            {(overAllocated || underAllocated) && (
+              <p className="text-sm text-amber-800 mt-2 pt-2 border-t border-amber-200/70">
+                {underAllocated ? (
+                  <>
+                    <span className="font-semibold">
+                      {currencySymbol}{remaining!.toLocaleString()}
+                    </span>{' '}
+                    still to assign — every part of the budget has to belong to a role
+                    before you can publish.
+                  </>
                 ) : (
                   <>
-                    <span className="font-semibold text-gray-900">
-                      {currencySymbol}
-                      {remaining!.toLocaleString()}
+                    <span className="font-semibold">
+                      {currencySymbol}{Math.abs(remaining!).toLocaleString()}
                     </span>{' '}
-                    unallocated
+                    over budget — reduce a role, or raise the project budget.
                   </>
                 )}
               </p>

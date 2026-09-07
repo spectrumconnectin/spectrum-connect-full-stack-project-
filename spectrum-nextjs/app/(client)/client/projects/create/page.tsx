@@ -404,12 +404,32 @@ export default function CreateProjectPage() {
     if (roles.length && !namedRoles.length) {
       errs.push('Give each project role a title, or remove the empty rows.');
     }
-    const allocated = namedRoles.reduce((sum, r) => sum + (r.budget_allocation || 0), 0);
-    if (!isNaN(budgetNum) && allocated > budgetNum) {
-      errs.push(
-        `Role budgets total ${allocated.toLocaleString()}, which is more than the ` +
-        `${budgetNum.toLocaleString()} project budget.`
-      );
+    // A project staffed by role is funded by role, so the whole budget has to be
+    // assigned. Anything left over belongs to nobody and can never be escrowed.
+    if (namedRoles.length && !isNaN(budgetNum)) {
+      const unpriced = namedRoles.filter(r => r.budget_allocation == null);
+      const allocated = namedRoles.reduce((sum, r) => sum + (r.budget_allocation || 0), 0);
+      const gap = Math.round((budgetNum - allocated) * 100) / 100;
+
+      if (unpriced.length) {
+        errs.push(
+          `Give every role a budget — ${unpriced.map(r => r.title.trim()).join(', ')} ` +
+          `${unpriced.length === 1 ? 'has' : 'have'} none.`
+        );
+      } else if (gap > 0.01) {
+        errs.push(
+          `Role budgets total ${currencySymbol(currency)}${allocated.toLocaleString()}, leaving ` +
+          `${currencySymbol(currency)}${gap.toLocaleString()} of the ` +
+          `${currencySymbol(currency)}${budgetNum.toLocaleString()} budget unassigned. ` +
+          `Distribute all of it across the roles.`
+        );
+      } else if (gap < -0.01) {
+        errs.push(
+          `Role budgets total ${currencySymbol(currency)}${allocated.toLocaleString()}, which is ` +
+          `${currencySymbol(currency)}${Math.abs(gap).toLocaleString()} more than the ` +
+          `${currencySymbol(currency)}${budgetNum.toLocaleString()} project budget.`
+        );
+      }
     }
     if (errs.length) { setSubmitError(errs.join('\n')); return; }
 

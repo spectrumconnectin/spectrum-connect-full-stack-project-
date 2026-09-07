@@ -61,7 +61,8 @@ class JobService:
                 fields = r.model_dump(exclude={"role_id"})
                 roles.append(ProjectRole(**fields))
             role_service.validate_role_budgets(
-                roles, budget.max if budget else None
+                roles, budget.max if budget else None,
+                currency=(budget.currency if budget else None) or job_data.currency or "USD",
             )
 
         # Convert proposal settings
@@ -426,7 +427,8 @@ class JobService:
                 )
 
         role_service.validate_role_budgets(
-            merged, job.budget.max if job.budget else None
+            merged, job.budget.max if job.budget else None,
+            currency=(job.budget.currency if job.budget else None) or job.currency or "USD",
         )
         return merged
 

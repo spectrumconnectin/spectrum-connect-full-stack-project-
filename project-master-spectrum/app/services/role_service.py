@@ -198,21 +198,74 @@ async def role_breakdown(job: JobPost) -> List[dict]:
     return breakdown
 
 
-def validate_role_budgets(roles: List[ProjectRole], total_budget: Optional[float]) -> None:
-    """Reject role allocations that exceed the project budget.
+def validate_role_budgets(
+    roles: List[ProjectRole],
+    total_budget: Optional[float],
+    currency: str = "USD",
+) -> None:
+    """Require a project's budget to be fully distributed across its roles.
 
-    Catching this at creation avoids a client hiring a full team they can't
-    fund, then discovering the shortfall at the escrow step.
+    A project staffed by role is funded by role: each hire gets their own escrow
+    drawn from their role's allocation. Money left unassigned belongs to nobody
+    — it cannot be escrowed, so it silently is not part of what anyone is hired
+    to do, while the client still believes they posted a project of that size.
+    Over-allocating is worse still: the client is committing to more than they
+    said they would pay.
+
+    So the allocations must total the budget exactly. Roles carrying no
+    allocation at all are reported by name rather than counted as zero, since
+    an unpriced role is almost always an oversight rather than a free one.
     """
-    if total_budget is None:
+    if total_budget is None or not roles:
         return
 
+    unpriced = [r.title or "Untitled role" for r in roles if r.budget_allocation is None]
     allocated = sum(r.budget_allocation for r in roles if r.budget_allocation is not None)
-    if allocated > total_budget:
+
+    # Compare at the currency's own precision — LKR has no minor unit, so
+    # requiring cent-level equality there would reject a correct split.
+    try:
+        from app.services import fx_service
+        allocated = fx_service.round_money(allocated, currency)
+        budget = fx_service.round_money(float(total_budget), currency)
+        tolerance = 0.5 if fx_service.decimals_for(currency) == 0 else 0.01
+    except Exception:
+        allocated = round(allocated, 2)
+        budget = round(float(total_budget), 2)
+        tolerance = 0.01
+
+    # Checked before the totals: a role with no allocation is a problem even
+    # when the priced roles happen to add up, because that role would have
+    # nothing to escrow the moment somebody is hired into it.
+    if unpriced:
+        missing = ", ".join(unpriced[:4])
+        more = f" and {len(unpriced) - 4} more" if len(unpriced) > 4 else ""
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Role budgets total {allocated:,.2f}, which exceeds the project "
-                f"budget of {total_budget:,.2f}."
+                f"Give every role a budget — {missing}{more} "
+                f"{'has' if len(unpriced) == 1 else 'have'} none. "
+                f"Nobody hired into an unfunded role could be paid."
             ),
         )
+
+    if abs(allocated - budget) <= tolerance:
+        return
+
+    if allocated > budget:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Role budgets total {allocated:,.2f}, which is {allocated - budget:,.2f} "
+                f"more than the {budget:,.2f} project budget."
+            ),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f"Role budgets total {allocated:,.2f}, leaving {budget - allocated:,.2f} "
+            f"of the {budget:,.2f} project budget unassigned. Distribute all of it "
+            f"across the roles."
+        ),
+    )
