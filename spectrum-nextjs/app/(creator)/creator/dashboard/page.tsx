@@ -131,7 +131,7 @@ export default function CreatorDashboardPage() {
       <PushPromptCard />
 
       {/* Setup journey — guides new creators to first success */}
-      <SetupJourney />
+      <SetupJourney role="creator" />
 
       {/* ETF Points widget — loyalty + trust signal */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">

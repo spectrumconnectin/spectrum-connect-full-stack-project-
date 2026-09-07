@@ -2,7 +2,9 @@
 Job Post Schemas for Upwork-style Job Marketplace
 Film Industry specific job postings
 """
-from pydantic import BaseModel, Field, validator
+import re
+
+from pydantic import BaseModel, Field, field_validator, validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -164,6 +166,22 @@ class ScreeningQuestionRead(BaseModel):
 # MAIN JOB POST SCHEMAS
 # ============================================================================
 
+# Titles the post-a-project flow suggests come from templates like
+# "Logo Design for [Company Name]". Publishing one with the brackets still in it
+# leaves every creator looking at an unfinished brief — and it happened often
+# enough that a third of live job posts carried one. Cheap to catch here.
+_TITLE_PLACEHOLDER = re.compile(r"[\[\]{}]|<[^>]{1,40}>|\b(your company|company name|product/brand)\b", re.I)
+
+
+def _reject_placeholder_title(v: str) -> str:
+    if v and _TITLE_PLACEHOLDER.search(v):
+        raise ValueError(
+            "Replace the placeholder in the title with your actual project or "
+            "company name before posting."
+        )
+    return v
+
+
 class JobPostCreate(BaseModel):
     """Create a new job post"""
     title: str = Field(..., min_length=5, max_length=200, description="Job title")
@@ -275,6 +293,11 @@ class JobPostCreate(BaseModel):
         if v and v not in ['student', 'entry', 'intermediate', 'expert']:
             raise ValueError('experience_level must be: student, entry, intermediate, or expert')
         return v
+
+    @field_validator('title')
+    @classmethod
+    def validate_title_not_placeholder(cls, v: str) -> str:
+        return _reject_placeholder_title(v)
 
     @validator('visibility')
     def validate_visibility(cls, v):

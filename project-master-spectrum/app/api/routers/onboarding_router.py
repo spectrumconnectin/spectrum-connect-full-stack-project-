@@ -5,8 +5,8 @@ GET /onboarding/journey returns a role-adaptive list of milestones computed from
 the user's real data (profile, portfolio, ETF, first project/application/escrow),
 so the dashboard can show genuine progression toward first success.
 """
-from fastapi import APIRouter, Depends
-from typing import Any, Dict, List
+from fastapi import APIRouter, Depends, Query
+from typing import Any, Dict, List, Optional
 
 from beanie import PydanticObjectId
 
@@ -42,11 +42,36 @@ async def _etf_activated(uid: PydanticObjectId) -> bool:
 
 
 @router.get("/journey", summary="Setup journey milestones for the current user")
-async def get_journey(current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
+async def get_journey(
+    current_user: User = Depends(get_current_user),
+    role: Optional[str] = Query(
+        None,
+        pattern="^(creator|client)$",
+        description="Which dashboard is asking. Required to get the right copy "
+                    "for an account that holds both roles.",
+    ),
+) -> Dict[str, Any]:
     uid = current_user.id
-    is_creator = current_user.account_type in ("crew", "both")
-    # A user who is both defaults to the creator journey on the creator dashboard;
-    # the frontend passes role context implicitly by which dashboard renders it.
+
+    # Which journey to describe.
+    #
+    # This used to be derived from account_type alone, with a comment claiming
+    # the frontend passed role context "implicitly by which dashboard renders
+    # it" — it did not, there was no such parameter. So a client-type account
+    # visiting the creator dashboard via the role switcher was told to "add a
+    # short bio so creators know who they're working with" and that escrow
+    # "releases only when you approve" — both written for the other side of the
+    # marketplace. The caller now says which dashboard it is.
+    # The dashboard doing the rendering is the authority here: the creator
+    # dashboard always wants the creator journey. Gating this on account_type
+    # would just reproduce the original bug for anyone whose type does not match
+    # the surface they are on. Which dashboards a user may open is a routing
+    # question, decided elsewhere — it has no bearing on which copy is correct
+    # once they are looking at one.
+    if role in ("creator", "client"):
+        is_creator = role == "creator"
+    else:
+        is_creator = current_user.account_type in ("crew", "both")
 
     steps: List[Dict[str, Any]] = [{
         "key": "account",

@@ -15,15 +15,15 @@ import { onboarding, type SetupJourney as Journey } from '@/lib/api';
 
 const DISMISS_KEY = 'sc_journey_dismissed';
 
-export default function SetupJourney() {
+export default function SetupJourney({ role }: { role?: 'creator' | 'client' }) {
   const [data, setData] = useState<Journey | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     try { if (localStorage.getItem(DISMISS_KEY) === '1') setDismissed(true); } catch {}
-    onboarding.getJourney().then(setData).catch(() => {});
-  }, []);
+    onboarding.getJourney(role).then(setData).catch(() => {});
+  }, [role]);
 
   if (dismissed || !data) return null;
 

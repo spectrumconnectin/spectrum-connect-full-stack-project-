@@ -1942,7 +1942,10 @@ export interface SetupJourney {
 }
 
 export const onboarding = {
-  getJourney: (): Promise<SetupJourney> => request<SetupJourney>('/onboarding/journey'),
+  /** `role` tells the server which dashboard is asking. An account holding both
+   *  roles gets the wrong half of the marketplace's copy without it. */
+  getJourney: (role?: 'creator' | 'client'): Promise<SetupJourney> =>
+    request<SetupJourney>(`/onboarding/journey${role ? `?role=${role}` : ''}`),
 };
 
 export const commission = {

@@ -68,7 +68,7 @@ function getStatusBadge(app: ProposalItem): { label: string; style: string } {
   // For hired creators, show the actual project stage from job_status
   if (app.status === 'accepted' && app.job_status && JOB_STATUS_LABEL[app.job_status]) {
     return {
-      label: JOB_STATUS_LABEL[app.job_status],
+      label: `Hired · ${JOB_STATUS_LABEL[app.job_status]}`,
       style: JOB_STATUS_STYLE[app.job_status] ?? 'bg-gray-100 text-gray-600',
     };
   }
@@ -91,7 +91,16 @@ function formatRelative(dateStr?: string): string {
   if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
-  return formatDate(dateStr);
+  // Past a week this used to fall back to formatDate(), which is exactly what
+  // the span beside it already shows — every older row read
+  // "Applied Jul 15, 2026 · Jul 15, 2026". Stay relative all the way up so the
+  // two halves carry different information.
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
 }
 
 // ── Main inner component ──────────────────────────────────────────────────────

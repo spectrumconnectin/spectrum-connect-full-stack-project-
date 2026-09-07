@@ -84,6 +84,12 @@ export default function ClientDashboardPage() {
   const deadlines = data?.deadlines ?? [];
   const activity  = data?.activity_feed ?? [];
   const hasProjects = jobs.length > 0;
+  // Must agree with the Active bucket on /client/projects. Counting "everything
+  // that isn't draft or completed" swept in removed and cancelled projects, so
+  // the greeting claimed six active projects while three of the six carried a
+  // "removed" badge on their own cards.
+  const ARCHIVED = new Set(['draft', 'completed', 'removed', 'cancelled']);
+  const activeProjectCount = jobs.filter(j => !ARCHIVED.has(j.status)).length;
   const hasPayments = totalInEscrow > 0 || totalReleased > 0;
 
   if (loading) {
@@ -109,7 +115,7 @@ export default function ClientDashboardPage() {
               <h1 className="text-2xl md:text-4xl font-bold mb-3">{userName || 'Client'}</h1>
               <p className="text-blue-100 text-lg max-w-md">
                 {hasProjects
-                  ? `You have ${jobs.filter(j => j.status !== 'draft' && j.status !== 'completed').length} active project${jobs.filter(j => j.status !== 'draft' && j.status !== 'completed').length !== 1 ? 's' : ''}.`
+                  ? `You have ${activeProjectCount} active project${activeProjectCount !== 1 ? 's' : ''}.`
                   : 'Post your first project and start connecting with talented creators.'}
               </p>
             </div>
@@ -123,7 +129,7 @@ export default function ClientDashboardPage() {
       </section>
 
       {/* ── Setup journey — guides new users to first success ── */}
-      <SetupJourney />
+      <SetupJourney role="client" />
 
       {/* ── New user: focused empty state ── */}
       {!hasProjects && (

@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { jobs, JobPostItem, formatJobBudget } from '@/lib/api';
 
-const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'approved', 'completed', 'draft'];
+const STATUS_FILTERS = ['All', 'open', 'in_review', 'pending_funding', 'in_progress', 'delivered', 'revision_requested', 'approved', 'completed', 'removed', 'cancelled', 'draft'];
+
+// Statuses that mean the project is no longer live work.
+//
+// The Active bucket used to be "everything that isn't completed", so a project
+// the client had removed still appeared under ACTIVE PROJECTS and still counted
+// toward "you have N active projects" — while carrying its own "removed" badge
+// on the same card. Listing the archived states explicitly keeps the count and
+// the badge telling the same story.
+const ARCHIVED_STATUSES = new Set(['completed', 'removed', 'cancelled']);
 
 // Map raw status → display label
 function statusLabel(status: string): string {
@@ -17,10 +26,27 @@ function statusLabel(status: string): string {
     revision_requested: 'Revision Requested',
     approved:           'Approved',
     completed:          'Completed',
+    removed:            'Removed',
+    cancelled:          'Cancelled',
     draft:              'Draft',
     closed:             'Active',  // legacy
   };
   return labels[status] ?? status;
+}
+
+// Backend enums are snake_case; rendering them raw showed "Small_crew" on the
+// card (CSS capitalize only lifts the first letter, it can't drop the
+// underscore). Unknown values fall back to a de-underscored version rather than
+// disappearing.
+const CREW_SIZE_LABELS: Record<string, string> = {
+  individual: 'Individual',
+  small_crew: 'Small crew',
+  large_team: 'Large team',
+  full_crew:  'Full crew',
+};
+function crewSizeLabel(v?: string): string {
+  if (!v) return '—';
+  return CREW_SIZE_LABELS[v] ?? v.replace(/_/g, ' ');
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -32,6 +58,8 @@ const STATUS_STYLES: Record<string, string> = {
   revision_requested: 'bg-orange-100 text-orange-700',
   approved:           'bg-teal-100 text-teal-700',
   completed:          'bg-emerald-100 text-emerald-700',
+  removed:            'bg-gray-100 text-gray-500',
+  cancelled:          'bg-rose-100 text-rose-600',
   draft:              'bg-gray-100 text-gray-500',
   closed:             'bg-blue-100 text-blue-700',
 };
@@ -74,9 +102,21 @@ export default function ClientProjectsPage() {
     return matchFilter && matchSearch;
   });
 
-  // Split active projects from completed history
-  const activeProjects    = filtered.filter(p => p.status !== 'completed');
+  // Split live work from everything that has been closed out.
+  const activeProjects    = filtered.filter(p => !ARCHIVED_STATUSES.has(p.status));
   const completedProjects = filtered.filter(p => p.status === 'completed');
+  const archivedProjects  = filtered.filter(p => p.status === 'removed' || p.status === 'cancelled');
+
+  // Budgets are stored per project, so one list can legitimately mix currencies.
+  // Show the code alongside the symbol only when it actually varies, so a
+  // single-currency account sees no extra noise.
+  const mixedCurrency = new Set(
+    allJobs.map(j => j.budget?.currency ?? j.currency ?? 'USD'),
+  ).size > 1;
+  const showBudget = (j: JobPostItem) =>
+    mixedCurrency
+      ? `${formatBudget(j)} ${j.budget?.currency ?? j.currency ?? 'USD'}`
+      : formatBudget(j);
 
   return (
     <>
@@ -168,13 +208,13 @@ export default function ClientProjectsPage() {
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                    <div><p className="text-gray-500 mb-1">Budget</p><p className="font-semibold text-gray-900">{formatBudget(p)}</p></div>
+                    <div><p className="text-gray-500 mb-1">Budget</p><p className="font-semibold text-gray-900">{showBudget(p)}</p></div>
                     <div><p className="text-gray-500 mb-1">Complexity</p><p className="font-semibold text-gray-900 capitalize">{p.complexity}</p></div>
-                    <div><p className="text-gray-500 mb-1">Crew Size</p><p className="font-semibold text-gray-900 capitalize">{p.crew_size}</p></div>
+                    <div><p className="text-gray-500 mb-1">Crew Size</p><p className="font-semibold text-gray-900">{crewSizeLabel(p.crew_size)}</p></div>
                     <div><p className="text-gray-500 mb-1">Proposals</p><p className="font-semibold text-gray-900">{p.proposal_count > 0 ? `${p.proposal_count} received` : 'None yet'}</p></div>
                   </div>
                   <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-xs text-gray-400">Posted {formatPosted(p.created_at)}</span>
+                    <span className="text-xs text-gray-400">Posted {formatPosted(p.published_at ?? p.created_at)}</span>
                     <div className="flex items-center gap-3 text-sm">
                       {p.proposal_count > 0 && p.status === 'open' && (
                         <Link href={`/client/projects/${p.id}/applicants`}
@@ -210,13 +250,48 @@ export default function ClientProjectsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-900 truncate group-hover:text-emerald-700">{p.title}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {p.department}{p.role ? ` · ${p.role}` : ''} · {formatBudget(p)}
+                      {p.department}{p.role ? ` · ${p.role}` : ''} · {showBudget(p)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-gray-400">{formatPosted(p.created_at)}</span>
+                    <span className="text-xs text-gray-400">{formatPosted(p.published_at ?? p.created_at)}</span>
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">Completed</span>
                     <i className="fa-solid fa-chevron-right text-xs text-gray-300 group-hover:text-emerald-500 transition"></i>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* Archived — removed or cancelled. Out of the Active count, but still
+              reachable rather than silently dropped from the list. */}
+          {archivedProjects.length > 0 && (
+            <div className="space-y-3 mt-8">
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                  <i className="fa-solid fa-box-archive text-gray-400 mr-1.5"></i>
+                  Archived ({archivedProjects.length})
+                </h2>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              {archivedProjects.map(p => (
+                <Link key={p.id} href={`/client/projects/${p.id}`}
+                  className="flex items-center gap-4 bg-white rounded-xl border border-gray-200 px-5 py-4 hover:border-gray-400 transition group opacity-75 hover:opacity-100">
+                  <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <i className="fa-solid fa-box-archive text-gray-400 text-sm"></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-700 truncate">{p.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {p.department}{p.role ? ` · ${p.role}` : ''} · {showBudget(p)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="text-xs text-gray-400">{formatPosted(p.published_at ?? p.created_at)}</span>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                      {statusLabel(p.status)}
+                    </span>
+                    <i className="fa-solid fa-chevron-right text-xs text-gray-300"></i>
                   </div>
                 </Link>
               ))}

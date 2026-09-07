@@ -189,7 +189,7 @@ export default async function BlogPage({ searchParams }: { searchParams: { categ
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* Category pills */}
         {categories.length > 0 && (
-          <nav className="flex items-center gap-2.5 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center">
+          <nav className="flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-fade-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center">
             {['All Posts', ...categories].map(cat => {
               const isAll = cat === 'All Posts';
               const active = isAll ? !activeCat : activeCat.toLowerCase() === cat.toLowerCase();

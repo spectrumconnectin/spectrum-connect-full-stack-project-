@@ -401,7 +401,7 @@ function SmartConnectInner() {
             ) : (
               <>
                 <p className="text-sm text-gray-500 mb-4">
-                  {hasSearched ? `${totalResults} creator${totalResults !== 1 ? 's' : ''} found` : `${creatives.length} top-rated creators`}
+                  {hasSearched ? `${totalResults} creator${totalResults !== 1 ? 's' : ''} found` : `${creatives.length} top-rated creator${creatives.length !== 1 ? 's' : ''}`}
                 </p>
                 <div className="space-y-4">
                   {creatives.map((c, idx) => {
@@ -435,7 +435,9 @@ function SmartConnectInner() {
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h3 className="font-bold text-gray-900">{c.name}</h3>
-                                  <TrustBadge tier={c.trust_tier} />
+                                  {c.trust_tier
+                                    && c.trust_tier.toLowerCase() !== (c.etf_level ?? '').toLowerCase()
+                                    && <TrustBadge tier={c.trust_tier} />}
                                   {c.etf_level ? (
                                     <EtfBadge level={{ name: c.etf_level, label: c.etf_level.charAt(0).toUpperCase() + c.etf_level.slice(1), icon: '', color: '', min_points: 0, next_min_points: null, progress_pct: 0 }} size="xs" />
                                   ) : (

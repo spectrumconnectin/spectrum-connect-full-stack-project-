@@ -217,7 +217,7 @@ body {
 .nav-cta .login-link { font-size: 14px; font-weight: 500; color: #374151; text-decoration: none; }
 
 /* ---- Buttons ---- */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: 8px; font: 600 14px/1 var(--font-inter, 'Inter'), sans-serif; text-decoration: none; cursor: pointer; transition: all 140ms ease; border: 0; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: 8px; font: 600 14px/1 var(--font-inter, 'Inter'), sans-serif; text-decoration: none; cursor: pointer; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease; border: 0; white-space: nowrap; }
 .btn-primary { background: var(--brand-exact); color: #fff; }
 .btn-primary:hover { background: var(--brand-exact-2); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(25,90,215,0.25); }
 .btn-white { background: #fff; color: var(--brand-exact-deep); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
@@ -1196,6 +1196,19 @@ section:has(.mk-reveal-x, .mk-reveal-r) {
 }
 
 /* Hide scrollbar while keeping horizontal scroll (used by compact nav) */
+/* Trailing-edge fade for rows that scroll sideways. The scrollbar is hidden on
+   these rows, so without it nothing says "there is more this way" — the last
+   label just looks clipped. Only applied while the row actually scrolls; at
+   >=640px these rows wrap instead and a fade there would be wrong. The fade is
+   28px so it lands mostly on the row's own right padding rather than eating the
+   final pill once you have scrolled to the end. */
+@media (max-width: 639px) {
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -1422,8 +1435,14 @@ body { overflow-x: hidden; }
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0,0,0,0.45);
+  background: rgba(17,24,39,0.38);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  backdrop-filter: blur(6px) saturate(120%);
   animation: scBackdropIn 0.15s ease forwards;
+}
+/* Without backdrop-filter the drawer needs the darker wash to stay legible. */
+@supports not (backdrop-filter: blur(6px)) {
+  .nav-mobile-overlay { background: rgba(0,0,0,0.45); }
 }
 
 /* Mobile drawer */
@@ -1465,7 +1484,12 @@ body { overflow-x: hidden; }
 .nav-mobile-close:hover { background: #f3f4f6; color: #111827; }
 
 .nav-mobile-links {
-  flex: 1;
+  /* Hug the links rather than stretch. With flex:1 this list grew to fill the
+     drawer and pushed the account block to the bottom edge, opening ~150px of
+     empty space between the last link and the divider — the drawer read as two
+     unrelated panels instead of one list. */
+  flex: 0 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px 12px;
   display: flex;
@@ -1489,6 +1513,9 @@ body { overflow-x: hidden; }
 
 .nav-mobile-cta {
   padding: 16px 20px 24px;
+  /* Deliberately NOT margin-top:auto — pinning this to the drawer floor is what
+     opened the mid-list gap. Any leftover height sits below the last item,
+     where it reads as padding instead of a hole in the middle of the list. */
   border-top: 1px solid #f3f4f6;
   display: flex;
   flex-direction: column;
