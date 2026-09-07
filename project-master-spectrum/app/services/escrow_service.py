@@ -421,6 +421,24 @@ class EscrowService:
         if stripe_fee is None:
             stripe_fee = round(fees_dict["client_total"] * 0.029 + 0.30, 2)
 
+        # Record what this earning is worth in the creator's own currency, at
+        # the rate locked when the escrow was created. Storing it per
+        # transaction means their history keeps showing the figure they were
+        # promised, even after the market has moved on.
+        payout_currency = getattr(escrow, "payout_currency", None)
+        locked_rate = getattr(escrow, "locked_fx_rate", None)
+        payout_amount = None
+        if payout_currency and locked_rate:
+            try:
+                from app.services import fx_service
+                payout_amount = fx_service.round_money(
+                    fees_dict["creator_payout"] * locked_rate, payout_currency
+                )
+            except Exception:
+                logger.exception("Could not apply the locked rate to a release")
+                payout_currency = None
+                locked_rate = None
+
         # Create the immutable transaction. The unique index on transaction_id is
         # the final backstop against duplicate-payment writes.
         transaction = Transaction(
@@ -430,6 +448,9 @@ class EscrowService:
             type="payment",
             amount=amount,
             currency=escrow.currency,
+            payout_currency=payout_currency,
+            payout_fx_rate=locked_rate,
+            payout_currency_amount=payout_amount,
             platform_fee=fees_dict["platform_take"],
             creator_fee=fees_dict["creator_fee"],
             client_fee=fees_dict["client_fee"],

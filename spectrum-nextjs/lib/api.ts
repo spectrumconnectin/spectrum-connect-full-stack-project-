@@ -1099,6 +1099,14 @@ export interface EarningTransaction {
   client_fee?: number;            // added to the client's charge (informational)
   commission_version?: string;
   currency: string;
+  /**
+   * What this earning was worth in the creator's own currency at the rate
+   * locked to the project. Absent on earnings released before rate locking
+   * existed, so always check before displaying.
+   */
+  payout_currency?: string | null;
+  payout_fx_rate?: number | null;
+  payout_currency_amount?: number | null;
   status: string;
   payment_method?: string;
   from_user_id?: string;

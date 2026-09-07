@@ -720,6 +720,13 @@ class JobPost(Document):
     daily_rate: Optional[Rate] = None
     weekly_rate: Optional[Rate] = None
     currency: str = "USD"              # ISO 4217 currency code for all rate fields
+    # The budget expressed in the platform base currency, captured when the
+    # project was posted. Lets projects priced in different currencies be
+    # compared, searched and ranked against each other without re-converting
+    # historical amounts at today's rate.
+    base_currency: Optional[str] = None      # always the platform base ("USD")
+    base_budget_max: Optional[float] = None  # budget.max converted to base
+    base_fx_rate: Optional[float] = None     # base units per 1 unit of currency
 
     location: Optional[str] = None         # physical location for in-person/on-site jobs
     event_date: Optional[datetime] = None  # specific event date (e.g. sports meet, wedding)
@@ -1301,6 +1308,14 @@ class Transaction(Document):
     payment_provider: Optional[str] = None # stripe, paypal, wise
     external_transaction_id: Optional[str] = None
     team_split: Optional[List[TeamSplit]] = None
+    # What this earning is worth in the recipient's own currency, at the rate
+    # locked to the project. Recorded per transaction because a creator's
+    # balance can hold earnings from several projects locked at different
+    # rates — a single balance-wide rate could not represent that honestly.
+    payout_currency: Optional[str] = None
+    payout_fx_rate: Optional[float] = None      # payout_currency per 1 unit of currency
+    payout_currency_amount: Optional[float] = None  # net_amount at that rate
+
     status: str = "pending" # pending, processing, completed, failed, refunded, cancelled
     failure_reason: Optional[str] = None
     retry_count: int = 0

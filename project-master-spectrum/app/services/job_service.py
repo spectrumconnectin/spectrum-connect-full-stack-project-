@@ -80,6 +80,28 @@ class JobService:
         if job_data.invited_crew:
             invited_crew_ids = [PydanticObjectId(id) for id in job_data.invited_crew]
 
+        # Record the budget in the base currency as posted, so a project priced
+        # in LKR can still be compared with one priced in USD without
+        # re-converting old amounts at today's rate.
+        job_currency = (getattr(job_data, "currency", None) or "USD").upper()
+        base_currency = None
+        base_budget_max = None
+        base_rate = None
+        try:
+            from app.services import fx_service
+            if budget and budget.max is not None:
+                converted, rate = await fx_service.convert(
+                    budget.max, job_currency, fx_service.BASE_CURRENCY
+                )
+                if converted is not None:
+                    base_currency = fx_service.BASE_CURRENCY
+                    base_budget_max = converted
+                    base_rate = rate
+        except Exception:
+            # A missing rate leaves the base fields unset rather than storing a
+            # figure that pretends to be a conversion.
+            logger.warning("Could not record a base-currency budget for a new project")
+
         # Create job post
         job_post = JobPost(
             client_id=user.id,
@@ -109,6 +131,9 @@ class JobService:
             currency=getattr(job_data, 'currency', 'USD') or 'USD',
             crew_call=crew_calls if crew_calls else None,
             roles=roles,
+            base_currency=base_currency,
+            base_budget_max=base_budget_max,
+            base_fx_rate=base_rate,
             visibility=job_data.visibility,
             invited_crew=invited_crew_ids,
             proposal_settings=proposal_settings,

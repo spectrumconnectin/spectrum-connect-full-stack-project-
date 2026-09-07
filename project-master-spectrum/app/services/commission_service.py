@@ -99,17 +99,26 @@ def _settings_decimal(name: str, fallback: str) -> Decimal:
 def calc_commission(
     project_subtotal: Numberish,
     currency: str = "USD",
+    rate_to_base: Numberish = None,
 ) -> CommissionBreakdown:
     """
     Compute the v1 8/4 commission split for a single charge.
 
     Args:
         project_subtotal: agreed project price before platform/client fees.
-        currency: ISO-4217 currency code (informational; math is independent).
+        currency: ISO-4217 currency code. The percentage math is
+            currency-independent, but the micro-project threshold and cap are
+            absolute amounts defined in the base currency, so they only mean
+            anything once the subtotal is expressed in that currency.
+        rate_to_base: base-currency units per 1 unit of `currency`. Required to
+            apply the micro-project rules to a non-base charge; without it an
+            LKR 5,000 project (about $15, genuinely a micro project) is compared
+            against a threshold of 20 and charged the full rate, because
+            5000 > 20. Percentage fees are unaffected either way.
 
     Returns:
         CommissionBreakdown with creator_fee + client_fee summing exactly
-        to the (possibly capped) platform fee.
+        to the (possibly capped) platform fee, in `currency`.
     """
 
     subtotal = _as_decimal(project_subtotal)
@@ -136,6 +145,25 @@ def calc_commission(
     version = getattr(settings, "COMM_VERSION", DEFAULT_COMMISSION_VERSION)
 
     platform_fee_raw = subtotal * total_rate
+
+    # Callers overwhelmingly don't pass a rate, so fall back to the cached one.
+    # Cache-only and best-effort: if it is cold we keep the previous
+    # base-currency behaviour rather than blocking a payment on a rate fetch.
+    if rate_to_base is None and (currency or "USD").upper() != "USD":
+        try:
+            from app.services import fx_service
+            rate_to_base = fx_service.rate_to_base_cached(currency)
+        except Exception:
+            rate_to_base = None
+
+    # The threshold and cap are absolute amounts in the base currency. Express
+    # them in this charge's currency before comparing, so a small project is
+    # treated as small whatever it is priced in.
+    if rate_to_base:
+        base_per_unit = _as_decimal(rate_to_base)
+        if base_per_unit > 0:
+            micro_threshold = micro_threshold / base_per_unit
+            micro_cap = micro_cap / base_per_unit
 
     if subtotal < micro_threshold:
         # Cap is a MAXIMUM — only apply if raw exceeds it.

@@ -196,6 +196,28 @@ async def rate_for(from_currency: str, to_currency: str) -> Optional[float]:
     return dst_per_base / src_per_base
 
 
+def rate_to_base_cached(currency: str) -> Optional[float]:
+    """Base-currency units per 1 unit of `currency`, from the in-process cache.
+
+    Synchronous and cache-only, so money paths that are not async (commission
+    maths, called from a dozen places) can still reason about non-base amounts.
+    Returns None when the cache is cold, and callers carry on with base-currency
+    behaviour rather than blocking on a network fetch mid-calculation.
+    """
+    code = (currency or BASE_CURRENCY).upper()
+    if code == BASE_CURRENCY:
+        return 1.0
+
+    snapshot = _cache.get("snapshot")
+    if not snapshot:
+        return None
+
+    per_base = snapshot.rates.get(code)
+    if not per_base:
+        return None
+    return 1.0 / per_base
+
+
 async def convert(
     amount: Optional[float],
     from_currency: str,

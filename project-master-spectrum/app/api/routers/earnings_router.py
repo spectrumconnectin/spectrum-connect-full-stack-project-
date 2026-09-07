@@ -41,6 +41,12 @@ def _fmt_txn(t: Transaction) -> dict:
         "client_fee": getattr(t, "client_fee", 0.0) or 0.0,
         "commission_version": getattr(t, "commission_version", None),
         "currency": t.currency,
+        # What this earning was worth in the creator's own currency at the rate
+        # locked to the project. Present only for earnings released after rate
+        # locking existed, so the UI must treat it as optional.
+        "payout_currency": getattr(t, "payout_currency", None),
+        "payout_fx_rate": getattr(t, "payout_fx_rate", None),
+        "payout_currency_amount": getattr(t, "payout_currency_amount", None),
         "status": t.status,
         "payment_method": t.payment_method,
         "from_user_id": str(t.from_user_id) if t.from_user_id else None,

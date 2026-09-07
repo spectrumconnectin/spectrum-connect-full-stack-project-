@@ -383,7 +383,27 @@ export default function EarningsPage() {
                           })()}
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-gray-900 whitespace-nowrap">
-                          ${t.net_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatMoney(t.net_amount, t.currency)}
+                          {/* The locked-rate value takes precedence: it is what
+                              this earning is actually worth to them, fixed when
+                              the project was agreed. Falls back to a live
+                              conversion for earnings released before locking. */}
+                          {(() => {
+                            if (t.payout_currency && t.payout_currency_amount != null) {
+                              return (
+                                <span className="block text-xs font-normal text-gray-400"
+                                  title="At the rate locked to this project">
+                                  {formatMoney(t.payout_currency_amount, t.payout_currency)}
+                                </span>
+                              );
+                            }
+                            const c = convert(t.net_amount, t.currency);
+                            return c ? (
+                              <span className="block text-xs font-normal text-gray-400">
+                                ≈ {c.formatted}
+                              </span>
+                            ) : null;
+                          })()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full capitalize ${TXN_STATUS_STYLE[t.status] ?? 'bg-gray-100 text-gray-600'}`}>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo } from 'react';
+import { usePreferredCurrency } from '@/components/CurrencyProvider';
 import {
   jobs, JobPostItem, formatJobBudget,
   talent, type TalentItem,
@@ -447,10 +448,15 @@ function ProjectCard({
   expanded: string | null;
   onExpand: (id: string | null) => void;
 }) {
+  const { convert } = usePreferredCurrency();
   const isSaved = saved.includes(p.id);
   const isExpanded = expanded === p.id;
   const desc = p.description || '';
   const budgetStr = formatBudget(p);
+  const budgetCcy = p.budget?.currency ?? p.currency ?? 'USD';
+  const budgetTop = p.budget?.max ?? p.budget?.min ?? null;
+  const budgetConverted = budgetTop != null ? convert(budgetTop, budgetCcy) : null;
+  const budgetApprox = budgetConverted ? `≈ ${budgetConverted.formatted}` : null;
   const postedStr = formatPosted(p.published_at || p.created_at);
   const durationStr = p.duration || (p.estimated_duration ? `${p.estimated_duration} days` : null);
 
@@ -514,6 +520,11 @@ function ProjectCard({
               <div className="flex items-center gap-4 text-xs text-gray-500">
                 <span className="flex items-center gap-1 font-medium text-gray-700">
                   <i className="fa-solid fa-dollar-sign text-gray-400"></i>{budgetStr}
+                  {/* A creator browsing in LKR needs to know what a USD budget
+                      is worth to them before deciding whether to apply. */}
+                  {budgetApprox && (
+                    <span className="text-gray-400 font-normal">({budgetApprox})</span>
+                  )}
                 </span>
                 {durationStr && (
                   <span className="flex items-center gap-1">
