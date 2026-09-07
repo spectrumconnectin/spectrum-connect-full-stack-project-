@@ -454,15 +454,20 @@ class EscrowService:
         fees = calc_commission(amount, currency=escrow.currency)
         fees_dict = fees.to_dict()
 
-        # Record the real Stripe processing fee captured at funding time; fall
-        # back to the standard rate only for legacy milestones that pre-date
-        # Stripe linkage.
+        # The real Stripe fee is read from the balance transaction at funding and
+        # stored on the milestone. Only milestones funded before that existed
+        # fall through to an estimate, and a US card rate on a GB account is a
+        # rough one — it is reporting-only and never touches the creator payout.
         stripe_fee = getattr(milestone, "stripe_fee", None)
         if stripe_fee is None:
             stripe_fee = round(fees_dict["client_total"] * 0.029 + 0.30, 2)
+            logger.info(
+                "No recorded Stripe fee on milestone %s — reporting an estimate.",
+                milestone_id,
+            )
 
         # Record what this earning is worth in the creator's own currency, at
-        # the rate locked when the escrow was created. Storing it per
+        # the rate locked when the escrow was funded. Storing it per
         # transaction means their history keeps showing the figure they were
         # promised, even after the market has moved on.
         payout_currency = getattr(escrow, "payout_currency", None)

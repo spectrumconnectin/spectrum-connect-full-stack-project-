@@ -201,6 +201,72 @@ async def _handle_event(event: stripe.Event) -> None:
         await _on_checkout_completed(event["data"]["object"])
 
 
+# Fallback only, when Stripe cannot tell us the real fee: the old flat estimate.
+_FALLBACK_FEE_RATE = 0.029
+_FALLBACK_FEE_FIXED = 0.30
+
+
+async def _actual_stripe_fee(payment_intent_id: Optional[str], amount_paid: float) -> dict:
+    """What Stripe actually charged for this payment.
+
+    Stripe reports its fee on the balance transaction, denominated in the
+    account's *settlement* currency — EUR for a GB account taking a USD charge —
+    together with the rate it used. Both are recorded: the settlement figure
+    reconciles against Stripe payouts, and the charge-currency figure stays
+    comparable to the amount on the same transaction.
+
+    Falls back to a flat estimate when the balance transaction is not yet
+    available (it can lag for some payment methods), flagged as an estimate so
+    reporting can tell a real fee from a guess rather than treating them alike.
+    """
+    estimate = {
+        "fee": round(amount_paid * _FALLBACK_FEE_RATE + _FALLBACK_FEE_FIXED, 2),
+        "fee_settlement": None,
+        "fee_settlement_currency": None,
+        "is_estimate": True,
+    }
+    if not payment_intent_id:
+        return estimate
+
+    try:
+        intent = stripe.PaymentIntent.retrieve(
+            payment_intent_id, expand=["latest_charge.balance_transaction"]
+        )
+        charge = intent.get("latest_charge")
+        bt = charge.get("balance_transaction") if isinstance(charge, dict) else None
+        if not isinstance(bt, dict):
+            logger.info(
+                "Balance transaction not available yet for %s — recording an estimated fee.",
+                payment_intent_id,
+            )
+            return estimate
+
+        # Fees are in the settlement currency's minor units.
+        fee_settlement = round(int(bt.get("fee") or 0) / 100, 2)
+        settlement_ccy = str(bt.get("currency") or "").upper() or None
+
+        # exchange_rate is settlement-per-charge-currency, and is absent when no
+        # conversion happened. Dividing back gives the fee in what the client
+        # was charged.
+        rate = bt.get("exchange_rate")
+        fee_in_charge_ccy = (
+            round(fee_settlement / rate, 2) if rate else fee_settlement
+        )
+
+        return {
+            "fee": fee_in_charge_ccy,
+            "fee_settlement": fee_settlement,
+            "fee_settlement_currency": settlement_ccy,
+            "is_estimate": False,
+        }
+    except stripe.StripeError as e:
+        logger.warning("Could not read the real Stripe fee for %s: %s", payment_intent_id, e)
+        return estimate
+    except Exception:
+        logger.exception("Unexpected error reading the Stripe fee for %s", payment_intent_id)
+        return estimate
+
+
 async def _on_checkout_completed(session: dict) -> None:
     """
     Mark the escrow milestone as funded when a Checkout Session is paid.
@@ -232,9 +298,16 @@ async def _on_checkout_completed(session: dict) -> None:
         )
         return
 
-    # Stripe charges 2.9% + $0.30 on the captured amount.
     amount_paid = round(amount_total_cents / 100, 2)
-    stripe_fee = round(amount_paid * 0.029 + 0.30, 2)
+
+    # Ask Stripe what it actually charged rather than assuming a rate. The old
+    # 2.9% + 0.30 was a US card rate applied to a GB account, where real rates
+    # differ by card origin, and the fixed component was added in whatever
+    # currency the charge happened to be in — a meaningless "0.30" on an LKR
+    # charge. This only ever fed reporting, never a creator's payout, but it
+    # misstated the platform's own margin.
+    fee_info = await _actual_stripe_fee(session.get("payment_intent"), amount_paid)
+    stripe_fee = fee_info["fee"]
 
     try:
         await EscrowService.fund_milestone(
@@ -245,8 +318,10 @@ async def _on_checkout_completed(session: dict) -> None:
             expected_cents=expected_cents or None,
         )
         logger.info(
-            "Milestone funded via Stripe: escrow=%s milestone=%s paid=$%.2f fee=$%.2f",
+            "Milestone funded via Stripe: escrow=%s milestone=%s paid=%.2f fee=%.2f%s",
             escrow_id, milestone_id, amount_paid, stripe_fee,
+            " (estimated)" if fee_info["is_estimate"] else
+            f" (actual, {fee_info['fee_settlement']} {fee_info['fee_settlement_currency']} settled)",
         )
         # Audit trail — system-actor financial event.
         try:
@@ -260,6 +335,9 @@ async def _on_checkout_completed(session: dict) -> None:
                     "client_id": client_id,
                     "amount_paid": amount_paid,
                     "stripe_fee": stripe_fee,
+                    "stripe_fee_is_estimate": fee_info["is_estimate"],
+                    "stripe_fee_settlement": fee_info["fee_settlement"],
+                    "stripe_fee_settlement_currency": fee_info["fee_settlement_currency"],
                     "payment_intent": session.get("payment_intent"),
                 },
                 severity="info",
