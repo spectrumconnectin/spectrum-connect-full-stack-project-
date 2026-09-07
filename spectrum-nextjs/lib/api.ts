@@ -1346,6 +1346,8 @@ export const earnings = {
 export interface ProposalItem {
   id: string;
   job_id: string;
+  /** Which role slot this application is for, on a multi-role project. */
+  role_id?: string | null;
   job_title: string;
   job_department: string;
   job_status: string;

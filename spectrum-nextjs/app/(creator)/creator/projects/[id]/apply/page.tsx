@@ -49,6 +49,9 @@ export default function ProjectApplicationPage() {
   // Distinguishes "this project isn't staffed by role" from "every seat is
   // taken" — the first applies normally, the second cannot be applied to.
   const [allRolesFull, setAllRolesFull] = useState(false);
+  // Roles this creator has already applied for — offering them again only
+  // leads to a refusal after they have written the whole application.
+  const [appliedRoleIds, setAppliedRoleIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!id) return;
@@ -57,8 +60,9 @@ export default function ProjectApplicationPage() {
       profileApi.getMe(),
       // Best-effort: a legacy project without roles still applies normally.
       jobs.roles(id).catch(() => null),
+      proposals.getMe().catch(() => null),
     ])
-      .then(([jobData, me, staffing]) => {
+      .then(([jobData, me, staffing, mine]) => {
         setJob(jobData);
 
         const open = (staffing?.roles ?? []).filter(
@@ -67,9 +71,17 @@ export default function ProjectApplicationPage() {
         setRoles(open);
         const defined = (staffing?.roles ?? []).filter(r => !r.derived);
         setAllRolesFull(defined.length > 0 && open.length === 0);
+
+        const already = new Set(
+          (mine ?? [])
+            .filter(a => String(a.job_id) === String(id) && a.role_id)
+            .map(a => a.role_id as string),
+        );
+        setAppliedRoleIds(already);
         // Pre-select when there is only one real choice, so the common case
         // needs no extra click.
-        if (open.length === 1) setRoleId(open[0].role_id);
+        const selectable = open.filter(r => !already.has(r.role_id));
+        if (selectable.length === 1) setRoleId(selectable[0].role_id);
         // For fixed-price jobs, lock the proposed budget to the exact fixed price
         if (isFixedPrice(jobData) && jobData.budget?.min) {
           setProposedBudget(String(jobData.budget.min));
@@ -82,6 +94,28 @@ export default function ProjectApplicationPage() {
       .catch(() => {})
       .finally(() => setLoadingJob(false));
   }, [id]);
+
+  // Applying for one seat on a multi-role project is an agreement about that
+  // seat, not the whole project. Every figure below has to follow the role, or
+  // a creator taking a $250 editing seat is shown the $1,000 project price.
+  // Every open seat already has an application from this creator, so there is
+  // nothing left here to apply for.
+  const nothingLeftToApplyFor =
+    roles.length > 0 && roles.every(r => appliedRoleIds.has(r.role_id));
+
+  const selectedRole = roles.find(r => r.role_id === roleId) ?? null;
+  const roleBudget = selectedRole?.budget_per_seat ?? null;
+  const effectiveBudget = roleBudget ?? job?.budget?.min ?? null;
+  const budgetCurrency = job?.budget?.currency ?? job?.currency;
+  // A role's seat price is fixed the same way a fixed-price project is: the
+  // client has already allocated that amount and escrows exactly it.
+  const rateIsFixed = roleBudget != null || (job ? isFixedPrice(job) : false);
+
+  // Follow the selection — a creator switching roles should not carry the
+  // previous role's number into the new application.
+  useEffect(() => {
+    if (roleBudget != null) setProposedBudget(String(roleBudget));
+  }, [roleBudget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,8 +170,14 @@ export default function ProjectApplicationPage() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-xl font-bold text-cobalt">{budgetLabel(job)}</div>
-                <div className="text-xs text-gray-500">Client budget</div>
+                {/* Once a seat is chosen, the project total is the wrong
+                    headline — it is not what this application is worth. */}
+                <div className="text-xl font-bold text-cobalt">
+                  {roleBudget != null ? formatMoney(roleBudget, budgetCurrency) : budgetLabel(job)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {selectedRole ? `${selectedRole.title} · per person` : 'Client budget'}
+                </div>
               </div>
             </div>
           ) : (
@@ -145,7 +185,30 @@ export default function ProjectApplicationPage() {
           )}
         </div>
 
-        {allRolesFull ? (
+        {nothingLeftToApplyFor ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-10 text-center shadow-sm">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-paper-plane text-cobalt text-2xl"></i>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              You&apos;ve applied for every open role here
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">
+              Nothing further to apply for on this project. You&apos;ll hear from the
+              client through your applications.
+            </p>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Link href="/creator/projects?tab=applications"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+                <i className="fa-solid fa-list-check"></i>View My Applications
+              </Link>
+              <Link href="/creator/find-projects"
+                className="inline-flex items-center gap-2 px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition text-sm">
+                Find Other Projects
+              </Link>
+            </div>
+          </div>
+        ) : allRolesFull ? (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-10 text-center shadow-sm">
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="fa-solid fa-users-slash text-amber-500 text-2xl"></i>
@@ -209,16 +272,20 @@ export default function ProjectApplicationPage() {
                 <div className="space-y-2">
                   {roles.map(r => {
                     const active = roleId === r.role_id;
+                    const applied = appliedRoleIds.has(r.role_id);
                     return (
                       <button
                         key={r.role_id}
                         type="button"
-                        onClick={() => setRoleId(r.role_id)}
+                        onClick={() => !applied && setRoleId(r.role_id)}
+                        disabled={applied}
                         aria-pressed={active}
                         className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
-                          active
-                            ? 'border-cobalt bg-blue-50'
-                            : 'border-gray-200 hover:border-cobalt hover:bg-gray-50'
+                          applied
+                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-70'
+                            : active
+                              ? 'border-cobalt bg-blue-50'
+                              : 'border-gray-200 hover:border-cobalt hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -226,6 +293,11 @@ export default function ProjectApplicationPage() {
                             <span className={`font-semibold ${active ? 'text-cobalt' : 'text-gray-900'}`}>
                               {r.title}
                             </span>
+                            {applied && (
+                              <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">
+                                Applied
+                              </span>
+                            )}
                             {(r.skills?.length ?? 0) > 0 && (
                               <span className="flex flex-wrap gap-1.5 mt-1.5">
                                 {r.skills!.slice(0, 4).map(s => (
@@ -243,7 +315,9 @@ export default function ProjectApplicationPage() {
                               </div>
                             )}
                             <div className="text-xs text-gray-400">
-                              {r.seats_remaining} {r.seats_remaining === 1 ? 'seat open' : 'seats open'}
+                              {applied
+                                ? 'Already applied'
+                                : `${r.seats_remaining} ${r.seats_remaining === 1 ? 'seat open' : 'seats open'}`}
                             </div>
                           </div>
                         </div>
@@ -283,15 +357,18 @@ export default function ProjectApplicationPage() {
               </div>
 
               {/* Fixed-price notice — rate is not negotiable */}
-              {job && isFixedPrice(job) ? (
+              {job && rateIsFixed && effectiveBudget != null ? (
                 <div className="mb-6">
                   <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3.5 mb-4">
                     <i className="fa-solid fa-tag text-emerald-600 text-lg flex-shrink-0"></i>
                     <div>
-                      <p className="text-sm font-bold text-emerald-900">Fixed Price Project</p>
+                      <p className="text-sm font-bold text-emerald-900">
+                        {selectedRole ? `Fixed rate for ${selectedRole.title}` : 'Fixed Price Project'}
+                      </p>
                       <p className="text-xs text-emerald-700 mt-0.5">
-                        This project has a fixed price of{' '}
-                        <strong>{currencySymbol(job.budget?.currency)}{job.budget!.min!.toLocaleString()}</strong>.
+                        {selectedRole ? 'This role pays ' : 'This project has a fixed price of '}
+                        <strong>{formatMoney(effectiveBudget, budgetCurrency)}</strong>
+                        {selectedRole ? ' per person. ' : '. '}
                         The rate is non-negotiable — you apply at this price or not at all.
                       </p>
                     </div>
@@ -299,7 +376,7 @@ export default function ProjectApplicationPage() {
                   <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                     <span className="text-sm font-semibold text-gray-700">Your payout (after 8% fee)</span>
                     <span className="text-lg font-bold text-emerald-600">
-                      {currencySymbol(job.budget?.currency)}{(job.budget!.min! * 0.92).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatMoney(effectiveBudget * 0.92, budgetCurrency)}
                     </span>
                   </div>
                 </div>
@@ -313,12 +390,16 @@ export default function ProjectApplicationPage() {
                       min="1"
                       value={proposedBudget}
                       onChange={e => setProposedBudget(e.target.value)}
-                      placeholder={job?.budget?.min ? String(job.budget.min) : '0'}
+                      placeholder={effectiveBudget != null ? String(effectiveBudget) : '0'}
                       className="w-full pl-8 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cobalt text-gray-900 placeholder-gray-400"
                     />
                   </div>
                   {job && (
-                    <p className="text-xs text-gray-400 mt-1.5">Client budget: {budgetLabel(job)}</p>
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      {selectedRole
+                        ? `Allocated for ${selectedRole.title}: ${formatMoney(roleBudget, budgetCurrency)}`
+                        : `Client budget: ${budgetLabel(job)}`}
+                    </p>
                   )}
                 </div>
               )}

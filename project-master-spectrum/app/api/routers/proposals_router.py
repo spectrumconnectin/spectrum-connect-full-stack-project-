@@ -305,6 +305,10 @@ async def get_my_proposals(
             "cover_letter": app.cover_letter,
             "proposed_budget": app.proposed_budget,
             "portfolio_url": app.portfolio_url,
+            # The role slot, not just its title — the apply screen uses it to
+            # show which roles a creator has already applied for, instead of
+            # letting them write another application that will be refused.
+            "role_id": app.role_id,
             "role": app.role,
             "status": app.status,
             "submitted_at": app.submitted_at.isoformat() if app.submitted_at else None,
