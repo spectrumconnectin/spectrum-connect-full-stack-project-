@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, usePathname } from 'next/navigation';
-import { jobs, proposals, profile as profileApi, JobPostItem, formatJobBudget, currencySymbol } from '@/lib/api';
+import { jobs, proposals, profile as profileApi, JobPostItem, ProjectRole, formatJobBudget, currencySymbol, formatMoney } from '@/lib/api';
 
 const DURATION_OPTIONS = [
   { label: 'Less than 1 week', value: 1 },
@@ -42,12 +42,34 @@ export default function ProjectApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Roles still taking applicants. A multi-role project cannot be applied to
+  // without naming one — the server rejects it — so this is required, not a nicety.
+  const [roles, setRoles] = useState<ProjectRole[]>([]);
+  const [roleId, setRoleId] = useState<string | null>(null);
+  // Distinguishes "this project isn't staffed by role" from "every seat is
+  // taken" — the first applies normally, the second cannot be applied to.
+  const [allRolesFull, setAllRolesFull] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([jobs.getById(id), profileApi.getMe()])
-      .then(([jobData, me]) => {
+    Promise.all([
+      jobs.getById(id),
+      profileApi.getMe(),
+      // Best-effort: a legacy project without roles still applies normally.
+      jobs.roles(id).catch(() => null),
+    ])
+      .then(([jobData, me, staffing]) => {
         setJob(jobData);
+
+        const open = (staffing?.roles ?? []).filter(
+          r => !r.derived && r.status !== 'closed' && r.seats_remaining > 0,
+        );
+        setRoles(open);
+        const defined = (staffing?.roles ?? []).filter(r => !r.derived);
+        setAllRolesFull(defined.length > 0 && open.length === 0);
+        // Pre-select when there is only one real choice, so the common case
+        // needs no extra click.
+        if (open.length === 1) setRoleId(open[0].role_id);
         // For fixed-price jobs, lock the proposed budget to the exact fixed price
         if (isFixedPrice(jobData) && jobData.budget?.min) {
           setProposedBudget(String(jobData.budget.min));
@@ -65,10 +87,15 @@ export default function ProjectApplicationPage() {
     e.preventDefault();
     if (!id || submitting) return;
     setError(null);
+    if (roles.length > 1 && !roleId) {
+      setError('Choose which role you are applying for.');
+      return;
+    }
     setSubmitting(true);
     try {
       await proposals.submit(id, {
         cover_letter: coverLetter,
+        role_id: roleId ?? undefined,
         proposed_budget: proposedBudget ? Number(proposedBudget) : undefined,
         proposed_duration: proposedDuration ? Number(proposedDuration) : undefined,
         portfolio_url: portfolioUrl.trim() || undefined,
@@ -118,7 +145,21 @@ export default function ProjectApplicationPage() {
           )}
         </div>
 
-        {isOwnJob ? (
+        {allRolesFull ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-10 text-center shadow-sm">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <i className="fa-solid fa-users-slash text-amber-500 text-2xl"></i>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Every role on this project is filled</h2>
+            <p className="text-gray-600 text-sm mb-6">
+              The client has hired for all the positions here. Nothing is open to apply for.
+            </p>
+            <Link href="/creator/find-projects"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-cobalt text-white rounded-xl font-semibold hover:bg-blue-700 transition text-sm">
+              <i className="fa-solid fa-magnifying-glass"></i>Find Other Projects
+            </Link>
+          </div>
+        ) : isOwnJob ? (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-10 text-center shadow-sm">
             <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="fa-solid fa-ban text-amber-500 text-3xl"></i>
@@ -145,6 +186,71 @@ export default function ProjectApplicationPage() {
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
                 {error}
+              </div>
+            )}
+
+            {/* Which role — first, because it frames everything below it. Only
+                shown when there is a genuine choice; a single-role project
+                selects itself. */}
+            {roles.length > 1 && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <i className="fa-solid fa-user-tag text-indigo-600 text-sm"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Which role?</h2>
+                    <p className="text-sm text-gray-500">
+                      This project is hiring for several. You&apos;re applying to one.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {roles.map(r => {
+                    const active = roleId === r.role_id;
+                    return (
+                      <button
+                        key={r.role_id}
+                        type="button"
+                        onClick={() => setRoleId(r.role_id)}
+                        aria-pressed={active}
+                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
+                          active
+                            ? 'border-cobalt bg-blue-50'
+                            : 'border-gray-200 hover:border-cobalt hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <div className="min-w-0">
+                            <span className={`font-semibold ${active ? 'text-cobalt' : 'text-gray-900'}`}>
+                              {r.title}
+                            </span>
+                            {(r.skills?.length ?? 0) > 0 && (
+                              <span className="flex flex-wrap gap-1.5 mt-1.5">
+                                {r.skills!.slice(0, 4).map(s => (
+                                  <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                    {s}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            {r.budget_per_seat != null && (
+                              <div className="font-semibold text-gray-900 text-sm">
+                                {formatMoney(r.budget_per_seat, job?.budget?.currency ?? job?.currency)}
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-400">
+                              {r.seats_remaining} {r.seats_remaining === 1 ? 'seat open' : 'seats open'}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
