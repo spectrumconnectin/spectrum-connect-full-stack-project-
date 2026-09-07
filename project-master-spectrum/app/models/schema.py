@@ -342,6 +342,11 @@ class User(Document):
     verification_badge: Optional[VerificationBadge] = None
     stats: Optional[UserStats] = Field(default_factory=UserStats)
     settings: Optional[UserSettings] = Field(default_factory=UserSettings)
+    # Currency this user reads the platform in. Amounts are stored in the
+    # platform base currency and converted for display, so changing this never
+    # alters what anyone is actually owed — only how it is shown.
+    preferred_currency: str = "USD"
+
     # Verified PayPal email creators withdraw their earnings to (self-service payouts).
     paypal_payout_email: Optional[str] = None
     # Stripe Connect (Express) account id for bank cash-outs, paid from the

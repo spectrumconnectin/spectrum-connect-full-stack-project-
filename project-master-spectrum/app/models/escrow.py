@@ -135,6 +135,19 @@ class Escrow(Document):
     # Milestones
     milestones: List[EscrowMilestone] = Field(default_factory=list)
 
+    # ── Currency lock ────────────────────────────────────────────────────────
+    # The rate is fixed when the escrow is created and never recalculated, so
+    # the figure a creator was shown when they took the job is the figure they
+    # are paid — even if the market moves during a three-month project. The
+    # platform absorbs the difference between this and the rate at payout time.
+    #
+    # `currency` above is the escrow's own currency (the project's). These
+    # record what that means for the creator who gets paid from it.
+    payout_currency: Optional[str] = None      # creator's currency at hire time
+    locked_fx_rate: Optional[float] = None     # payout_currency per 1 unit of currency
+    fx_locked_at: Optional[datetime] = None
+    fx_rate_source: Optional[str] = None       # snapshot id, for auditability
+
     # Status
     # active → completed | disputed | refunded | cancelled
     status: str = "active"

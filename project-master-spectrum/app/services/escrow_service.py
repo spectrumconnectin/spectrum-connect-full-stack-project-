@@ -16,6 +16,7 @@ Responsibilities
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import logging
 import uuid
 
 from beanie import PydanticObjectId
@@ -25,6 +26,8 @@ from app.core.config import settings
 from app.models.escrow import Escrow, EscrowMilestone
 from app.models.schema import User, Transaction
 from app.services.commission_service import calc_commission, calc_refund_reversal
+
+logger = logging.getLogger(__name__)
 
 
 class EscrowService:
@@ -106,6 +109,33 @@ class EscrowService:
             ))
             total += amount
 
+        # Lock the exchange rate now, while the creator can still see the figure
+        # they are agreeing to. Recalculating at payout time would mean the
+        # amount they were shown when they took the job is not the amount they
+        # receive, which is exactly the confusion this is meant to remove.
+        payout_currency = None
+        locked_rate = None
+        fx_locked_at = None
+        fx_source = None
+        try:
+            from app.services import fx_service
+
+            payout_currency = (getattr(creator, "preferred_currency", None) or currency).upper()
+            if payout_currency != currency.upper():
+                locked_rate = await fx_service.rate_for(currency, payout_currency)
+                if locked_rate:
+                    fx_locked_at = datetime.utcnow()
+                    snapshot = await fx_service.current_snapshot()
+                    fx_source = str(snapshot.id) if snapshot else None
+                else:
+                    # No rate available: leave it unlocked rather than invent
+                    # one. Display falls back to the project currency.
+                    logger.warning(
+                        "No FX rate to lock for escrow %s->%s", currency, payout_currency
+                    )
+        except Exception:
+            logger.exception("Could not lock an FX rate for this escrow")
+
         escrow = Escrow(
             client_id=PydanticObjectId(client_id),
             creator_id=PydanticObjectId(creator_id),
@@ -115,6 +145,10 @@ class EscrowService:
             currency=currency,
             milestones=milestone_docs,
             description=description,
+            payout_currency=payout_currency,
+            locked_fx_rate=locked_rate,
+            fx_locked_at=fx_locked_at,
+            fx_rate_source=fx_source,
         )
         await escrow.insert()
 

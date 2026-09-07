@@ -28,6 +28,7 @@ from app.models.community import (
 from app.models.etf import ETFVault, ETFContribution, ETFLedger
 from app.models.etf_points import EtfPoints, EtfEvent
 from app.models.oauth_state import OAuthState
+from app.models.exchange_rate import ExchangeRateSnapshot
 from app.models.ceo_call import CeoCallRequest
 from app.models.review_queue import ReviewQueue
 from app.models.escrow import Escrow, Dispute, GuaranteeFund
@@ -38,6 +39,7 @@ from app.models.platform_settings import PlatformSettings, BroadcastNotification
 from app.models.smart_connect_history import SmartConnectHistory
 from app.auth.router import router as auth_router
 from app.api.routers.job_router import router as job_router
+from app.api.routers.currency_router import router as currency_router
 from app.api.routers.client_dashboard import router as client_dashboard_router
 from app.api.routers.account_router import router as account_router
 from app.api.routers.blog_router import router as blog_router
@@ -168,6 +170,7 @@ app.include_router(account_router, tags=["Account Settings"])
 app.include_router(client_dashboard_router, tags=["Client Dashboard"])
 app.include_router(creator_dashboard_router, tags=["Creator Dashboard"])
 app.include_router(job_router, prefix="/jobs", tags=["Job Posts"])
+app.include_router(currency_router, prefix="/currency", tags=["Currency"])
 app.include_router(client_teams_router, tags=["Client Teams"])
 app.include_router(client_projects_router, tags=["Client Projects"])
 app.include_router(creator_teams_router, tags=["Creator Teams"])
@@ -248,6 +251,7 @@ async def startup_db_client():
                 SmartConnectHistory,
                 OAuthState,
                 CeoCallRequest,
+                ExchangeRateSnapshot,
             ],
         )
         logger.info("Beanie initialized successfully — all models registered")
