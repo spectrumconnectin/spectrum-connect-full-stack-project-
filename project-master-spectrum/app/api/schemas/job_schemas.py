@@ -445,6 +445,14 @@ class JobPostListRead(BaseModel):
 
     published_at: Optional[datetime] = None
     deadline: Optional[datetime] = None
+    # job_to_dict() derives created_at from the ObjectId, but response_model
+    # strips anything this schema does not declare — so the list payload lost it
+    # and every card rendered "Posted —" while the detail page (JobPostRead,
+    # which does declare it) showed the real date. published_at is null on every
+    # existing post, so it cannot stand in for this.
+    created_at: Optional[datetime] = None
+    # Needed to tell a USD budget from an LKR one in a mixed list.
+    currency: Optional[str] = None
 
 
 class JobPostSearchFilters(BaseModel):
