@@ -593,10 +593,67 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   AUD: 'A$', INR: '₹', SGD: 'S$', CAD: 'C$', AED: 'AED ',
 };
 
+/** Currencies with no minor unit — "Rs 50,000.00" is not a real amount. */
+const ZERO_DECIMAL_CURRENCIES = new Set([
+  'LKR', 'JPY', 'KRW', 'VND', 'IDR', 'CLP', 'ISK', 'HUF', 'XOF', 'XAF',
+]);
+
 /** Returns the display symbol for a given ISO 4217 currency code. */
 export function currencySymbol(code?: string | null): string {
   if (!code) return '$';
   return CURRENCY_SYMBOLS[code] ?? `${code} `;
+}
+
+export function currencyDecimals(code?: string | null): number {
+  return ZERO_DECIMAL_CURRENCIES.has((code ?? '').toUpperCase()) ? 0 : 2;
+}
+
+/**
+ * Format an amount in its own currency.
+ *
+ * `withCode` appends the ISO code. Prefer it anywhere a user could plausibly
+ * be looking at more than one currency — "Rs 50,000" alone is ambiguous to
+ * anyone who has seen more than one kind of rupee.
+ */
+export function formatMoney(
+  amount?: number | null,
+  code?: string | null,
+  opts?: { withCode?: boolean },
+): string {
+  if (amount === null || amount === undefined || Number.isNaN(amount)) return '—';
+  const ccy = (code ?? 'USD').toUpperCase();
+  const digits = currencyDecimals(ccy);
+  const body = `${currencySymbol(ccy)}${amount.toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}`;
+  return opts?.withCode ? `${body} (${ccy})` : body;
+}
+
+/** An amount as the API describes it: the real figure, plus how it reads to this viewer. */
+export interface MoneyValue {
+  amount: number | null;
+  currency: string;
+  formatted: string;
+  converted?: {
+    amount: number;
+    currency: string;
+    formatted: string;
+    rate: number;
+    /** True when the rate was fixed for this project rather than looked up live. */
+    locked: boolean;
+    /** True for live conversions — the figure is indicative, not a promise. */
+    approximate: boolean;
+    rate_age_stale: boolean;
+    as_of: string | null;
+  } | null;
+}
+
+export interface SupportedCurrency {
+  code: string;
+  name: string;
+  symbol: string;
+  decimals: number;
 }
 
 /** Currency-aware budget formatter — reads currency from the JobPostItem. */
@@ -1139,6 +1196,28 @@ export interface BankDetailsPayload {
   country_code?: string;
   currency?: string;
 }
+
+export const currency = {
+  /** Selectable currencies, with symbols and minor-unit digits. */
+  list: (): Promise<{
+    base: string;
+    currencies: SupportedCurrency[];
+    rates_as_of: string | null;
+    rates_stale: boolean;
+  }> => request('/currency', {}, false),
+
+  /** The signed-in user's display currency. */
+  mine: (): Promise<{
+    currency: string; symbol: string; name: string; decimals: number; is_base: boolean;
+  }> => request('/currency/me'),
+
+  /** Change display currency. Never changes what anyone is owed. */
+  setMine: (code: string): Promise<{ success: boolean; currency: string; message: string }> =>
+    request('/currency/me', { method: 'PUT', body: JSON.stringify({ currency: code }) }),
+
+  convert: (amount: number, from: string, to?: string): Promise<MoneyValue> =>
+    request<MoneyValue>(`/currency/convert${buildQS({ amount, from, to })}`),
+};
 
 export const earnings = {
   getTransactions: (params?: { status?: string; type?: string; limit?: number; skip?: number }): Promise<EarningTransaction[]> =>

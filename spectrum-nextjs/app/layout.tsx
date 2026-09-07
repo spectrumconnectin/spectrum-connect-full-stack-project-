@@ -10,6 +10,7 @@ const inter = Inter({
   variable: "--font-inter",
 });
 import CookieBanner from "@/components/CookieBanner";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
@@ -181,7 +182,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        {children}
+        {/* Holds the viewer's display currency and rates, so every amount on
+            the page renders in the currency they chose. */}
+        <CurrencyProvider>
+          {children}
+        </CurrencyProvider>
         {/* Cookie consent banner */}
         <CookieBanner />
         {/* Vercel Speed Insights */}

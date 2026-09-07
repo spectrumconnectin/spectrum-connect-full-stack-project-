@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { earnings, EarningTransaction, EarningsStats, PayoutBalance, PayoutOptions, BankDetails } from '@/lib/api';
+import { earnings, EarningTransaction, EarningsStats, PayoutBalance, PayoutOptions, BankDetails, formatMoney } from '@/lib/api';
+import { usePreferredCurrency } from '@/components/CurrencyProvider';
 import BankPayoutForm from '@/components/BankPayoutForm';
 
 const TXN_STATUS_STYLE: Record<string, string> = {
@@ -73,6 +74,8 @@ export default function EarningsPage() {
   const [payoutOptions, setPayoutOptions] = useState<PayoutOptions | null>(null);
   const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [connecting, setConnecting] = useState(false);
+  // Earnings are held in USD; this renders them in the creator's own currency.
+  const { convert } = usePreferredCurrency();
 
   const loadBalance = useCallback(async () => {
     try {
@@ -208,14 +211,24 @@ export default function EarningsPage() {
               <div className="absolute top-0 right-0 w-96 h-96 bg-purple-400 rounded-full opacity-20 blur-3xl pointer-events-none"></div>
               <div className="relative">
                 <span className="text-sm font-bold uppercase tracking-widest text-blue-100">Total Earned</span>
-                <p className="text-6xl font-bold mt-3 mb-6">
-                  ${(stats?.total_earned ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <p className="text-6xl font-bold mt-3 mb-1">
+                  {formatMoney(stats?.total_earned ?? 0, 'USD')}
                 </p>
+                {/* Earnings are held in USD; show what that is in the creator's
+                    own currency so the headline figure means something to them. */}
+                {(() => {
+                  const c = convert(stats?.total_earned ?? 0, 'USD');
+                  return c ? (
+                    <p className="text-blue-100 text-sm mb-5">
+                      ≈ {c.formatted} · based on current exchange rates
+                    </p>
+                  ) : <div className="mb-5" />;
+                })()}
                 {/* Available-to-withdraw line */}
                 {balance && (
-                  <p className="text-sm text-blue-100 mb-4 -mt-3">
+                  <p className="text-sm text-blue-100 mb-4 -mt-2">
                     <span className="font-semibold text-white">
-                      ${balance.available.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatMoney(balance.available, 'USD')}
                     </span> available to withdraw
                   </p>
                 )}
@@ -245,8 +258,12 @@ export default function EarningsPage() {
                   <i className="fa-solid fa-clock text-amber-500"></i>
                 </div>
                 <p className="text-3xl font-bold text-gray-900">
-                  ${(stats?.pending ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatMoney(stats?.pending ?? 0, 'USD')}
                 </p>
+                {(() => {
+                  const c = convert(stats?.pending ?? 0, 'USD');
+                  return c ? <p className="text-xs text-gray-400 mt-0.5">≈ {c.formatted}</p> : null;
+                })()}
                 <p className="text-xs text-gray-400 mt-1">Processing / awaiting release</p>
               </div>
               <div className="bg-white rounded-2xl p-6 border border-gray-200">

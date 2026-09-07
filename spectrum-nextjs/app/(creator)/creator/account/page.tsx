@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import EtfWidget from '@/components/EtfWidget';
 import CreatorSettingsSheet from '@/components/CreatorSettingsSheet';
+import CurrencySelector from '@/components/CurrencySelector';
 import { profile as profileApi, type MeResponse } from '@/lib/api';
 
 // Mockup's "Profile" tab is a stats card + nav-row hub. `/creator/profile`
@@ -104,6 +105,11 @@ export default function CreatorAccountPage() {
           <span className="flex-1 text-left text-[15px] font-semibold text-gray-900">Settings</span>
           <i className="fa-solid fa-chevron-right text-[11px] text-gray-300"></i>
         </button>
+      </div>
+
+      {/* Display currency */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm mt-6">
+        <CurrencySelector />
       </div>
 
       <CreatorSettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
