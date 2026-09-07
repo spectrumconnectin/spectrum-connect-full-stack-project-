@@ -605,19 +605,51 @@ export default function EarningsPage() {
                         </p>
                       </div>
 
-                      <div className="bg-gray-50 rounded-2xl px-4 py-3.5 space-y-2.5 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-500">You&apos;ll receive</span>
-                          <span className="font-bold text-gray-900">${fmtMoney(Number(withdrawAmount) || 0)}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-500">Payout fee</span><span className="font-semibold text-emerald-600">Free</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-500">Arrives</span>
-                          <span className="font-medium text-gray-700">{method === 'paypal' ? 'Within minutes' : '1–2 business days'}</span>
-                        </div>
-                      </div>
+                      {(() => {
+                        const usd = Number(withdrawAmount) || 0;
+                        // What lands in their bank. The balance quote covers the
+                        // whole available balance, so scale it to the amount being
+                        // withdrawn — the same proportional split the server uses.
+                        const localCcy = balance?.payout_currency;
+                        const localTotal = balance?.payout_available;
+                        const avail = balance?.available ?? 0;
+                        const local = (localCcy && localTotal != null && avail > 0)
+                          ? localTotal * (usd / avail)
+                          : null;
+
+                        return (
+                          <div className="bg-gray-50 rounded-2xl px-4 py-3.5 space-y-2.5 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500">You&apos;ll receive</span>
+                              {local !== null ? (
+                                <span className="text-right">
+                                  <span className="font-bold text-gray-900 block">
+                                    {formatMoney(local, localCcy, { withCode: true })}
+                                  </span>
+                                  <span className="text-[12px] text-gray-400">
+                                    from ${fmtMoney(usd)}
+                                  </span>
+                                </span>
+                              ) : (
+                                <span className="font-bold text-gray-900">${fmtMoney(usd)}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500">Payout fee</span><span className="font-semibold text-emerald-600">Free</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-500">Arrives</span>
+                              <span className="font-medium text-gray-700">{method === 'paypal' ? 'Within minutes' : '1–2 business days'}</span>
+                            </div>
+                            {local !== null && balance?.payout_fully_locked && (
+                              <p className="text-[12px] text-gray-400 pt-0.5 border-t border-gray-200/70 mt-0.5">
+                                At the rates locked when your projects were funded — this
+                                amount won&apos;t change if rates move.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
                 </>

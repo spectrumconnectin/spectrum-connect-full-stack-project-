@@ -183,36 +183,61 @@ async def create_beneficiary(
 async def create_transfer(
     *,
     beneficiary_id: str,
-    source_amount: float,
     idempotency_key: str,
+    source_amount: Optional[float] = None,
+    payment_amount: Optional[float] = None,
     source_currency: Optional[str] = None,
     target_currency: str = "LKR",
     reason: str = "Creator payout from Spectrum Connect",
 ) -> Dict[str, Any]:
     """Pay a registered beneficiary from the platform's Airwallex balance.
 
-    `source_amount` is denominated in `source_currency` — the currency the
-    creator's Spectrum balance is held in (USD), NOT the currency they receive.
+    Exactly one of `source_amount` or `payment_amount` must be given, and which
+    one you pick decides who carries the exchange-rate movement:
 
-    This distinction is the whole point of the parameter name. Sending the
-    amount as `payment_amount` in LKR instead would pay a creator owed $100
-    exactly LKR 100 — about a third of a dollar. We send `source_amount` and let
-    Airwallex convert, so the creator receives the LKR equivalent of what they
-    actually earned.
+    `source_amount` — denominated in `source_currency` (the currency the
+        creator's Spectrum balance is held in, USD). Airwallex converts at its
+        rate on the day, so the creator receives whatever that yields. Used when
+        no rate was ever promised to them.
+
+    `payment_amount` — denominated in `target_currency`, the exact sum the
+        creator receives. Used when the earnings behind this payout were locked
+        to a project rate: the creator is paid the figure they were shown and
+        the platform absorbs any drift in what it costs to send.
+
+    A caution for future readers, because this looks like a bug that was already
+    fixed once: passing a USD balance figure as `payment_amount` would pay a
+    creator owed $100 exactly LKR 100. `payment_amount` is only ever correct
+    when the number is genuinely denominated in `target_currency` — as it is
+    when it comes from locked per-project rates. It is not interchangeable with
+    `source_amount`.
 
     Idempotency-keyed so a retried request cannot pay twice.
     """
+    if (source_amount is None) == (payment_amount is None):
+        raise ValueError("Pass exactly one of source_amount or payment_amount.")
+
     payload = {
         "beneficiary_id": beneficiary_id,
         "source_currency": (source_currency or settings.AIRWALLEX_SOURCE_CURRENCY).upper(),
         "payment_currency": target_currency.upper(),
-        # Debit this much from the platform balance; Airwallex converts and the
-        # beneficiary receives the equivalent in payment_currency.
-        "source_amount": round(float(source_amount), 2),
         "reason": reason,
         "reference": idempotency_key[:32],
         "request_id": idempotency_key,
     }
+
+    if source_amount is not None:
+        # Debit this much from the platform balance; Airwallex converts and the
+        # beneficiary receives whatever that yields.
+        payload["source_amount"] = round(float(source_amount), 2)
+    else:
+        # Credit the beneficiary exactly this much; the platform pays whatever
+        # it costs. Rounded to the target currency's own precision — LKR has no
+        # minor unit, so a fractional rupee would be rejected.
+        from app.services import fx_service
+        payload["payment_amount"] = fx_service.round_money(
+            float(payment_amount), target_currency
+        )
 
     result = await _request(
         "POST", "/api/v1/transfers/create", payload, idempotency_key=idempotency_key

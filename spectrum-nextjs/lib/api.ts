@@ -1136,6 +1136,15 @@ export interface PayoutBalance {
   stripe_enabled: boolean;         // Stripe Connect configured platform-wide
   stripe_connected: boolean;       // this creator has a connected account
   stripe_payouts_enabled: boolean; // their account can receive payouts
+
+  // What the available balance is worth in the creator's own currency, at the
+  // rates their projects were locked at. Absent when they are paid in USD or
+  // when no rate could be determined.
+  payout_currency?: string;
+  payout_available?: number;
+  /** True when every dollar was locked to a project rate — the figure is exact. */
+  payout_fully_locked?: boolean;
+  payout_blended_rate?: number | null;
 }
 
 export interface ConnectStatus {
