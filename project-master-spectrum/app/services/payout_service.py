@@ -63,6 +63,13 @@ async def get_balance(user_id: PydanticObjectId) -> Dict[str, Any]:
         "payouts_enabled": paypal_service.is_enabled(),
     }
 
+    # Money secured against their work but not yet released. Best-effort: the
+    # withdrawable figures above must still render if this fails.
+    try:
+        result["escrow"] = await escrow_position(user_id)
+    except Exception:
+        logger.exception("Could not compute the escrow position for %s", user_id)
+
     # What the available balance is actually worth to this creator in their own
     # currency, honouring the rates their projects were locked at. Shown so a
     # creator paid in LKR sees the figure they will receive rather than a USD
@@ -79,6 +86,61 @@ async def get_balance(user_id: PydanticObjectId) -> Dict[str, Any]:
             result["payout_fully_locked"] = quote["fully_locked"]
             result["payout_blended_rate"] = quote["blended_rate"]
 
+    return result
+
+
+async def escrow_position(user_id: PydanticObjectId) -> Dict[str, Any]:
+    """Money held in escrow for a creator that has not reached their balance yet.
+
+    Their wallet only shows what has been released, so a creator with $1,000
+    secured against their work sees nothing until the client approves — the
+    reassurance escrow is supposed to provide is invisible at exactly the point
+    it matters.
+
+    Split by what the creator can act on:
+
+      in_escrow       — funded, work under way or in revision
+      pending_release — delivered or approved, waiting on the client
+      disputed        — frozen until the dispute is settled
+
+    Amounts are net of the creator fee, so they match what would actually land
+    in the wallet rather than a gross figure that shrinks on arrival.
+    """
+    from app.models.escrow import Escrow
+    from app.services.commission_service import calc_commission
+
+    IN_ESCROW = {"funded", "revision_requested"}
+    PENDING = {"delivered", "approved", "releasing"}
+    DISPUTED = {"disputed"}
+
+    buckets = {"in_escrow": 0.0, "pending_release": 0.0, "disputed": 0.0}
+    currencies: Dict[str, float] = {}
+
+    escrows = await Escrow.find(Escrow.creator_id == user_id).to_list()
+    for esc in escrows:
+        # A refunded or cancelled escrow holds nothing for the creator.
+        if esc.status in {"refunded", "cancelled"}:
+            continue
+        for m in esc.milestones:
+            if m.status in IN_ESCROW:
+                key = "in_escrow"
+            elif m.status in PENDING:
+                key = "pending_release"
+            elif m.status in DISPUTED:
+                key = "disputed"
+            else:
+                continue
+
+            # What the creator would receive, not the client's gross.
+            net = float(calc_commission(m.amount, currency=esc.currency).to_dict()["creator_payout"])
+            buckets[key] += net
+            currencies[esc.currency or "USD"] = currencies.get(esc.currency or "USD", 0.0) + net
+
+    result = {k: round(v, 2) for k, v in buckets.items()}
+    result["total_held"] = round(sum(buckets.values()), 2)
+    # Present so a mixed-currency position is not silently added up as if it
+    # were one number.
+    result["currencies"] = sorted(currencies.keys())
     return result
 
 

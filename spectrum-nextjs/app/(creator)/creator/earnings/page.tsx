@@ -264,8 +264,41 @@ export default function EarningsPage() {
                   const c = convert(stats?.pending ?? 0, 'USD');
                   return c ? <p className="text-xs text-gray-400 mt-0.5">≈ {c.formatted}</p> : null;
                 })()}
-                <p className="text-xs text-gray-400 mt-1">Processing / awaiting release</p>
+                <p className="text-xs text-gray-400 mt-1">Payments still settling</p>
               </div>
+
+              {/* Money a client has already funded against this creator's work.
+                  Without it, escrow is invisible to the person it protects —
+                  they see nothing until the client approves. */}
+              {(balance?.escrow?.total_held ?? 0) > 0 && (
+                <div className="bg-white rounded-2xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Secured in escrow</span>
+                    <i className="fa-solid fa-lock text-cobalt"></i>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {formatMoney(balance!.escrow!.total_held, 'USD')}
+                  </p>
+                  {(() => {
+                    const c = convert(balance!.escrow!.total_held, 'USD');
+                    return c ? <p className="text-xs text-gray-400 mt-0.5">≈ {c.formatted}</p> : null;
+                  })()}
+
+                  {(() => {
+                    const e = balance!.escrow!;
+                    const parts: string[] = [];
+                    if (e.in_escrow > 0) parts.push(`${formatMoney(e.in_escrow, 'USD')} while you work`);
+                    if (e.pending_release > 0) parts.push(`${formatMoney(e.pending_release, 'USD')} awaiting your client`);
+                    if (e.disputed > 0) parts.push(`${formatMoney(e.disputed, 'USD')} in dispute`);
+                    return (
+                      <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                        {parts.join(' · ')}
+                      </p>
+                    );
+                  })()}
+                  <p className="text-xs text-gray-400 mt-1">Yours on release, after fees</p>
+                </div>
+              )}
               <div className="bg-white rounded-2xl p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-600">This Month</span>

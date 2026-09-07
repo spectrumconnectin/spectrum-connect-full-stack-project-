@@ -1137,6 +1137,22 @@ export interface PayoutBalance {
   stripe_connected: boolean;       // this creator has a connected account
   stripe_payouts_enabled: boolean; // their account can receive payouts
 
+  /**
+   * Money secured against this creator's work that hasn't reached their wallet
+   * yet. Net of the creator fee, so it matches what actually arrives on release.
+   */
+  escrow?: {
+    /** Funded — work under way or in revision. */
+    in_escrow: number;
+    /** Delivered or approved — waiting on the client. */
+    pending_release: number;
+    /** Frozen until a dispute is settled. */
+    disputed: number;
+    total_held: number;
+    /** Every currency represented, so a mixed position isn't read as one number. */
+    currencies: string[];
+  };
+
   // What the available balance is worth in the creator's own currency, at the
   // rates their projects were locked at. Absent when they are paid in USD or
   // when no rate could be determined.
