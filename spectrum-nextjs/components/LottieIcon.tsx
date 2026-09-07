@@ -27,6 +27,28 @@ function recolor(node: unknown, rgb: [number, number, number]): void {
 }
 
 /**
+ * Animation JSON, fetched at most once per URL per page load.
+ *
+ * The same icon is reused across sections (right.json appears three times on
+ * the homepage alone), and a per-instance fetch meant one network round trip
+ * per placement. Keyed by URL and holding the *promise*, so instances that
+ * mount together share one request instead of racing to start their own.
+ */
+const animationCache = new Map<string, Promise<object>>();
+
+function loadAnimation(src: string): Promise<object> {
+  let pending = animationCache.get(src);
+  if (!pending) {
+    pending = fetch(src).then(r => r.json());
+    // A failed fetch must not be cached, or one flaky load leaves the icon
+    // permanently blank for the rest of the session.
+    pending.catch(() => animationCache.delete(src));
+    animationCache.set(src, pending);
+  }
+  return pending;
+}
+
+/**
  * Renders a Lottie animation from /public/animations. Lazy-fetches the JSON so
  * the (often large) animation data never ships in the page bundle.
  *
@@ -61,10 +83,13 @@ export default function LottieIcon({
 
   useEffect(() => {
     let active = true;
-    fetch(src)
-      .then(r => r.json())
-      .then(d => {
+    loadAnimation(src)
+      .then(shared => {
         if (!active) return;
+        // Always work on a copy: recolor() mutates in place, and lottie-web
+        // also writes bookkeeping onto the data it is handed. Either one would
+        // corrupt the cached copy for every other instance of this icon.
+        const d = structuredClone(shared);
         const rgb = color ? hexToRgb(color) : null;
         if (rgb) recolor(d, rgb);
         setData(d);

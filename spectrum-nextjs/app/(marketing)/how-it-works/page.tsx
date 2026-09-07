@@ -242,7 +242,7 @@ export default function HowItWorksPage() {
           mockBg="mock-bg-orange" mock={<MockFair/>}/>
       </div>
 
-      <section className="flow-diff">
+      <section className="flow-diff" id="the-journey">
         <h2>Why This Flow Is Different</h2>
         <div className="sub">Most marketplaces care about closing the deal. We care about trust, fairness, and relationships that last.</div>
         <div className="diff-grid">
@@ -271,7 +271,7 @@ export default function HowItWorksPage() {
         <p>Join thousands of creators and clients already collaborating on Spectrum Connect. Your next great project starts here.</p>
         <div className="btns">
           <Link href="/signup" className="btn btn-white btn-lg">Get Started Free</Link>
-          <Link href="#" className="btn btn-ghost-light btn-lg">See the Journey</Link>
+          <Link href="#the-journey" className="btn btn-ghost-light btn-lg">See the Journey</Link>
         </div>
       </section>
       <Footer/>

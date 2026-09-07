@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 
@@ -156,9 +157,9 @@ export default function HelpPage() {
             <a href="mailto:team.spectrumstudios@gmail.com" style={{ padding: '12px 24px', background: '#195ad7', color: '#fff', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
               <i className="fa-solid fa-envelope mr-2"></i>Email Support
             </a>
-            <a href="#" style={{ padding: '12px 24px', background: '#fff', color: '#195ad7', border: '1px solid #195ad7', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
-              <i className="fa-solid fa-comments mr-2"></i>Live Chat
-            </a>
+            <Link href="/call-the-ceo" style={{ padding: '12px 24px', background: '#fff', color: '#195ad7', border: '1px solid #195ad7', borderRadius: 12, fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
+              <i className="fa-solid fa-phone mr-2"></i>Call the CEO
+            </Link>
           </div>
         </div>
       </section>

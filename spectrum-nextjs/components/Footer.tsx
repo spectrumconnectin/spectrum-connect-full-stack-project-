@@ -24,12 +24,10 @@ export default function Footer() {
             A premium marketplace where creators and clients connect, collaborate,
             and complete amazing projects together.
           </p>
-          <div className="socials">
-            <a href="#" aria-label="Twitter"><i className="fa-brands fa-x-twitter"></i></a>
-            <a href="#" aria-label="Instagram"><i className="fa-brands fa-instagram"></i></a>
-            <a href="#" aria-label="LinkedIn"><i className="fa-brands fa-linkedin-in"></i></a>
-            <a href="#" aria-label="YouTube"><i className="fa-brands fa-youtube"></i></a>
-          </div>
+          {/* Social row removed until the accounts exist. Dead href="#" icons on
+              a page whose pitch is verification read as "not a real company" —
+              the same reason app/layout.tsx leaves these out of sameAs. Restore
+              the row here and uncomment sameAs together. */}
         </div>
         <div>
           <h5>Product</h5>
@@ -48,8 +46,7 @@ export default function Footer() {
             <li><Link href="/about">About Us</Link></li>
             <li><Link href="/call-the-ceo">Call the CEO</Link></li>
             <li><Link href="/community">Community</Link></li>
-            <li><a href="#">Careers</a></li>
-            <li><a href="#">Blog</a></li>
+            <li><Link href="/blog">Blog</Link></li>
           </ul>
         </div>
         <div>

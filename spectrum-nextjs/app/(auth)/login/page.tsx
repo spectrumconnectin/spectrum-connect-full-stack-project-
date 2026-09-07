@@ -238,8 +238,8 @@ export default function LoginPage() {
           </div>
           <div className="footer-note">
             By logging in, you agree to our{' '}
-            <Link href="#" className="ftr-link">Terms of Service</Link> and{' '}
-            <Link href="#" className="ftr-link">Privacy Policy</Link>
+            <Link href="/terms" className="ftr-link">Terms of Service</Link> and{' '}
+            <Link href="/privacy" className="ftr-link">Privacy Policy</Link>
           </div>
         </div>
       </main>

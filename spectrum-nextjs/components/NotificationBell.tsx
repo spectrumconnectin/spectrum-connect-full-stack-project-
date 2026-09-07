@@ -114,6 +114,8 @@ export default function NotificationBell() {
           open ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
         }`}
         title="Notifications"
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+        aria-expanded={open}
       >
         <i className="fa-solid fa-bell text-[18px]"></i>
         {unread > 0 && (

@@ -15,6 +15,8 @@ export const tokenStore = {
     return localStorage.getItem(LOGGED_IN_KEY) === 'true';
   },
   markLoggedIn: (rememberMe: boolean = false) => {
+    // A new session must not read anything cached for the previous one.
+    invalidateViewerCache();
     localStorage.setItem(LOGGED_IN_KEY, 'true');
     if (rememberMe) {
       localStorage.setItem(REMEMBER_ME_KEY, 'true');
@@ -27,10 +29,17 @@ export const tokenStore = {
     return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
   },
   clear: () => {
+    invalidateViewerCache();
     localStorage.removeItem(LOGGED_IN_KEY);
     localStorage.removeItem(REMEMBER_ME_KEY);
   },
 };
+
+// Areas that require a session to be meaningful at all. A 401 anywhere under
+// these paths sends the visitor to login even if the client never thought it
+// had a session; everywhere else (marketing, auth, legal) a 401 is just a
+// failed optional call and the page carries on signed-out.
+const PROTECTED_PREFIXES = ['/creator', '/client', '/admin', '/onboarding'];
 
 // ── Core fetch wrapper ───────────────────────────────────────────────────────
 async function request<T>(
@@ -53,10 +62,34 @@ async function request<T>(
 
   if (!res.ok) {
     if (auth && res.status === 401) {
+      // A 401 means one of two very different things, and they need different
+      // answers:
+      //
+      //   1. A session we believed in was rejected — it expired or was
+      //      revoked. Bounce to login wherever the user is.
+      //   2. A signed-out visitor called an authed endpoint on purpose. Public
+      //      pages do this by design — the marketing homepage asks
+      //      /currency/me for a display preference and catches the failure —
+      //      so 401 is the expected answer, not a problem.
+      //
+      // Treating (2) as (1) redirected every anonymous visitor off the
+      // homepage mid-render, because a caller's .catch() runs after the
+      // navigation has already been ordered and cannot undo it. So the
+      // decision belongs here, not at the call site.
+      //
+      // Protected areas still redirect unconditionally: this 401 is the only
+      // route guard those layouts have, so a visitor opening a bookmarked
+      // /creator/... URL with no session must still land on login.
+      const hadSession = tokenStore.isLoggedIn();
       tokenStore.clear();
-      // Redirect to login on the client side (skip during SSR)
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const inProtectedArea = PROTECTED_PREFIXES.some(
+          (p) => path === p || path.startsWith(p + '/'),
+        );
+        if ((hadSession || inProtectedArea) && !path.startsWith('/login')) {
+          window.location.href = '/login';
+        }
       }
       throw new Error('HTTP_401');
     }
@@ -81,6 +114,42 @@ async function request<T>(
   // 204 No Content
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+// ── "Who is the viewer?" cache ───────────────────────────────────────────────
+// A handful of endpoints answer the same question for every component on the
+// page — the profile, the currency list, the currency preference. Left alone,
+// each header, sidebar, price tag and provider asks separately: one homepage
+// load fired /profiles/me four times and /currency four times.
+//
+// This holds the in-flight promise per key, so components mounting in the same
+// tick share one request, and keeps the settled result for a short window so a
+// component mounting slightly later doesn't start a second one. It is
+// deliberately not a long-lived store: anything that changes the answer calls
+// invalidateViewerCache(), and the window is short enough that a stale read is
+// measured in seconds.
+const VIEWER_CACHE_TTL_MS = 30_000;
+const viewerCache = new Map<string, { at: number; promise: Promise<unknown> }>();
+
+function sharedRequest<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const hit = viewerCache.get(key);
+  if (hit && Date.now() - hit.at < VIEWER_CACHE_TTL_MS) {
+    return hit.promise as Promise<T>;
+  }
+  const promise = run();
+  // Never cache a rejection — a single failure would otherwise be replayed to
+  // every later caller for the rest of the window.
+  promise.catch(() => {
+    if (viewerCache.get(key)?.promise === promise) viewerCache.delete(key);
+  });
+  viewerCache.set(key, { at: Date.now(), promise });
+  return promise;
+}
+
+/** Drop cached viewer data. Call after anything that changes the answer. */
+export function invalidateViewerCache(key?: string) {
+  if (key) viewerCache.delete(key);
+  else viewerCache.clear();
 }
 
 // ── Auth types ───────────────────────────────────────────────────────────────
@@ -220,6 +289,8 @@ export const auth = {
       // Best-effort — still clear local UI state below even if this fails.
     }
     tokenStore.clear();
+    // Whoever signs in next must not be shown the previous viewer's profile.
+    invalidateViewerCache();
   },
 
   googleLogin: () => { window.location.href = `${BASE_URL}/auth/google_login`; },
@@ -348,7 +419,8 @@ export const notifications = {
 
 // ── Profile ──────────────────────────────────────────────────────────────────
 export const profile = {
-  getMe: (): Promise<MeResponse> => request<MeResponse>('/profiles/me'),
+  getMe: (): Promise<MeResponse> =>
+    sharedRequest('profiles/me', () => request<MeResponse>('/profiles/me')),
 
   // Same lookup, but never redirects and never throws — returns null instead.
   // Public marketing pages need to ask "is anyone signed in?" without the
@@ -369,14 +441,23 @@ export const profile = {
     }
   },
 
-  updateMe: (data: UserProfileUpdate): Promise<MeResponse> =>
-    request<MeResponse>('/profiles/me', { method: 'PUT', body: JSON.stringify(data) }),
+  updateMe: async (data: UserProfileUpdate): Promise<MeResponse> => {
+    const updated = await request<MeResponse>('/profiles/me', { method: 'PUT', body: JSON.stringify(data) });
+    invalidateViewerCache('profiles/me');
+    return updated;
+  },
 
-  updateSettings: (data: UserSettingsUpdate): Promise<object> =>
-    request('/profiles/me/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  updateSettings: async (data: UserSettingsUpdate): Promise<object> => {
+    const res = await request<object>('/profiles/me/settings', { method: 'PUT', body: JSON.stringify(data) });
+    invalidateViewerCache('profiles/me');
+    return res;
+  },
 
-  updateProfilePicture: (picture_url: string): Promise<object> =>
-    request('/profiles/me/profile-picture', { method: 'PUT', body: JSON.stringify({ picture_url }) }),
+  updateProfilePicture: async (picture_url: string): Promise<object> => {
+    const res = await request<object>('/profiles/me/profile-picture', { method: 'PUT', body: JSON.stringify({ picture_url }) });
+    invalidateViewerCache('profiles/me');
+    return res;
+  },
 
   updateCoverImage: (cover_url: string): Promise<object> =>
     request('/profiles/me/cover-image', { method: 'PUT', body: JSON.stringify({ cover_url }) }),
@@ -1237,16 +1318,20 @@ export const currency = {
     currencies: SupportedCurrency[];
     rates_as_of: string | null;
     rates_stale: boolean;
-  }> => request('/currency', {}, false),
+  }> => sharedRequest('currency', () => request('/currency', {}, false)),
 
   /** The signed-in user's display currency. */
   mine: (): Promise<{
     currency: string; symbol: string; name: string; decimals: number; is_base: boolean;
-  }> => request('/currency/me'),
+  }> => sharedRequest('currency/me', () => request('/currency/me')),
 
   /** Change display currency. Never changes what anyone is owed. */
-  setMine: (code: string): Promise<{ success: boolean; currency: string; message: string }> =>
-    request('/currency/me', { method: 'PUT', body: JSON.stringify({ currency: code }) }),
+  setMine: async (code: string): Promise<{ success: boolean; currency: string; message: string }> => {
+    const res = await request<{ success: boolean; currency: string; message: string }>(
+      '/currency/me', { method: 'PUT', body: JSON.stringify({ currency: code }) });
+    invalidateViewerCache('currency/me');
+    return res;
+  },
 
   convert: (amount: number, from: string, to?: string): Promise<MoneyValue> =>
     request<MoneyValue>(`/currency/convert${buildQS({ amount, from, to })}`),

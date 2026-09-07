@@ -1041,6 +1041,19 @@ section:has(.mk-reveal-x, .mk-reveal-r) {
   overflow-x: hidden;
 }
 
+/* Reduced motion: collapse straight to the finished state.
+   The global reduce rule only shortens transitions, which is not enough here —
+   these elements start at opacity 0 and depend on a class arriving to become
+   visible at all. Someone who asks for less motion should get the content
+   immediately and with no travel, not a 0.01ms version of the same slide. */
+@media (prefers-reduced-motion: reduce) {
+  .mk-reveal, .mk-reveal-x, .mk-reveal-r, .mk-stagger > * {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* Stagger grid: parent gets .mk-stagger, children animate in cascade */
 .mk-stagger > * {
   opacity: 0;

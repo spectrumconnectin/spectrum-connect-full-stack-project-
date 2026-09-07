@@ -102,7 +102,7 @@ function ClientHeader() {
               <Link href="/client/messaging" data-tour="messages"
                 className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
                   pathname === '/client/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-                }`} title="Messages">
+                }`} title="Messages" aria-label="Messages">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
@@ -112,7 +112,8 @@ function ClientHeader() {
 
               {/* Avatar + profile dropdown */}
               <div className="relative">
-                <button onClick={() => setMenuOpen(o => !o)} className="flex items-center focus:outline-none group">
+                <button onClick={() => setMenuOpen(o => !o)} className="flex items-center focus:outline-none group"
+                  aria-label="Account menu" aria-expanded={menuOpen} aria-haspopup="menu">
                   {avatarUrl
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={avatarUrl} alt={displayName} className="w-9 h-9 md:w-10 md:h-10 rounded-xl border-2 border-gray-200 group-hover:border-cobalt transition-colors object-cover" />

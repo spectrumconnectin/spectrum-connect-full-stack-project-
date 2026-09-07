@@ -12,7 +12,7 @@
  */
 
 import { useEffect } from 'react';
-import { presence, auth, tokenStore } from '@/lib/api';
+import { presence, tokenStore } from '@/lib/api';
 
 export function usePresence() {
   useEffect(() => {
@@ -21,10 +21,8 @@ export function usePresence() {
       return;
     }
 
-    // Mark user as online when page loads
-    presence.setOnline().catch(() => {
-      // Silently fail - presence tracking is not critical
-    });
+    // What we last told the server, so repeats are not re-sent.
+    let lastSent: 'online' | 'offline' | null = null;
 
     // Heartbeat every 30 s — online window is 2 min so this gives a comfortable
     // 4× safety margin; prevents false-offline on slow connections.
@@ -51,17 +49,43 @@ export function usePresence() {
       }
     };
 
+    // Every visibilitychange used to fire a request immediately, so a quick
+    // alt-tab produced offline/online/offline/online in under a second — six
+    // presence calls in one page load, and a user who flickers offline to
+    // everyone watching. Two guards fix that: remember what was last sent and
+    // skip no-op repeats, and let a brief tab switch pass without reporting
+    // offline at all.
+    const TAB_SWITCH_GRACE_MS = 5000;
+    let pendingOffline: ReturnType<typeof setTimeout> | null = null;
+
+    const send = (next: 'online' | 'offline') => {
+      if (next === lastSent) return;
+      lastSent = next;
+      const call = next === 'online' ? presence.setOnline() : presence.setOffline();
+      call.catch(() => {
+        // Silently fail — presence tracking is not critical. Forget the send so
+        // the next change is not suppressed by a state we never reached.
+        if (lastSent === next) lastSent = null;
+      });
+    };
+
     const handleVisibilityChange = () => {
+      if (pendingOffline) {
+        clearTimeout(pendingOffline);
+        pendingOffline = null;
+      }
       if (document.hidden) {
-        presence.setOffline().catch(() => {
-          // Silently fail
-        });
+        pendingOffline = setTimeout(() => {
+          pendingOffline = null;
+          send('offline');
+        }, TAB_SWITCH_GRACE_MS);
       } else {
-        presence.setOnline().catch(() => {
-          // Silently fail
-        });
+        send('online');
       }
     };
+
+    // Mark user as online when page loads.
+    send('online');
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -69,6 +93,7 @@ export function usePresence() {
     // Cleanup
     return () => {
       clearInterval(activityInterval);
+      if (pendingOffline) clearTimeout(pendingOffline);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
