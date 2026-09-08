@@ -269,7 +269,7 @@ function MyWorkInner() {
                       </div>
 
                       {/* Info */}
-                      <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+                      <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] sm:basis-0">
                         <div className="flex items-center gap-3 mb-1 flex-wrap">
                           <h3 className="text-lg font-bold text-gray-900 group-hover:text-cobalt transition">{app.job_title}</h3>
                           <span className={`text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap ${statusStyle}`}>
@@ -301,7 +301,7 @@ function MyWorkInner() {
                       </div>
 
                       {/* Right side — escrow status + actions */}
-                      <div className="flex w-full items-center gap-3 flex-shrink-0 flex-wrap justify-start sm:w-auto sm:justify-end" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-3 flex-shrink-0 flex-wrap justify-start ml-16 sm:ml-0 sm:justify-end" onClick={e => e.stopPropagation()}>
                         {isCompleted && (
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-2 rounded-xl">
                             <i className="fa-solid fa-circle-check text-emerald-500"></i>Project Completed
