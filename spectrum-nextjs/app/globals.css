@@ -325,6 +325,21 @@ body {
 .pr-foot-bottom .links { display: flex; gap: 18px; }
 .pr-foot-bottom .links a { color: #64748b; text-decoration: none; }
 
+/* Footer links are inline, and min-height does not apply to a non-replaced
+   inline box — so the 44px touch-target rule above matches these and then does
+   nothing. They measured 17px tall with no gap between them: two dozen
+   near-adjacent targets a third of the intended size. Making them inline-flex
+   is what lets the height take effect. */
+@media (max-width: 767px) {
+  .pr-foot-inner ul a,
+  .pr-foot-bottom .links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .pr-foot-inner ul { gap: 0; }
+}
+
 /* On a phone this row stayed a space-between flex row: the copyright got
    squeezed into a ~90px column and broke across four lines, while the link row
    ran off the right edge with "Help" cut in half. Stack it and let the links
@@ -505,7 +520,12 @@ nav a[aria-current="page"], nav a.is-active { color: var(--sc-brand) !important;
 .pr-final .meta { font-size:13.5px; color:rgba(255,255,255,0.85); }
 @media (max-width:900px) {
   .pr-hero h1 { font-size:36px; }
-  .fee-grid,.fee-split,.covers-grid,.up-grid,.wpw-grid,.pr-foot-inner { grid-template-columns:1fr; }
+  .fee-grid,.fee-split,.covers-grid,.up-grid,.wpw-grid { grid-template-columns:1fr; }
+  /* The footer's three link columns stay two-up rather than collapsing to one.
+     Once each link is a real 44px touch target (below), a single column runs
+     the footer to roughly twice the height for no benefit. */
+  .pr-foot-inner { grid-template-columns:1fr 1fr; gap:30px 20px; }
+  .pr-foot-inner > div:first-child { grid-column:1 / -1; }
   .no-hidden .nh-grid { grid-template-columns:1fr; }
   .fee-split { grid-template-columns:1fr; }
 }
