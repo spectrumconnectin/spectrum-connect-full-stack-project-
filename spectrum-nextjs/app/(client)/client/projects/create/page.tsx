@@ -511,13 +511,13 @@ export default function CreateProjectPage() {
   };
 
   const sectionHeader = (icon: string, iconBg: string, title: string, subtitle: string) => (
-    <div className="flex items-center gap-4 mb-6">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
         {/* Callers pass a bare icon name ('bullseye'); Font Awesome needs the fa- prefix. */}
         <i className={`fa-solid fa-${icon}`}></i>
       </div>
       <div>
-        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        <h2 className="text-base sm:text-lg font-bold text-gray-900">{title}</h2>
         <p className="text-sm text-gray-500">{subtitle}</p>
       </div>
     </div>
@@ -679,7 +679,7 @@ export default function CreateProjectPage() {
         {/* ── 1. Project Information ── */}
         <div id="section-info" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('circle-info', 'bg-blue-100 text-cobalt', 'Project Information', 'What are you working on?')}
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-1.5">
                 Project Title <span className="text-red-500">*</span>
@@ -695,7 +695,7 @@ export default function CreateProjectPage() {
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map(c => (
                   <button key={c} type="button" onClick={() => setCategory(c)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+                    className={`px-2.5 sm:px-4 py-2 rounded-xl text-sm font-semibold border transition ${
                       category === c
                         ? 'border-cobalt bg-blue-50 text-cobalt'
                         : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
@@ -760,7 +760,7 @@ export default function CreateProjectPage() {
         {/* ── 4. Budget ── */}
         <div id="section-budget" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('dollar-sign', 'bg-green-100 text-green-600', 'Project Budget', 'Fixed price — what is this project worth?')}
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
 
             {/* Currency selector */}
             <div>
@@ -848,7 +848,7 @@ export default function CreateProjectPage() {
         {/* ── 6. Location & Work Type ── */}
         <div id="section-location" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('location-dot', 'bg-rose-100 text-rose-600', 'Location & Work Type', 'Is this an in-person, on-site, or remote project?')}
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {/* Work type */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-2">Work Type</label>
@@ -902,7 +902,7 @@ export default function CreateProjectPage() {
         {/* ── 7. Timeline & Skills ── */}
         <div id="section-timeline" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 md:p-7 shadow-sm scroll-mt-24">
           {sectionHeader('calendar-days', 'bg-amber-100 text-amber-600', 'Timeline & Skills', 'When do you need it, and who should apply?')}
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-1.5">
                 Timeline <span className="text-gray-400 font-normal">(optional)</span>
