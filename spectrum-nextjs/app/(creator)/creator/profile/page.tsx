@@ -50,7 +50,7 @@ const emptyCert: CertEntry = { name: '', issuing_organization: '', issue_date: '
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
     <button onClick={onToggle}
-      className={`relative w-11 h-6 shrink-0 rounded-full transition-colors ${on ? 'bg-cobalt' : 'bg-gray-200'}`}>
+      className={`relative w-11 h-6 shrink-0 rounded-full transition-colors sc-fixed-size sc-tap-target ${on ? 'bg-cobalt' : 'bg-gray-200'}`}>
       <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
     </button>
   );

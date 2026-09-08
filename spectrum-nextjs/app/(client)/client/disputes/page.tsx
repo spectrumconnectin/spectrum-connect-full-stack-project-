@@ -77,7 +77,7 @@ function NewDisputeModal({ onClose, onCreated }: {
             <h2 className="text-xl font-bold text-gray-900">Open a Dispute</h2>
             <p className="text-sm text-gray-500 mt-0.5">Our team reviews all disputes within 48 hours.</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">
+          <button onClick={onClose} className="w-8 h-8 sc-fixed-size sc-tap-target flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>

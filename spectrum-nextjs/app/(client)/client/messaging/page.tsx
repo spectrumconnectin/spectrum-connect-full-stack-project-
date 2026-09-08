@@ -91,7 +91,7 @@ function ProjectPanel({ jobId, onClose }: { jobId: string; onClose: () => void }
     <div className="w-72 border-l border-gray-200 bg-gray-50 flex flex-col overflow-y-auto flex-shrink-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
         <span className="font-bold text-gray-900 text-sm">Project Details</span>
-        <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+        <button onClick={onClose} className="w-7 h-7 sc-fixed-size sc-tap-target flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
           <i className="fa-solid fa-xmark text-xs"></i>
         </button>
       </div>

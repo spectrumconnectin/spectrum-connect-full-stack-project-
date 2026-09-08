@@ -198,8 +198,9 @@ export default function NotificationBell() {
                     {!n.is_read && (
                       <button
                         onClick={() => handleMarkOne(n.id)}
-                        className="w-2.5 h-2.5 bg-cobalt rounded-full flex-shrink-0 mt-1.5 hover:bg-blue-700 transition"
+                        className="w-2.5 h-2.5 bg-cobalt rounded-full flex-shrink-0 mt-1.5 hover:bg-blue-700 transition sc-fixed-size sc-tap-target"
                         title="Mark as read"
+                        aria-label="Mark as read"
                       />
                     )}
                   </div>

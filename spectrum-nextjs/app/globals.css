@@ -1670,10 +1670,34 @@ body { overflow-x: hidden; }
   }
 }
 
+/* Extends a control's touch target to the 44px minimum WITHOUT resizing it.
+   For anything whose height is part of its shape — a switch, a small icon
+   button — growing the box is not an option, so the hit area is grown instead
+   with a transparent overlay centred on the control. */
+.sc-tap-target { position: relative; }
+.sc-tap-target::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
 /* ── General mobile quality-of-life ──────────────────────────────────────── */
 @media (max-width: 767px) {
-  /* Minimum touch target size */
-  button, a[href], [role="button"] {
+  /* Minimum touch target size.
+     Skips .sc-fixed-size, because this rule cannot tell the difference between
+     a button that happens to be short and one whose height IS its design. It
+     was stretching the settings switches from 44x24 to 44x44 — and since they
+     are rounded-full, a square renders as a circle, which is exactly how they
+     were being reported. Small icon buttons were being drawn as tall ovals for
+     the same reason. Those opt out here and use .sc-tap-target instead, which
+     gives them the same 44px hit area without touching their shape. */
+  button:not(.sc-fixed-size),
+  a[href]:not(.sc-fixed-size),
+  [role="button"]:not(.sc-fixed-size) {
     min-height: 44px;
   }
   /* Prevent text overflow in cards */
