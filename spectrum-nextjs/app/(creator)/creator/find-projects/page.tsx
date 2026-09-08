@@ -308,7 +308,7 @@ export default function DiscoverPage() {
                 <span className="text-red-500">Error loading</span>
               ) : (
                 <>
-                  <span className="font-semibold text-gray-900">{sorted.length}</span> projects found
+                  <span className="font-semibold text-gray-900">{sorted.length}</span> project{sorted.length !== 1 ? 's' : ''} found
                   {search && <span> for <span className="font-semibold text-cobalt">&ldquo;{search}&rdquo;</span></span>}
                 </>
               )}
@@ -542,17 +542,17 @@ function ProjectCard({
       </div>
 
       {/* Actions */}
-      <div className="px-5 pb-4 flex items-center gap-3 border-t border-gray-100 pt-4">
+      <div className="px-5 pb-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
         <Link href={`/creator/find-projects/${p.id}/apply`}
-          className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition">
+          className="px-5 py-2.5 bg-cobalt text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap">
           <i className="fa-solid fa-paper-plane mr-2"></i>Apply Now
         </Link>
         <Link href={`/creator/find-projects/${p.id}`}
-          className="px-5 py-2.5 border border-cobalt text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-50 transition">
+          className="px-5 py-2.5 border border-cobalt text-cobalt rounded-xl text-sm font-semibold hover:bg-blue-50 transition whitespace-nowrap">
           View Details
         </Link>
         {postedStr && (
-          <span className="ml-auto text-xs text-gray-400 flex items-center gap-1">
+          <span className="ml-auto text-xs text-gray-400 flex items-center gap-1 whitespace-nowrap">
             <i className="fa-regular fa-calendar text-gray-300"></i>
             Posted {postedStr}
           </span>

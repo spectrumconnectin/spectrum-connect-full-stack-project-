@@ -81,7 +81,7 @@ export default function SetupJourney({ role }: { role?: 'creator' | 'client' }) 
               const isNext = s.key === next_key;
               return (
                 <li key={s.key}
-                  className={`flex items-center gap-3.5 px-5 py-3.5 transition-colors ${isNext ? 'bg-blue-50/40' : ''}`}>
+                  className={`flex flex-wrap items-center gap-x-3.5 gap-y-2 px-5 py-3.5 transition-colors ${isNext ? 'bg-blue-50/40' : ''}`}>
                   {/* Status node */}
                   <div className="relative flex flex-col items-center flex-shrink-0">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all ${
@@ -98,7 +98,7 @@ export default function SetupJourney({ role }: { role?: 'creator' | 'client' }) 
                   </div>
 
                   {/* Copy */}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 basis-[calc(100%-2.625rem)] sm:basis-0">
                     <p className={`text-sm font-semibold leading-tight ${s.done ? 'text-gray-400 line-through decoration-gray-300' : 'text-gray-900'}`}>
                       {s.title}
                     </p>
@@ -108,7 +108,7 @@ export default function SetupJourney({ role }: { role?: 'creator' | 'client' }) 
                   {/* Action */}
                   {!s.done && s.href && s.cta && (
                     <Link href={s.href}
-                      className={`flex-shrink-0 text-xs font-bold px-3 py-2 rounded-lg transition active:scale-95 ${
+                      className={`flex-shrink-0 whitespace-nowrap text-xs font-bold px-3 py-2 rounded-lg transition active:scale-95 ml-[2.625rem] sm:ml-0 ${
                         isNext ? 'bg-cobalt text-white hover:bg-blue-700 shadow-sm' : 'text-cobalt hover:bg-blue-50'
                       }`}>
                       {s.cta}

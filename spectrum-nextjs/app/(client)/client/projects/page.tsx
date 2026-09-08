@@ -136,12 +136,12 @@ export default function ClientProjectsPage() {
       <section className="mb-8">
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-fade-x -mx-1 px-1 sm:mx-0 sm:px-0 sm:overflow-visible sm:flex-wrap">
               {STATUS_FILTERS.map(f => {
                 const label = f === 'All' ? 'All' : statusLabel(f);
                 return (
                   <button key={f} onClick={() => setActiveFilter(f)}
-                    className={`px-4 py-2.5 text-sm rounded-lg font-medium transition ${activeFilter === f ? 'font-semibold text-cobalt bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
+                    className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-sm rounded-lg font-medium transition ${activeFilter === f ? 'font-semibold text-cobalt bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}>
                     {label}
                   </button>
                 );
