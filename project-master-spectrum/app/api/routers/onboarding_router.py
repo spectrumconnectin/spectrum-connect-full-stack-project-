@@ -5,7 +5,7 @@ GET /onboarding/journey returns a role-adaptive list of milestones computed from
 the user's real data (profile, portfolio, ETF, first project/application/escrow),
 so the dashboard can show genuine progression toward first success.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import Any, Dict, List, Optional
 
 from beanie import PydanticObjectId
@@ -164,3 +164,41 @@ async def get_journey(
         "all_done": completed == total,
         "next_key": next_step["key"] if next_step else None,
     }
+
+
+# ── Product tour ─────────────────────────────────────────────────────────────
+# The welcome tour should run once per account, not once per browser. It used
+# to be gated purely on a localStorage flag, which meant a new device, a cleared
+# cache, or a phone browser evicting site data all replayed it — the reported
+# symptom was the tour appearing on essentially every mobile sign-in.
+
+VALID_TOUR_ROLES = ("creator", "client")
+
+
+@router.get("/tours", summary="Which product tours this account has already seen")
+async def get_tours_seen(current_user: User = Depends(get_current_user)) -> Dict[str, Any]:
+    return {"seen": list(current_user.tours_seen or [])}
+
+
+@router.post("/tours/{role}", summary="Mark a product tour as seen for this account")
+async def mark_tour_seen(
+    role: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    if role not in VALID_TOUR_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"role must be one of: {', '.join(VALID_TOUR_ROLES)}",
+        )
+
+    seen = list(current_user.tours_seen or [])
+    if role not in seen:
+        seen.append(role)
+        # A targeted $set rather than save(): the User document also carries
+        # payout, bank and Stripe fields, and rewriting the whole document to
+        # record a dismissed tour risks clobbering a concurrent write to one of
+        # them with a stale in-memory copy.
+        current_user.tours_seen = seen
+        await current_user.set({User.tours_seen: seen})
+
+    return {"seen": seen}

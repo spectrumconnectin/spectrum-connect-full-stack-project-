@@ -1946,6 +1946,14 @@ export const onboarding = {
    *  roles gets the wrong half of the marketplace's copy without it. */
   getJourney: (role?: 'creator' | 'client'): Promise<SetupJourney> =>
     request<SetupJourney>(`/onboarding/journey${role ? `?role=${role}` : ''}`),
+
+  /** Product tours this account has already been through. Kept server-side so
+   *  the tour runs once per account, not once per browser. */
+  getToursSeen: (): Promise<{ seen: string[] }> =>
+    request<{ seen: string[] }>('/onboarding/tours'),
+
+  markTourSeen: (role: 'creator' | 'client'): Promise<{ seen: string[] }> =>
+    request<{ seen: string[] }>(`/onboarding/tours/${role}`, { method: 'POST' }),
 };
 
 export const commission = {

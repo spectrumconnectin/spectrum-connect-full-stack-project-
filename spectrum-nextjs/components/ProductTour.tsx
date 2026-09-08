@@ -6,7 +6,9 @@
  * - Spotlight steps highlight a real element (`selector`) by dimming + blurring
  *   everything around it and ringing the target; the tooltip points at it.
  * - Concept steps (no selector) show a centered premium card.
- * - Auto-launches once per role on first dashboard visit (localStorage flag).
+ * - Auto-launches once per role, per ACCOUNT. The seen flag lives on the user
+ *   record; localStorage is only a local fast-path so a returning visitor
+ *   never sees a flash before the server answers.
  * - Can be re-launched anywhere via `window.dispatchEvent(new Event('sc:start-tour'))`.
  * - Skip is always available; the tour never hard-blocks the user.
  *
@@ -15,6 +17,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { onboarding } from '@/lib/api';
 
 type Step = {
   key: string;
@@ -82,24 +85,58 @@ export default function ProductTour({ role }: { role: 'client' | 'creator' }) {
 
   const finish = useCallback((completed: boolean) => {
     setClosing(true);
+    // Local flag first so this browser stops instantly, then the account flag
+    // so no other device replays it. A failed write is not worth interrupting
+    // anyone over — the worst case is the tour offering itself again.
     try { localStorage.setItem(STORAGE_KEY(role), completed ? 'done' : 'skipped'); } catch {}
+    onboarding.markTourSeen(role).catch(() => {});
     setTimeout(() => { setOpen(false); setClosing(false); setI(0); }, 180);
   }, [role]);
 
   const start = useCallback(() => { setI(0); setClosing(false); setOpen(true); }, []);
 
-  // Auto-launch once, on first dashboard visit.
+  // Auto-launch once per account, on first dashboard visit.
+  //
+  // This used to read localStorage alone. That is per-browser and phone
+  // browsers evict it freely, so the welcome tour replayed on almost every
+  // mobile sign-in. The account is the source of truth now; localStorage stays
+  // as a fast path so someone who has already seen it never waits on a request.
   useEffect(() => {
     if (startedRef.current) return;
-    const onDashboard = pathname === `/${role}/dashboard`;
-    if (!onDashboard) return;
-    let seen = 'done';
-    try { seen = localStorage.getItem(STORAGE_KEY(role)) || ''; } catch {}
-    if (!seen) {
+    if (pathname !== `/${role}/dashboard`) return;
+
+    let local = '';
+    try { local = localStorage.getItem(STORAGE_KEY(role)) || ''; } catch {}
+    if (local) {
+      // Already settled on this browser. Anyone carrying this flag from before
+      // the account-level record existed would otherwise get one last replay on
+      // their next device, so push it up once.
       startedRef.current = true;
-      const t = setTimeout(start, 700); // let the dashboard paint first
-      return () => clearTimeout(t);
+      onboarding.markTourSeen(role).catch(() => {});
+      return;
     }
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    onboarding.getToursSeen()
+      .then(({ seen }) => {
+        if (cancelled || startedRef.current) return;
+        if (seen?.includes(role)) {
+          // Seen on another device. Remember it here so the next load on this
+          // browser costs nothing.
+          try { localStorage.setItem(STORAGE_KEY(role), 'done'); } catch {}
+          return;
+        }
+        startedRef.current = true;
+        timer = setTimeout(start, 700);      // let the dashboard paint first
+      })
+      .catch(() => {
+        // Server unreachable: say nothing rather than risk replaying a tour
+        // the account has already been through.
+      });
+
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [pathname, role, start]);
 
   // Manual re-launch from anywhere.

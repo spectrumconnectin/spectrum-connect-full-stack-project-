@@ -342,6 +342,15 @@ class User(Document):
     verification_badge: Optional[VerificationBadge] = None
     stats: Optional[UserStats] = Field(default_factory=UserStats)
     settings: Optional[UserSettings] = Field(default_factory=UserSettings)
+
+    # Product tours this account has already been through, by role
+    # ("creator", "client"). Kept on the account rather than in the browser:
+    # localStorage is per-device and phone browsers evict it, so a tour flagged
+    # only there replayed on every new device — and, on mobile, often on every
+    # sign-in. Seeing the welcome tour is a fact about the person, not the
+    # browser they happen to be holding.
+    tours_seen: List[str] = Field(default_factory=list)
+
     # Currency this user reads the platform in. Amounts are stored in the
     # platform base currency and converted for display, so changing this never
     # alters what anyone is actually owed — only how it is shown.
