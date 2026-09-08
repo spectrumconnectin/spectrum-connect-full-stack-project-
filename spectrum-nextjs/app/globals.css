@@ -1694,10 +1694,14 @@ body { overflow-x: hidden; }
      are rounded-full, a square renders as a circle, which is exactly how they
      were being reported. Small icon buttons were being drawn as tall ovals for
      the same reason. Those opt out here and use .sc-tap-target instead, which
-     gives them the same 44px hit area without touching their shape. */
-  button:not(.sc-fixed-size),
-  a[href]:not(.sc-fixed-size),
-  [role="button"]:not(.sc-fixed-size) {
+     gives them the same 44px hit area without touching their shape.
+     role="switch" is excluded outright rather than per-instance: a switch's
+     track is a fixed pill by definition, so stretching one is never correct,
+     and leaving it to each new switch to remember the opt-out is how this
+     would come back. */
+  button:not(.sc-fixed-size):not([role="switch"]),
+  a[href]:not(.sc-fixed-size):not([role="switch"]),
+  [role="button"]:not(.sc-fixed-size):not([role="switch"]) {
     min-height: 44px;
   }
   /* Prevent text overflow in cards */

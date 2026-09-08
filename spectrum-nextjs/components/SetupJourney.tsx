@@ -61,7 +61,7 @@ export default function SetupJourney({ role }: { role?: 'creator' | 'client' }) 
             </button>
             {all_done && (
               <button onClick={dismiss} aria-label="Dismiss"
-                className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
+                className="sc-fixed-size sc-tap-target w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition">
                 <i className="fa-solid fa-xmark" />
               </button>
             )}

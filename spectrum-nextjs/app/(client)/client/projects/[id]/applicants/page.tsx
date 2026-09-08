@@ -106,7 +106,7 @@ export default function ApplicantsPage() {
       <section className="mb-8">
         <div className="flex items-center gap-4 mb-2">
           <Link href={`/client/projects/${id}`}
-            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition">
+            className="sc-fixed-size sc-tap-target w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition">
             <i className="fa-solid fa-arrow-left text-gray-600"></i>
           </Link>
           <div>

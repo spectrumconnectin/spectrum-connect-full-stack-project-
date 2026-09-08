@@ -58,7 +58,7 @@ function ClientHeader() {
 
             {/* Hamburger (mobile only) */}
             <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-600 hover:bg-gray-100 transition"
+              className="sc-fixed-size sc-tap-target md:hidden flex items-center justify-center w-10 h-10 rounded-xl text-gray-600 hover:bg-gray-100 transition"
               onClick={() => setDrawerOpen(o => !o)}
               aria-label="Open menu"
             >
@@ -100,7 +100,7 @@ function ClientHeader() {
             {/* Right actions */}
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <Link href="/client/messaging" data-tour="messages"
-                className={`flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
+                className={`sc-fixed-size sc-tap-target flex items-center justify-center w-9 h-9 md:w-10 md:h-10 rounded-xl transition-all ${
                   pathname === '/client/messaging' ? 'text-cobalt bg-blue-50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                 }`} title="Messages" aria-label="Messages">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

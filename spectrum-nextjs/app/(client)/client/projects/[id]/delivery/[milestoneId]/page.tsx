@@ -288,7 +288,7 @@ function RevisionModal({
             <p className="text-sm text-gray-500 mt-0.5">Describe what needs to change</p>
           </div>
           <button onClick={onClose} disabled={busy}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
+            className="sc-fixed-size sc-tap-target w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>

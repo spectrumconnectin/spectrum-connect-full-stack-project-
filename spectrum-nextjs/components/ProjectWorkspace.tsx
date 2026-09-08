@@ -292,7 +292,7 @@ function ChatTab({ convo, msgs, myUserId, onSend, sending }: {
         <button
           onClick={handleSend}
           disabled={(!input.trim() && !uploadingFile) || sending}
-          className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition ${
+          className={`sc-fixed-size sc-tap-target flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition ${
             (input.trim() || uploadingFile) && !sending
               ? 'bg-cobalt text-white hover:bg-blue-700 shadow-sm'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'

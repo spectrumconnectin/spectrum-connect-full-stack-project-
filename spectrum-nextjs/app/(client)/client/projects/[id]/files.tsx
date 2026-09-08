@@ -273,7 +273,7 @@ export default function FileShare({ projectId }: FileShareProps) {
                   download={file.name}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-cobalt hover:border-cobalt transition text-sm"
+                  className="sc-fixed-size sc-tap-target w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-cobalt hover:border-cobalt transition text-sm"
                   title="Download"
                 >
                   <i className="fa-solid fa-download"></i>

@@ -61,7 +61,7 @@ function SortableMediaRow({ dndId, item, onRemove }: { dndId: string; item: Pend
     <li ref={setNodeRef} style={style}
       className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
       <button type="button" {...attributes} {...listeners} aria-label="Drag to reorder"
-        className="w-6 h-6 rounded text-gray-300 hover:text-gray-500 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
+        className="sc-fixed-size sc-tap-target w-6 h-6 rounded text-gray-300 hover:text-gray-500 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
         <i className="fa-solid fa-grip-vertical text-xs" />
       </button>
       {c.kind === 'image' ? (
@@ -77,7 +77,7 @@ function SortableMediaRow({ dndId, item, onRemove }: { dndId: string; item: Pend
         <p className="text-xs text-gray-400 truncate">{item.caption || item.url}</p>
       </div>
       <button onClick={onRemove} aria-label="Remove"
-        className="w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition flex-shrink-0">
+        className="sc-fixed-size sc-tap-target w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition flex-shrink-0">
         <i className="fa-solid fa-xmark" />
       </button>
     </li>

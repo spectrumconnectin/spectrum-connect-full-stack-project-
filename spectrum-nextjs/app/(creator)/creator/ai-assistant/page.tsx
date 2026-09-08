@@ -855,7 +855,7 @@ export default function CreatorAiAssistantPage() {
                 <>
                   <button
                     onClick={shareConv}
-                    className="w-9 h-9 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-cobalt flex items-center justify-center transition-colors"
+                    className="sc-fixed-size sc-tap-target w-9 h-9 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-cobalt flex items-center justify-center transition-colors"
                     title="Copy conversation"
                   >
                     <i className={`fa-solid ${shared ? 'fa-check text-emerald-500' : 'fa-arrow-up-from-bracket'} text-sm`} />

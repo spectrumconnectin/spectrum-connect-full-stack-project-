@@ -74,7 +74,7 @@ function BlockRow({
   return (
     <div ref={setNodeRef} style={style} className="flex gap-2.5 bg-gray-50 border border-gray-200 rounded-xl p-3">
       <button type="button" {...attributes} {...listeners} aria-label="Drag to reorder"
-        className="w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
+        className="sc-fixed-size sc-tap-target w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-200 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
         <i className="fa-solid fa-grip-vertical text-xs" />
       </button>
 

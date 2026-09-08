@@ -98,7 +98,7 @@ function SortableProjectRow({
       className="flex items-center gap-4 bg-white border border-gray-200 rounded-2xl p-3.5 shadow-sm">
       {!compact && (
         <button type="button" {...attributes} {...listeners} aria-label="Drag to reorder"
-          className="w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
+          className="sc-fixed-size sc-tap-target w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 flex items-center justify-center flex-shrink-0 cursor-grab active:cursor-grabbing touch-none">
           <i className="fa-solid fa-grip-vertical text-xs" />
         </button>
       )}
@@ -123,11 +123,11 @@ function SortableProjectRow({
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         <button onClick={onEdit} aria-label="Edit"
-          className="w-8 h-8 rounded-lg text-gray-400 hover:text-cobalt hover:bg-blue-50 flex items-center justify-center transition">
+          className="sc-fixed-size sc-tap-target w-8 h-8 rounded-lg text-gray-400 hover:text-cobalt hover:bg-blue-50 flex items-center justify-center transition">
           <i className="fa-solid fa-pen text-xs" />
         </button>
         <button onClick={onDelete} aria-label="Delete"
-          className="w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition">
+          className="sc-fixed-size sc-tap-target w-8 h-8 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition">
           <i className="fa-solid fa-trash text-xs" />
         </button>
       </div>

@@ -563,7 +563,7 @@ export default function CreateProjectPage() {
       {/* Back + title */}
       <div className="flex items-center gap-4 mb-8">
         <Link href="/client/projects"
-          className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition flex-shrink-0">
+          className="sc-fixed-size sc-tap-target w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition flex-shrink-0">
           <i className="fa-solid fa-arrow-left text-gray-600 text-sm"></i>
         </Link>
         <div>

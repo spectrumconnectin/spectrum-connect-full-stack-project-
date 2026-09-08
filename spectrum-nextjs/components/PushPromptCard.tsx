@@ -67,7 +67,7 @@ export default function PushPromptCard({ forceShow = false }: { forceShow?: bool
       <button
         onClick={dismiss}
         aria-label="Dismiss"
-        className="absolute top-3 right-3 w-8 h-8 rounded-lg text-white/70 hover:text-white hover:bg-white/15 flex items-center justify-center transition z-10"
+        className="sc-fixed-size sc-tap-target absolute top-3 right-3 w-8 h-8 rounded-lg text-white/70 hover:text-white hover:bg-white/15 flex items-center justify-center transition z-10"
       >
         <i className="fa-solid fa-xmark" />
       </button>

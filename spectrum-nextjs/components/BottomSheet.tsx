@@ -49,7 +49,7 @@ export default function BottomSheet({ open, onClose, title, children, footer }: 
           <div className="flex items-center justify-between px-5 sm:px-6 pt-2 sm:pt-6 pb-3 sm:pb-4 border-b border-gray-100 flex-shrink-0">
             <h3 className="text-base sm:text-lg font-bold text-gray-900">{title}</h3>
             <button onClick={onClose} aria-label="Close"
-              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition">
+              className="sc-fixed-size sc-tap-target w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition">
               <i className="fa-solid fa-xmark text-sm"></i>
             </button>
           </div>
