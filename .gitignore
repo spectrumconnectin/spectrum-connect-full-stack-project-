@@ -57,3 +57,12 @@ project-master-spectrum/scripts/seed_creators_created.json
 Spectrum-Connect-Security-Plan.md
 Spectrum-Connect-Security-Plan*.pdf
 INCIDENT-RESPONSE.md
+
+# design-sync (spectrum-ui)
+spectrum-ui/.ds-sync/
+spectrum-ui/ds-bundle/
+spectrum-ui/.design-sync/.cache/
+spectrum-ui/.design-sync/learnings/
+spectrum-ui/.design-sync/node_modules
+spectrum-ui/node_modules/
+spectrum-ui/dist/

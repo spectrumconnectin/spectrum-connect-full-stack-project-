@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design tokens ────────────────────────────────────────────────────────
+   The same values the product's tailwind config and globals.css carry. */
+:root {
+  --sc-brand: #195ad7;
+  --sc-brand-2: #1449b0;
+  --sc-brand-deep: #103a8c;
+  --sc-brand-50: #eef3ff;
+  --sc-brand-100: #dde7ff;
+  --sc-ink: #0f172a;
+  --sc-ink-2: #334155;
+  --sc-mute: #64748b;
+  --sc-line: #e5e7eb;
+  --sc-bg: #fafafa;
+  --sc-card: #ffffff;
+  --sc-radius: 14px;
+  --sc-shadow-sm: 0 1px 2px rgba(15, 23, 42, .04), 0 1px 1px rgba(15, 23, 42, .04);
+  --sc-shadow: 0 4px 16px -4px rgba(15, 23, 42, .08), 0 2px 4px rgba(15, 23, 42, .04);
+  --sc-ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--sc-bg);
+  color: var(--sc-ink);
+}
+
+/* ── Scrolling rows ───────────────────────────────────────────────────────
+   Rows that scroll sideways hide their scrollbar, so without a fade nothing
+   says there is more to see — the last label just looks clipped. Only while
+   the row actually scrolls; at >=640px these rows wrap instead. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (max-width: 639px) {
+  .scroll-fade-x {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
+/* ── Touch targets ────────────────────────────────────────────────────────
+   Controls get a 44px minimum on a phone, EXCEPT those whose height is part of
+   their shape. A switch forced from 44x24 to 44x44 renders as a circle, so it
+   opts out with .sc-fixed-size and takes its touch area from .sc-tap-target
+   instead — a transparent overlay that grows the hit box, not the control. */
+.sc-tap-target { position: relative; }
+.sc-tap-target::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
+@media (max-width: 767px) {
+  button:not(.sc-fixed-size),
+  a[href]:not(.sc-fixed-size),
+  [role="button"]:not(.sc-fixed-size) {
+    min-height: 44px;
+  }
+  /* 16px or iOS Safari zooms the page when the field takes focus. */
+  input, textarea, select { font-size: 16px !important; }
+}
