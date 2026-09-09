@@ -31,3 +31,12 @@ export type { AvatarProps, PresenceDotProps } from './Avatar';
 
 export { Money, currencySymbol } from './Money';
 export type { MoneyProps } from './Money';
+
+export {
+  AppShell, AppHeader, BottomNav, PageHeader, WelcomeBanner,
+  StatGrid, ListSection, SplitLayout,
+} from './Layout';
+export type {
+  AppShellProps, AppHeaderProps, BottomNavProps, NavItem, PageHeaderProps,
+  WelcomeBannerProps, StatGridProps, ListSectionProps, SplitLayoutProps,
+} from './Layout';

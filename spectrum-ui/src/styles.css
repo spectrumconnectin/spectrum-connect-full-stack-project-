@@ -73,3 +73,19 @@ body {
   /* 16px or iOS Safari zooms the page when the field takes focus. */
   input, textarea, select { font-size: 16px !important; }
 }
+
+/* ── App shell ────────────────────────────────────────────────────────────
+   The mobile tab bar is a material, not a flat bar: translucent with a blur so
+   content shows through as it scrolls under. safe-bottom keeps it clear of the
+   home indicator on a notched phone. */
+.sc-bottom-nav {
+  background: rgba(255, 255, 255, 0.86);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, .05), 0 -8px 24px rgba(15, 23, 42, .06);
+}
+@supports not (backdrop-filter: blur(18px)) {
+  .sc-bottom-nav { background: #fff; }
+}
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-top { padding-top: env(safe-area-inset-top, 0px); }

@@ -17,6 +17,31 @@ Styling comes entirely from `styles.css`. It already carries Inter and Font
 Awesome 6.6 as local `@font-face` rules — do not add a font `<link>` or a CDN
 `@import`, and do not install an icon package.
 
+## Start from the structure, not the parts
+
+Screens are built shell-first. `AppShell` is the frame every signed-in page sits
+in — it owns the `max-w-7xl` container, the page padding, and the `pb-24 md:pb-8`
+that stops the fixed mobile tab bar covering the last row of a list.
+
+```jsx
+<AppShell
+  header={<AppHeader links={['Dashboard', 'My Projects', 'Payments']} hasNotifications />}
+  bottomNav={<BottomNav items={tabs} />}
+>
+  <WelcomeBanner name="…" message="…" action={<Button variant="white">…</Button>} />
+  <StatGrid>{/* four <Stat> */}</StatGrid>
+  <ListSection title="Active Projects (3)" icon="fa-solid fa-briefcase">{/* cards */}</ListSection>
+</AppShell>
+```
+
+The rest of the structural set: `PageHeader` (title + subtitle + action) opens a
+page that has no banner; `SplitLayout` is the detail-page shape — content left,
+a sidebar right from `lg:` and stacked below on smaller screens.
+
+Do not hand-roll these containers. Getting the max width, the page padding or
+the bottom clearance slightly different is what makes a screen look almost-right
+but not like the product.
+
 ## The styling idiom: Tailwind utilities
 
 Components are styled with Tailwind utility classes, and **your own layout glue
