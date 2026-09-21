@@ -87,7 +87,7 @@ export default function LegalIndexPage() {
           <p style={{ fontSize: 16, color: '#6b7280', margin: 0, maxWidth: 600, lineHeight: 1.65 }}>
             Everything that governs how Spectrum Connect works, how your data is used, and what
             your rights are. If you have a question that isn&apos;t answered here, email{' '}
-            <a href="mailto:team.spectrumstudios@gmail.com" style={{ color: '#195ad7', textDecoration: 'underline', textUnderlineOffset: 2 }}>team.spectrumstudios@gmail.com</a>.
+            <a href="mailto:contact@spectrumconect.com" style={{ color: '#195ad7', textDecoration: 'underline', textUnderlineOffset: 2 }}>contact@spectrumconect.com</a>.
           </p>
         </div>
       </section>
@@ -133,11 +133,11 @@ export default function LegalIndexPage() {
             </h3>
             <p style={{ fontSize: 14, color: '#6b7280', margin: 0, lineHeight: 1.65 }}>
               For takedown notices (DMCA) write to{' '}
-              <a href="mailto:team.spectrumstudios@gmail.com" style={{ color: '#195ad7' }}>team.spectrumstudios@gmail.com</a>.
+              <a href="mailto:admin@spectrumconect.com" style={{ color: '#195ad7' }}>admin@spectrumconect.com</a>.
               For data-rights requests write to{' '}
-              <a href="mailto:team.spectrumstudios@gmail.com" style={{ color: '#195ad7' }}>team.spectrumstudios@gmail.com</a>.
+              <a href="mailto:admin@spectrumconect.com" style={{ color: '#195ad7' }}>admin@spectrumconect.com</a>.
               For everything else,{' '}
-              <a href="mailto:team.spectrumstudios@gmail.com" style={{ color: '#195ad7' }}>team.spectrumstudios@gmail.com</a>{' '}
+              <a href="mailto:contact@spectrumconect.com" style={{ color: '#195ad7' }}>contact@spectrumconect.com</a>{' '}
               or the <a href="/help" style={{ color: '#195ad7' }}>Help Center</a>.
             </p>
           </div>

@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     BREVO_SMTP_USER: str = ""
     FROM_EMAIL: Union[EmailStr, str] = "team.spectrumstudios@gmail.com"
+    # Deliberately still a Gmail address. The domain's SPF authorises only
+    # Cloudflare and there is no Brevo DKIM record, so mail SENT as
+    # @spectrumconect.com would fail authentication and land in spam — including
+    # account verification emails, which would lock out new signups. Move this to
+    # an @spectrumconect.com address only after adding Brevo to SPF and
+    # publishing its DKIM record.
+
+    # Where the platform sends mail meant for the founding team. Receiving at the
+    # domain works (MX routes through Cloudflare Email Routing), so unlike
+    # FROM_EMAIL this can safely be a domain alias.
+    TEAM_EMAIL: str = "team@spectrumconect.com"
 
     # Frontend URL
     FRONTEND_URL: Union[AnyUrl, str] = "http://localhost:5173"

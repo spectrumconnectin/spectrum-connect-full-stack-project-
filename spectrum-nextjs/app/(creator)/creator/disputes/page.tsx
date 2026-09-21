@@ -309,7 +309,7 @@ export default function CreatorDisputesPage() {
                       {d.resolved_at && <p><span className="font-semibold">Resolved:</span> {formatDate(d.resolved_at)}</p>}
                       <p className="pt-2 text-gray-400 text-xs">
                         For urgent escalation contact{' '}
-                        <a href="mailto:team.spectrumstudios@gmail.com" className="text-cobalt underline">team.spectrumstudios@gmail.com</a>
+                        <a href="mailto:support@spectrumconect.com" className="text-cobalt underline">support@spectrumconect.com</a>
                       </p>
                     </div>
                   )}

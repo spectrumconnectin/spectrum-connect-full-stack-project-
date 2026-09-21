@@ -87,7 +87,9 @@ async def submit_ceo_call(
             </table>
             <p>Review it in the admin panel under "Call the CEO".</p>
         """
-        await send_email(str(settings.FROM_EMAIL), f"📞 Founder call request — {purpose_label}", admin_html)
+        # To the founders' inbox, not FROM_EMAIL — that is the sender identity,
+        # and reusing it as a destination only worked by coincidence.
+        await send_email(settings.TEAM_EMAIL, f"📞 Founder call request — {purpose_label}", admin_html)
 
         user_html = f"""
             <h2>Thanks, {doc.full_name.split(' ')[0]} — we received your request</h2>

@@ -47,6 +47,10 @@ export default function Footer() {
             <li><Link href="/call-the-ceo">Call the CEO</Link></li>
             <li><Link href="/community">Community</Link></li>
             <li><Link href="/blog">Blog</Link></li>
+            {/* A plain mailto, not a Link — there is no careers page, and a real
+                address beats the dead href="#" this row used to carry. */}
+            <li><a href="mailto:careers@spectrumconect.com">Careers</a></li>
+            <li><a href="mailto:contact@spectrumconect.com">Contact</a></li>
           </ul>
         </div>
         <div>
