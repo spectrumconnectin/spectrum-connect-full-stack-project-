@@ -226,6 +226,11 @@ async def add_portfolio_item(
 
     current_user.profile.portfolio_items.append(new_item)
     await current_user.save()
+
+    from app.services.audit_service import log_event
+    await log_event("portfolio.item_added", actor=current_user, target_type="portfolio_item",
+                    target_id=new_item.id,
+                    metadata={"first": len(current_user.profile.portfolio_items) == 1, "kind": item_type})
     return _to_read(new_item)
 
 

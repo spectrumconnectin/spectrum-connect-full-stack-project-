@@ -190,6 +190,12 @@ class Profile(BaseModel):
     headline: Optional[str] = None
     hourly_rate_min: Optional[float] = None
     hourly_rate_max: Optional[float] = None
+    # Onboarding answers
+    availability_label: Optional[str] = None      # creator: "Full-time (40+ hrs/week)" etc.
+    remote_only: Optional[bool] = None            # creator: only takes remote work
+    hiring_categories: Optional[List[str]] = None # client: types of work they hire for
+    typical_budget: Optional[str] = None          # client: e.g. "$500–$2,000"
+    typical_timeline: Optional[str] = None        # client: e.g. "2–4 weeks"
     rating: Optional[float] = None
     review_count: Optional[int] = None
     # Portfolio items — up to 2 videos + 3 images (legacy; see portfolio_projects)

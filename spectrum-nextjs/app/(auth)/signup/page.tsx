@@ -39,7 +39,8 @@ const IconEye = ({ open }: { open: boolean }) => open ? (
 );
 
 // ── OTP Step ────────────────────────────────────────────────────────────────
-function OtpStep({ email, accountType, onVerified }: { email: string; accountType: string; onVerified: () => void }) {
+function OtpStep({ email, password, onVerified }: { email: string; password: string; onVerified: () => void }) {
+  const router = useRouter();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -51,9 +52,18 @@ function OtpStep({ email, accountType, onVerified }: { email: string; accountTyp
     setLoading(true); setErr('');
     try {
       await auth.verifyOtp(email, otp);
-      onVerified();
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : 'Verification failed');
+      setLoading(false);
+      return;
+    }
+    // Verifying doesn't create a session, and onboarding needs one — without
+    // this the first save there 401s and bounces the new user to /login.
+    try {
+      await auth.login(email, password);
+      onVerified();
+    } catch {
+      router.push(`/login?verified=1&email=${encodeURIComponent(email)}`);
     } finally {
       setLoading(false);
     }
@@ -143,7 +153,6 @@ function SuccessView({ first, accountType }: { first: string; accountType: strin
 export default function SignUpPage() {
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('+1');
   const [password, setPassword] = useState('');
@@ -170,29 +179,32 @@ export default function SignUpPage() {
   }, [password]);
   const pwLabel = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'][pwScore];
 
+  // Mirror the backend rules (app/auth/schemas.py) so users see them before submitting.
+  const passwordError = password.length < 8 ? 'Must be at least 8 characters'
+    : !(/[A-Za-z]/.test(password) && /\d/.test(password)) ? 'Must include at least one letter and one number'
+    : '';
+
   const errors = {
     first: touched.first && !first.trim() ? 'Required' : '',
     last: touched.last && !last.trim() ? 'Required' : '',
-    username: touched.username && !username.trim() ? 'Required' : '',
     email: touched.email && email && !emailValid ? 'Enter a valid email' : (touched.email && !email ? 'Required' : ''),
     phone: touched.phone && phone.length > 2 && !phoneValid ? 'Use international format e.g. +12025551234' : '',
-    password: touched.password && password.length < 8 ? 'Must be at least 8 characters' : '',
+    password: touched.password ? passwordError : '',
     accountType: touched.accountType && !accountType ? 'Choose an account type' : '',
     agreed: touched.agreed && !agreed ? 'You must agree' : '',
   };
-  const formValid = first.trim() && last.trim() && username.trim() && emailValid && phoneValid && password.length >= 8 && accountType && agreed;
+  const formValid = first.trim() && last.trim() && emailValid && phoneValid && !passwordError && accountType && agreed;
 
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ first: true, last: true, username: true, email: true, phone: true, password: true, accountType: true, agreed: true });
+    setTouched({ first: true, last: true, email: true, phone: true, password: true, accountType: true, agreed: true });
     if (!formValid) return;
     setSubmitting(true);
     setErr('');
     try {
       await auth.register({
         email,
-        username,
         password,
         phone_number: phone.length > 3 ? phone : undefined,
         first_name: first.trim(),
@@ -205,8 +217,7 @@ export default function SignUpPage() {
       const msg = e instanceof Error ? e.message : 'Registration failed';
       // Surface specific constraint violations as field hints
       if (msg.toLowerCase().includes('email already')) setErr('This email is already registered. Try logging in instead.');
-      else if (msg.toLowerCase().includes('username already') || msg.toLowerCase().includes('username')) setErr('That username is taken. Try a different one.');
-      else if (msg.toLowerCase().includes('phone')) setErr('Phone number already registered. Try a different number or leave it blank.');
+      else if (msg.toLowerCase().includes('phone number already')) setErr('Phone number already registered. Try a different number or leave it blank.');
       else setErr(msg);
     } finally {
       setSubmitting(false);
@@ -233,7 +244,7 @@ export default function SignUpPage() {
             <div className="card">
               <OtpStep
                 email={email}
-                accountType={accountType}
+                password={password}
                 onVerified={() => setStep('done')}
               />
             </div>
@@ -280,7 +291,7 @@ export default function SignUpPage() {
         </div>
         <div className="brand-hero">
           <h1>Start your creative journey today</h1>
-          <p>Join thousands of creators and clients building amazing projects together.</p>
+          <p>Join creators and clients building amazing projects together.</p>
         </div>
         <div className="features">
           <div className="feature">
@@ -353,15 +364,6 @@ export default function SignUpPage() {
                     onBlur={() => setTouched(t => ({ ...t, last: true }))} />
                   {errors.last && <div className="help error">{errors.last}</div>}
                 </div>
-              </div>
-
-              <div className="field">
-                <label htmlFor="username">Username</label>
-                <input id="username" className={`input${errors.username ? ' invalid' : ''}`}
-                  type="text" placeholder="@yourname" autoComplete="username" value={username}
-                  onChange={e => setUsername(e.target.value.replace(/\s/g, '').toLowerCase())}
-                  onBlur={() => setTouched(t => ({ ...t, username: true }))} />
-                {errors.username && <div className="help error">{errors.username}</div>}
               </div>
 
               <div className="field">
@@ -448,7 +450,7 @@ export default function SignUpPage() {
 
               <div className="divider">Or sign up with</div>
               <div className="social">
-                <button type="button" className="btn-social" onClick={() => auth.googleLogin()}>
+                <button type="button" className="btn-social" onClick={() => auth.googleLogin(accountType || undefined)}>
                   <IconGoogle /> Google
                 </button>
               </div>

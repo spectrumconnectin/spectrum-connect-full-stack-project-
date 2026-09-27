@@ -1,7 +1,8 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import Dict, Optional
 import logging
+import re
 import secrets
 
 from pydantic import BaseModel
@@ -156,15 +157,21 @@ async def verify_otp(
     if user and not user.is_verified:
         user.is_verified = True
         await user.save()
+        from app.services.audit_service import log_event
+        await log_event("user.email_verified", actor=user, target_type="user",
+                        target_id=str(user.id), metadata={"method": "otp"})
 
     logger.info("OTP verified for %s", request.email)
     return {"success": True, "message": "Email verified successfully. You can now log in."}
 
 @router.get("/google_login")
-async def google_login():
+async def google_login(account_type: Optional[str] = None):
     """
     Redirects to Google's authorization page with a CSRF-protection state token.
     The state is stored server-side and verified in the callback.
+
+    `account_type` (crew | producer) is what the signup page had selected; it is
+    kept with the state and only used if the Google account is new.
     """
     from urllib.parse import urlencode
 
@@ -172,7 +179,8 @@ async def google_login():
     # across workers via MongoDB; auto-expires via TTL index).
     from app.models.oauth_state import OAuthState
     state_token = secrets.token_urlsafe(32)
-    await OAuthState(key=state_token, value="1").insert()
+    signup_type = account_type if account_type in ("crew", "producer") else "crew"
+    await OAuthState(key=state_token, value=signup_type).insert()
 
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -185,6 +193,19 @@ async def google_login():
     }
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
     return RedirectResponse(url)
+
+
+async def _username_from_email(email: str) -> str:
+    """A unique, valid username from the email's local part, e.g. jane.doe → jane.doe2."""
+    base = re.sub(r"[^A-Za-z0-9._-]", "", email.split("@")[0]).lower()[:24] or "user"
+    if len(base) < 3:
+        base = f"{base}user"
+    candidate = base
+    for n in range(2, 1000):
+        if not await User.find_one(User.username == candidate):
+            return candidate
+        candidate = f"{base}{n}"
+    return f"{base}{secrets.token_hex(3)}"
 
 @router.post("/register", response_model=UserRead, summary="Register new user")
 async def register_user(
@@ -224,9 +245,12 @@ async def register_user(
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    existing_username = await User.find_one(User.username == user.username)
-    if existing_username:
-        raise HTTPException(status_code=400, detail="Username already taken")
+    if user.username:
+        existing_username = await User.find_one(User.username == user.username)
+        if existing_username:
+            raise HTTPException(status_code=400, detail="Username already taken")
+    else:
+        user.username = await _username_from_email(user.email)
 
     # Check if phone number is already registered (only if provided)
     if user.phone_number:
@@ -273,7 +297,7 @@ async def register_user(
             actor=user_db,
             target_type="user",
             target_id=str(user_db.id),
-            metadata={"account_type": user_db.account_type, "username": user_db.username},
+            metadata={"account_type": user_db.account_type, "username": user_db.username, "method": "email"},
         )
     except Exception:
         pass
@@ -407,6 +431,7 @@ async def google_callback(code: str, state: str | None = None):
         logger.warning("OAuth callback rejected: invalid or missing state token")
         return RedirectResponse(f"{settings.FRONTEND_URL}/oauth-error?reason=invalid_state")
     # Consume the state token — one-time use only.
+    signup_type = state_doc.value if state_doc.value in ("crew", "producer") else "crew"
     await state_doc.delete()
 
     try:
@@ -460,7 +485,7 @@ async def google_callback(code: str, state: str | None = None):
                 email=email,
                 username=username,
                 password_hash=hashed_password,
-                account_type="crew",
+                account_type=signup_type,
                 is_verified=True,
                 oauth=OAuth(
                     google=GoogleOAuth(
@@ -474,6 +499,15 @@ async def google_callback(code: str, state: str | None = None):
             await new_user.insert()
             jwt_token = create_access_token(data={"sub": new_user.username})
             user = new_user
+
+            from app.services.audit_service import log_event
+            await log_event(
+                "user.signup",
+                actor=new_user,
+                target_type="user",
+                target_id=str(new_user.id),
+                metadata={"account_type": new_user.account_type, "username": new_user.username, "method": "google"},
+            )
 
         # Store the token in a short-lived exchange store keyed by an opaque
         # code so the JWT is NEVER placed in the redirect URL (which would
@@ -579,6 +613,9 @@ async def verify_email(token: str):
     
     user.is_verified = True
     await user.save()
+    from app.services.audit_service import log_event
+    await log_event("user.email_verified", actor=user, target_type="user",
+                    target_id=str(user.id), metadata={"method": "link"})
     return JSONResponse({"message": "Email verified successfully"})
 
 @router.post("/resend-verification", summary="Resend verification email")
@@ -840,7 +877,11 @@ async def creator_onboarding(
         # For now, we'll note it in the crew profile
         
         await crew_profile.save()
-    
+
+    from app.services.audit_service import log_event
+    await log_event("user.onboarding_completed", actor=current_user, target_type="user",
+                    target_id=str(current_user.id), metadata={"flow": "creator"})
+
     return JSONResponse({"message": "Creator onboarding completed successfully"})
 
 @router.post("/onboarding/producer", summary="Complete producer/client onboarding")
@@ -931,6 +972,10 @@ async def producer_onboarding(
             # Log error but don't fail onboarding if job creation fails
             logger.warning(f"Failed to create starter job during onboarding: {e}")
     
+    from app.services.audit_service import log_event
+    await log_event("user.onboarding_completed", actor=current_user, target_type="user",
+                    target_id=str(current_user.id), metadata={"flow": "producer"})
+
     return JSONResponse({"message": "Producer onboarding completed successfully"})
 
 

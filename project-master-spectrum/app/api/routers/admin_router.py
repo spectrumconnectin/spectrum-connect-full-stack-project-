@@ -533,6 +533,70 @@ async def get_stats_timeseries(
     return {"metric": metric, "days": days, "data": data}
 
 
+# Activation funnel steps, in order. Each maps to an AuditLog event_type.
+_FUNNEL_STEPS = [
+    ("signed_up",            "user.signup"),
+    ("email_verified",       "user.email_verified"),
+    ("onboarding_completed", "user.onboarding_completed"),
+    ("portfolio_added",      "portfolio.item_added"),
+    ("job_posted",           "job.posted"),
+    ("applied",              "application.submitted"),
+    ("conversation_started", "conversation.started"),
+]
+
+
+@router.get("/stats/funnel", summary="Signup → activation funnel for a signup cohort")
+async def get_stats_funnel(
+    days: int = Query(30, ge=1, le=365, description="Cohort: users who signed up in the past N days"),
+    admin: User = Depends(get_admin_user),
+):
+    """
+    Takes everyone who signed up in the past `days` days and counts how many of
+    them reached each activation step (at any time since signing up).
+
+    Response shape:
+    {
+      "days": 30,
+      "signups_by_method": {"email": 120, "google": 40},
+      "steps": [
+        {"step": "signed_up", "users": 160, "pct": 100.0},
+        {"step": "email_verified", "users": 130, "pct": 81.3},
+        ...
+      ]
+    }
+    """
+    from app.models.audit_log import AuditLog
+
+    since = datetime.utcnow() - timedelta(days=days)
+    signups = await AuditLog.find(
+        AuditLog.event_type == "user.signup",
+        AuditLog.created_at >= since,
+    ).to_list()
+
+    cohort = {s.actor_id for s in signups if s.actor_id}
+    by_method: dict[str, int] = {}
+    for s in signups:
+        method = (s.metadata or {}).get("method", "email")
+        by_method[method] = by_method.get(method, 0) + 1
+
+    collection = AuditLog.get_motor_collection()
+    steps = []
+    for step, event_type in _FUNNEL_STEPS:
+        if step == "signed_up":
+            reached = len(cohort)
+        elif cohort:
+            reached = len(await collection.distinct(
+                "actor_id",
+                {"event_type": event_type, "actor_id": {"$in": list(cohort)}},
+            ))
+        else:
+            reached = 0
+        pct = round(reached / len(cohort) * 100, 1) if cohort else 0.0
+        steps.append({"step": step, "users": reached, "pct": pct})
+
+    return {"days": days, "signups_by_method": by_method, "steps": steps}
+
+
 # ── User Management ────────────────────────────────────────────────────────────
 
 @router.get("/users", summary="List all users")

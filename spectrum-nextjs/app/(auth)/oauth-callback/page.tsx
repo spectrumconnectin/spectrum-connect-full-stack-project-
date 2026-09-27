@@ -58,19 +58,15 @@ function OAuthCallbackInner() {
       setMessage('Almost there…');
       profileApi.getMe()
         .then(user => {
-          const accountType = user.account_type;
+          const isClient = user.account_type === 'producer' || user.account_type === 'both';
           const hasProfile = !!(user.profile?.first_name || user.profile?.display_name);
 
-          if (accountType === 'producer' || accountType === 'both') {
-            router.replace('/client/dashboard');
-          } else if (accountType === 'crew') {
-            if (hasProfile) {
-              router.replace('/creator/dashboard');
-            } else {
-              router.replace('/onboarding/creator');
-            }
+          // New Google accounts have no profile yet — send both creators and
+          // clients through onboarding, not just creators.
+          if (hasProfile) {
+            router.replace(isClient ? '/client/dashboard' : '/creator/dashboard');
           } else {
-            router.replace('/onboarding/creator');
+            router.replace(isClient ? '/onboarding/client' : '/onboarding/creator');
           }
         })
         .catch(() => {

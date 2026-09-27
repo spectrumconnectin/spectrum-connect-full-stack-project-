@@ -175,8 +175,12 @@ class ProfileUpdate(BaseModel):
     social_links: Optional[SocialLinksCreate] = None
     hourly_rate_min: Optional[float] = None
     hourly_rate_max: Optional[float] = None
-    availability_status: Optional[str] = Field(None, description="available, busy, not_available")
-    availability_label: Optional[str] = None  # Human-readable onboarding label
+    availability_status: Optional[str] = Field(None, description="available, busy, not_available")  # stored in user.settings
+    availability_label: Optional[str] = Field(None, max_length=100)  # Human-readable onboarding label
+    remote_only: Optional[bool] = None
+    hiring_categories: Optional[List[str]] = Field(None, max_length=20)
+    typical_budget: Optional[str] = Field(None, max_length=50)
+    typical_timeline: Optional[str] = Field(None, max_length=100)
     # Portfolio Builder
     portfolio_template: Optional[str] = Field(None, description="visual, motion, minimal")
     portfolio_published: Optional[bool] = None

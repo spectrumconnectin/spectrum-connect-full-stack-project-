@@ -22,14 +22,13 @@ S3_BASE_URL = f"https://{S3_BUCKET}.s3.{S3_REGION}.amazonaws.com"
 _USER_DAILY_QUOTA_BYTES = 200 * 1024 * 1024   # 200 MB / user / day
 
 # ── Allowlists ────────────────────────────────────────────────────────────────
-_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"}
-# SVG can carry an embedded <script>/event-handler payload. Browsers never execute
-# it when the SVG is rendered via <img src="...">, but they DO execute it if the
-# raw URL is opened as a top-level document — so SVG must never get an inline
-# Content-Disposition, only these genuinely inert raster types may.
+# SVG is deliberately NOT accepted: it can carry an embedded <script>/event-handler
+# payload that executes when the raw URL is opened as a top-level document.
+_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+# Raster types that are safe to serve with an inline Content-Disposition.
 _INLINE_SAFE_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 _ALLOWED_VIDEO_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"}
-_ALLOWED_IMAGE_EXTS  = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+_ALLOWED_IMAGE_EXTS  = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 _ALLOWED_VIDEO_EXTS  = {".mp4", ".webm", ".mov", ".avi"}
 _ALLOWED_DOC_TYPES = {
     "application/pdf",
@@ -66,18 +65,10 @@ _MAGIC: list[tuple[str, int, bytes]] = [
     ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", 0, b"PK\x03\x04"),
 ]
 
-_SVG_STARTERS = (b"<svg", b"<?xml", b"\xef\xbb\xbf<")  # UTF-8 BOM + XML
-
-
 def _check_magic(content: bytes, declared_type: str) -> bool:
     """Return True if the file's magic bytes are consistent with declared_type.
-    SVG and AVI have no single definitive signature so they are checked leniently.
+    AVI has no single definitive signature so it is checked leniently.
     """
-    if declared_type == "image/svg+xml":
-        # SVG is text — just verify it starts with XML/SVG markers
-        snippet = content[:64].lstrip()
-        return any(snippet.startswith(s) for s in _SVG_STARTERS)
-
     for ctype, offset, sig in _MAGIC:
         if ctype != declared_type:
             continue

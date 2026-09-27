@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -61,7 +61,16 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(false);
-  const [role, setRole] = useState<'creator' | 'client'>('creator');
+  // Set when arriving from email verification: first login goes to onboarding.
+  const [justVerified, setJustVerified] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === '1') setJustVerified(true);
+    const prefill = params.get('email');
+    if (prefill) setEmail(prefill);
+  }, []);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const errors = {
@@ -74,6 +83,7 @@ export default function LoginPage() {
     e.preventDefault();
     setTouched({ email: true, password: true });
     setErr('');
+    setUnverified(false);
     if (!formValid) return;
     setSubmitting(true);
     try {
@@ -81,16 +91,18 @@ export default function LoginPage() {
       // Fetch actual account_type from server — don't rely on the UI toggle
       const me = await auth.me();
       // Map backend values: producer/both → client, crew → creator
-      const dest = (me.account_type === 'producer' || me.account_type === 'both')
-        ? '/client/dashboard'
-        : '/creator/dashboard';
+      const isClient = me.account_type === 'producer' || me.account_type === 'both';
+      const dest = justVerified
+        ? (isClient ? '/onboarding/client' : '/onboarding/creator')
+        : (isClient ? '/client/dashboard' : '/creator/dashboard');
       setDone(true);
       setTimeout(() => { router.push(dest); }, 900);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Login failed';
-      // If email not verified, offer OTP re-send
+      // If email not verified, point them at the verify page (it re-sends the code)
       if (msg.toLowerCase().includes('verify')) {
-        setErr('Email not verified. Please verify with the OTP sent when you registered.');
+        setUnverified(true);
+        setErr('Your email isn’t verified yet.');
       } else {
         setErr(msg);
       }
@@ -119,8 +131,8 @@ export default function LoginPage() {
               <img src="/assets/team-icon-white.svg" alt="" width="22" height="22" style={{ display: 'block' }} />
             </div>
             <div className="txt">
-              <div className="t">50,000+ Active Creators</div>
-              <div className="s">Join a thriving community of professionals</div>
+              <div className="t">A Growing Creative Community</div>
+              <div className="s">Creators and clients collaborating on real projects</div>
             </div>
           </div>
           <div className="feature">
@@ -144,8 +156,8 @@ export default function LoginPage() {
               </svg>
             </div>
             <div className="txt">
-              <div className="t">100,000+ Projects Completed</div>
-              <div className="s">Be part of a proven platform</div>
+              <div className="t">Secure Payments</div>
+              <div className="s">Funds held in escrow until work is delivered</div>
             </div>
           </div>
         </div>
@@ -161,12 +173,23 @@ export default function LoginPage() {
                 <h2>Log in to your account</h2>
                 <p className="lede">Welcome back! Please enter your details.</p>
 
+                {justVerified && !err && (
+                  <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#166534', fontWeight: 500 }}>
+                    ✓ Email verified. Log in to set up your profile.
+                  </div>
+                )}
+
                 {err && (
                   <div className="alert">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
                     </svg>
-                    <span>{err}</span>
+                    <span>
+                      {err}
+                      {unverified && (
+                        <>{' '}<Link href={`/verify-email?email=${encodeURIComponent(email)}`} className="link">Verify now</Link></>
+                      )}
+                    </span>
                   </div>
                 )}
 
@@ -196,18 +219,6 @@ export default function LoginPage() {
                     </button>
                   </div>
                   {errors.password && <div className="help error">{errors.password}</div>}
-                </div>
-
-                <div className="field">
-                  <label>I&apos;m signing in as</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
-                    {(['creator', 'client'] as const).map(r => (
-                      <button key={r} type="button" onClick={() => setRole(r)}
-                        style={{ padding: '10px 12px', borderRadius: 10, border: `1.5px solid ${role === r ? '#195ad7' : '#e5e7eb'}`, background: role === r ? '#eef4ff' : '#fff', fontWeight: 600, fontSize: 13, color: role === r ? '#195ad7' : '#374151', cursor: 'pointer', textTransform: 'capitalize' }}>
-                        {r}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 <div className="row-between">

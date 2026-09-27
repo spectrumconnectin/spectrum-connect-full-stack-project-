@@ -202,3 +202,37 @@ async def mark_tour_seen(
         await current_user.set({User.tours_seen: seen})
 
     return {"seen": seen}
+
+
+# ── Activation tracking ────────────────────────────────────────────────────────
+# The onboarding pages save through PUT /profiles/me, which also serves every
+# later profile edit, so it can't tell when onboarding finished. The pages call
+# this once at the end instead. Logged at most once per account per flow.
+
+VALID_ONBOARDING_FLOWS = ("creator", "producer")
+
+
+@router.post("/complete/{flow}", summary="Record that this account finished onboarding")
+async def mark_onboarding_complete(
+    flow: str,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    if flow not in VALID_ONBOARDING_FLOWS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"flow must be one of: {', '.join(VALID_ONBOARDING_FLOWS)}",
+        )
+
+    from app.models.audit_log import AuditLog
+    from app.services.audit_service import log_event
+
+    already = await AuditLog.find_one({
+        "event_type": "user.onboarding_completed",
+        "actor_id": current_user.id,
+        "metadata.flow": flow,
+    })
+    if not already:
+        await log_event("user.onboarding_completed", actor=current_user, target_type="user",
+                        target_id=str(current_user.id), metadata={"flow": flow})
+
+    return {"recorded": True}

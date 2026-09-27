@@ -4,7 +4,8 @@ import re
 
 class UserCreate(BaseModel):
     email: EmailStr
-    username: str = Field(..., min_length=3, max_length=30)
+    # Optional: when omitted, register derives a unique one from the email.
+    username: Optional[str] = Field(None, min_length=3, max_length=30)
     password: str = Field(..., min_length=8, max_length=128)
     # Phone is optional — User model stores it as Optional[str]
     phone_number: Optional[str] = Field(None, description="Phone number in E.164 format (e.g., +1234567890)")
@@ -26,6 +27,8 @@ class UserCreate(BaseModel):
 
     @validator('username')
     def validate_username(cls, v):
+        if v is None:
+            return v
         # Username may contain letters, digits, dot, dash, underscore.
         if not re.match(r'^[A-Za-z0-9._-]+$', v):
             raise ValueError('Username may only contain letters, digits, ".", "_" and "-".')

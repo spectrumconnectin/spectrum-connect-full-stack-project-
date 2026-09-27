@@ -13,7 +13,7 @@ The audit covered authentication & authorization, API security, database access,
 We found and fixed **17 issues** across **CRITICAL**, **HIGH**, and **MEDIUM** severity. All code-level fixes have been deployed:
 
 - Frontend: https://spectrum-nextjs.vercel.app (deployment `dpl_HEgPN9upVoN4RfE4v3WHqusL11vk`)
-- Backend: http://spectrum-connect-prod.eba-dnnmz6mt.ap-south-1.elasticbeanstalk.com (deployment `app-69c8-260530_153351703501`)
+- Backend: http://spectrum-connect-single.ap-south-1.elasticbeanstalk.com *(updated 2026-09-27; the original `spectrum-connect-prod.eba-dnnmz6mt…` environment no longer resolves)*
 
 **Six outstanding operational items** remain and require the dev/ops team's intervention. The highest-priority outstanding items are:
 
@@ -103,7 +103,7 @@ Until items 1–4 are completed, **the platform should not be considered product
   - Permissive MIME prefix-check let users upload e.g. `image/svg+xml` containing scripts, which browsers may render inline.
   - `ACL=public-read` is incompatible with modern S3 buckets that block ACLs, and bypasses bucket-policy-based access control.
 - **Fix:**
-  - Explicit MIME allowlist (`image/jpeg|png|gif|webp|svg+xml`, `video/mp4|webm|quicktime|x-msvideo`).
+  - Explicit MIME allowlist (`image/jpeg|png|gif|webp`, `video/mp4|webm|quicktime|x-msvideo`). **Update 2026-09-27:** SVG (`image/svg+xml`, `.svg`) removed from the allowlist entirely — it can carry scripts that run when the file URL is opened directly.
   - Extension allowlist & sanitization (defends against path traversal in `file.filename`).
   - `ACL` arg removed; rely on bucket policy.
   - `Content-Disposition: inline` set so the API can't be turned into a file-host for malicious binaries.
@@ -146,7 +146,7 @@ Until items 1–4 are completed, **the platform should not be considered product
 ### Backend
 
 ```bash
-$ curl -sS -I http://spectrum-connect-prod.eba-dnnmz6mt.ap-south-1.elasticbeanstalk.com/health
+$ curl -sS -I http://spectrum-connect-prod.eba-dnnmz6mt.ap-south-1.elasticbeanstalk.com/health   # original environment, since replaced
 HTTP/1.1 200 OK
 x-content-type-options: nosniff
 x-frame-options: DENY

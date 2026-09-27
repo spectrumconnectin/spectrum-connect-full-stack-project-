@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile, currency as currencyApi } from '@/lib/api';
+import { profile, currency as currencyApi, onboarding as onboardingApi } from '@/lib/api';
 
 const CATEGORIES = ['Video Production', 'Photography', 'Graphic Design', 'Motion & Animation', 'Copywriting & Content', 'Music & Audio', 'Social Media', 'Branding', 'Web & App Design', 'Other'];
 const BUDGETS = ['< $500', '$500–$2,000', '$2,000–$10,000', '$10,000–$50,000', '$50,000+'];
@@ -84,6 +84,9 @@ export default function ClientOnboardingPage() {
           headline: industry.trim() || undefined,
           website: website.trim() || undefined,
           bio: projectDesc.trim() || undefined,
+          hiring_categories: selectedCategories,
+          typical_budget: budget,
+          typical_timeline: timeline.trim() || undefined,
         },
       });
       // Best-effort: a failure here shouldn't block someone from finishing
@@ -91,6 +94,7 @@ export default function ClientOnboardingPage() {
       try {
         await currencyApi.setMine(currency);
       } catch { /* keeps the platform default */ }
+      onboardingApi.markComplete('producer').catch(() => { /* tracking only */ });
       setStep(3);
       setTimeout(() => router.push('/client/dashboard'), 2000);
     } catch (e) {
@@ -200,7 +204,7 @@ export default function ClientOnboardingPage() {
 
                     <div className="field">
                       <label htmlFor="projectDesc">Describe your typical project (optional)</label>
-                      <textarea id="projectDesc" className="input" rows={3} placeholder="Tell creators about the kind of work you usually bring to the platform…" value={projectDesc} onChange={e => setProjectDesc(e.target.value)} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                      <textarea id="projectDesc" className="input" rows={3} placeholder="Tell creators about the kind of work you usually bring to the platform…" value={projectDesc} maxLength={500} onChange={e => setProjectDesc(e.target.value)} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
                     </div>
                   </>
                 )}

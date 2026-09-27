@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { profile, currency as currencyApi } from '@/lib/api';
+import { profile, currency as currencyApi, onboarding as onboardingApi } from '@/lib/api';
 import PortfolioProjectEditor from '@/components/portfolio/PortfolioProjectEditor';
 
 const SKILLS = [
@@ -127,6 +127,7 @@ export default function CreatorOnboardingPage() {
           hourly_rate_max,
           availability_status: availabilityStatus(availability),
           availability_label: availability, // store the human-readable label
+          remote_only: remoteOnly,
         },
       });
       if (selectedSkills.length > 0) {
@@ -136,6 +137,7 @@ export default function CreatorOnboardingPage() {
       try {
         await currencyApi.setMine(payCurrency);
       } catch { /* keeps the platform default */ }
+      onboardingApi.markComplete('creator').catch(() => { /* tracking only */ });
       setStep(4); // Done
       setTimeout(() => router.push('/creator/dashboard'), 2000);
     } catch (e) {
@@ -216,8 +218,8 @@ export default function CreatorOnboardingPage() {
                     </div>
                     <div className="field">
                       <label htmlFor="bio">Bio <span style={{ color: '#ef4444' }}>*</span></label>
-                      <textarea id="bio" className="input" rows={4} placeholder="Describe your experience, style, and what you bring to projects…" value={bio} onChange={e => setBio(e.target.value)} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
-                      <div className="help" style={{ color: bio.length < 20 ? '#9ca3af' : '#10b981' }}>{bio.length}/200 characters {bio.length < 20 ? '(min 20)' : '✓'}</div>
+                      <textarea id="bio" className="input" rows={4} placeholder="Describe your experience, style, and what you bring to projects…" value={bio} maxLength={500} onChange={e => setBio(e.target.value)} style={{ resize: 'vertical', fontFamily: 'inherit' }} />
+                      <div className="help" style={{ color: bio.length < 20 ? '#9ca3af' : '#10b981' }}>{bio.length}/500 characters {bio.length < 20 ? '(min 20)' : '✓'}</div>
                     </div>
                     <div className="field">
                       <label htmlFor="location">Location</label>

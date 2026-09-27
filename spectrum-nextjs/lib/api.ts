@@ -240,7 +240,7 @@ export const auth = {
 
   register: async (payload: {
     email: string;
-    username: string;
+    username?: string;
     password: string;
     phone_number?: string;
     phone_country_code?: string;
@@ -293,7 +293,11 @@ export const auth = {
     invalidateViewerCache();
   },
 
-  googleLogin: () => { window.location.href = `${BASE_URL}/auth/google_login`; },
+  /** `accountType` only matters for a new Google account (crew = creator, producer = client). */
+  googleLogin: (accountType?: string) => {
+    const q = accountType ? `?account_type=${encodeURIComponent(accountType)}` : '';
+    window.location.href = `${BASE_URL}/auth/google_login${q}`;
+  },
 };
 
 // ── Profile types matching backend schemas ────────────────────────────────────
@@ -313,6 +317,10 @@ export interface ProfileUpdate {
   hourly_rate_max?: number;
   availability_status?: string;
   availability_label?: string;
+  remote_only?: boolean;
+  hiring_categories?: string[];
+  typical_budget?: string;
+  typical_timeline?: string;
   portfolio_template?: string;
   portfolio_published?: boolean;
   portfolio_access?: 'public' | 'password';
@@ -1954,6 +1962,10 @@ export const onboarding = {
 
   markTourSeen: (role: 'creator' | 'client'): Promise<{ seen: string[] }> =>
     request<{ seen: string[] }>(`/onboarding/tours/${role}`, { method: 'POST' }),
+
+  /** Records the activation event for the signup funnel. Logged once per account. */
+  markComplete: (flow: 'creator' | 'producer'): Promise<{ recorded: boolean }> =>
+    request<{ recorded: boolean }>(`/onboarding/complete/${flow}`, { method: 'POST' }),
 };
 
 export const commission = {

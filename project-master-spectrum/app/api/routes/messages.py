@@ -157,6 +157,12 @@ async def create_conversation(
         except Exception:
             pass
 
+    if was_created:
+        from app.services.audit_service import log_event
+        await log_event("conversation.started", actor=current_user, target_type="conversation",
+                        target_id=str(conversation.id),
+                        metadata={"source": data.source, "job_id": data.job_id})
+
     # ETF: platform activity for initiating contact
     try:
         from app.services.etf_points_service import EtfPointsService

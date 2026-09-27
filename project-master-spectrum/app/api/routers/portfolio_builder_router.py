@@ -328,6 +328,10 @@ async def create_project(
     )
     projects.append(project)
     await current_user.save()
+
+    from app.services.audit_service import log_event
+    await log_event("portfolio.item_added", actor=current_user, target_type="portfolio_project",
+                    target_id=project.id, metadata={"first": len(projects) == 1, "kind": "project"})
     return _to_read(project)
 
 

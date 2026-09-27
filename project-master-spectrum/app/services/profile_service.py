@@ -88,6 +88,17 @@ class ProfileService:
                 user.profile.social_links = SocialLinks(**profile_dict["social_links"])
                 del profile_dict["social_links"]
 
+            # Availability lives on settings (read by talent search / Smart Connect),
+            # not on Profile — setting it on Profile raised and failed onboarding.
+            availability = profile_dict.pop("availability_status", None)
+            if availability is not None:
+                if availability not in ("available", "busy", "not_available"):
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                        detail="availability_status must be available, busy or not_available")
+                if not user.settings:
+                    user.settings = UserSettings()
+                user.settings.availability_status = availability
+
             # Update remaining fields
             for key, value in profile_dict.items():
                 if value is not None:

@@ -30,8 +30,9 @@ function VerifyEmailContent() {
     try {
       await auth.verifyOtp(email, otp);
       setStatus('success');
-      const dest = type === 'producer' ? '/onboarding/client' : '/onboarding/creator';
-      setTimeout(() => router.push(dest), 1800);
+      // Verifying doesn't create a session and onboarding requires one, so
+      // go through login (which sends new accounts on to onboarding).
+      setTimeout(() => router.push(`/login?verified=1&email=${encodeURIComponent(email)}&type=${type}`), 1800);
     } catch (e) {
       setErr((e as Error).message ?? 'Verification failed. Please try again.');
     } finally {
@@ -104,7 +105,7 @@ function VerifyEmailContent() {
                   </svg>
                 </div>
                 <h2>Email verified!</h2>
-                <p>Your account is now active. Taking you to profile setup…</p>
+                <p>Your account is now active. Taking you to log in…</p>
               </div>
             ) : (
               <form noValidate onSubmit={onVerify}>
