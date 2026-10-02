@@ -17,7 +17,7 @@
 | 1 | Security lockdown + tracking | ✅ Done (dummy-tested) — live values + deploy left |
 | 2 | Fix findings + start onboarding UX | ✅ Done (dummy-tested) — deploy left |
 | 3 | Onboarding UX + API access review | ✅ Done (dummy-tested) — deploy left |
-| 4 | Month 1 security report | ⏳ Pending |
+| 4 | Month 1 security report | ✅ Done (dummy-tested) — password change + history push left |
 | 5 | Referral MVP + UI sprint 2 | ⏳ Pending |
 | 6 | Upload, storage and messaging security | 🟡 Partly done |
 | 7 | Fix signup drop-offs | ⏳ Pending |
@@ -35,7 +35,7 @@
 | 1.2 | Check login, roles and admin access | ✅ Done | All `/admin` routes require an admin; `/wipe-data` requires a superadmin and their password; `/register-admin` rate-limited (3/hour). **Tested locally ✅** |
 | 1.3 | Set `ENVIRONMENT=production`, `SECRET_KEY`, `ADMIN_REGISTRATION_KEY` on EB | ✅ Done | Live: `/docs` returns 404, HSTS header sent |
 | 1.4 | Rotate the Google OAuth client secret | ✅ Done (dummy-tested) | Google sign-in works end to end with a new dummy secret (10/10). Secret is read only from env, none left in code. **Live:** Reset Secret in Google Cloud → `eb setenv GOOGLE_CLIENT_SECRET=...` |
-| 1.5 | Delete the MongoDB user `nasireaglines_db_user` | ✅ Done (dummy-tested) | App connects with any DB user given in `MONGO_URI`; no DB passwords left in code. **Live:** delete the user in Atlas (old password is still in 3 git-history commits) |
+| 1.5 | Delete the MongoDB user `nasireaglines_db_user` | ✅ Done (dummy-tested) | App connects with any DB user given in `MONGO_URI`. **Correction (Week 4):** the password was still in `SECURITY_AUDIT.md` line 243 — missed by the Week 1 scan; removed in Week 4. **Live:** delete the user in Atlas — urgent, it was readable on GitHub |
 | 1.6 | Turn on HTTPS for the backend | ✅ Done (dummy-tested) | Production mode tested (7/7): HSTS on, `/docs` hidden, OTP never echoed, cookies Secure + HttpOnly; weak `SECRET_KEY` refused. **Live:** ACM cert + 443 listener; set `next.config.mjs` line 52 to `https://` |
 | 1.7 | Set up signup and activation tracking | ✅ Done (dummy-tested) | Code done and **tested locally ✅** incl. Google sign-up (mocked Google), **not yet deployed**. Events: `user.signup` (email + Google), `user.email_verified`, `user.onboarding_completed`, `portfolio.item_added`, `job.posted`, `application.submitted`, `conversation.started`. Funnel report: `GET /admin/stats/funnel?days=30`. Confirm the event list with Ashish |
 
@@ -61,7 +61,7 @@ Dummy Google client ID/secret, dummy MongoDB user, production mode, mocked Googl
 | Task | What was tested | Result |
 |---|---|---|
 | 1.4 OAuth | Secret comes from env; login redirects to Google with the new client ID; callback creates + verifies the user; one-time exchange code (no token in URL, can't reuse); forged or replayed `state` rejected; `user.signup` logged as `google` | ✅ 10/10 |
-| 1.5 MongoDB | App connects with the DB user in `MONGO_URI`; no leaked Google secret or DB password anywhere in current code | ✅ |
+| 1.5 MongoDB | App connects with the DB user in `MONGO_URI` | ✅ (leak scan was wrong — see Week 4) |
 | 1.6 HTTPS / production | HSTS header; `/docs` 404; register + login work; OTP never returned; session cookie `Secure` + `HttpOnly`; app refuses to start with a weak `SECRET_KEY` | ✅ 8/8 |
 
 **Not tested locally:** real S3 uploads, real email sending. Check these after deploy.
@@ -153,8 +153,17 @@ Sent both profile pages' exact requests to the server (41 checks).
 
 | # | Task | Status | Notes |
 |---|---|---|---|
-| 4.1 | Write the Month 1 security report | ⏳ Pending | Base it on `SECURITY_AUDIT.md` + Week 1–3 results |
-| 4.2 | Purge leaked secrets from git history | ⏳ Pending | Optional; `git filter-repo`, then everyone re-clones |
+| 4.1 | Write the Month 1 security report | ✅ Done | `SECURITY_REPORT_MONTH_1.md` — summary, fixes by week, 165 tests, open risks in priority order |
+| 4.2 | Purge leaked secrets from git history | ✅ Done (dummy-tested) | Run on a throwaway mirror: 293/293 commits and both branches kept; 4 affected file versions → 0 secrets left. **Live:** force-push needs team OK, then everyone re-clones — after changing the passwords |
+| 4.3 | Remove DB password still in `SECURITY_AUDIT.md` | ✅ Done | Found this week on `main` (line 243, inside the old clean-up command) |
+| 4.4 | Fix the broken purge instructions in `SECURITY_AUDIT.md` §4.4 | ✅ Done | Old commands used placeholder text and missed the UTF-16 file — would have removed nothing |
+
+### Leak findings (2 Oct 2026)
+
+- **Database password** was still in the current `SECURITY_AUDIT.md` on GitHub `main` — the Week 1 scan skipped it because the line also contains "REDACTED". Removed.
+- **Google secret** is in the first commit's `.env.example`, saved as UTF-16, which normal searches (and the Week 1 scan) don't see.
+- The other env files in history (`spectrum-nextjs/.env.local`, `composio-agent/.env.example`) hold only a localhost URL and a placeholder — no secrets.
+- **Changing both passwords on the live services is now the most urgent open item.**
 
 **Milestone:** 1,000 total users.
 

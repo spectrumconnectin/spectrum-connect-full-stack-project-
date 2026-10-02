@@ -227,29 +227,21 @@ Once HTTPS is in place, the HSTS header on the backend will start protecting cli
 
 ### 4.4 Purge the leaked secrets from git history (recommended)
 
-The Google secret and MongoDB credentials are in commit `6ab51ac` and survive on every developer's clone and on GitHub. Even after rotation, anyone with a clone or a fork retains the old secrets. To purge:
+> **Updated 2 Oct 2026 — the original commands here would not have worked.** The `--replace-text` list held placeholder text, not the real values, and the Google secret sits in a **UTF-16** `.env.example` that plain text replacement doesn't match. The database password was also still written in this file until 2 Oct.
+
+The secrets are in commit `6ab51ac` (`.env.example`, UTF-16; `inspect_database.py`) and in this file's history (`1f85ccd` onward). Rotate first (§4.1) — purging history does not make a leaked secret safe.
+
+A tested clean-up script (reads the real values from history itself, replaces them in UTF-8 and UTF-16, never prints them) was run on a throwaway mirror on 2 Oct 2026: **293/293 commits kept, both branches kept, 4 affected file versions → 0 secrets left.** See `SECURITY_REPORT_MONTH_1.md` §4.2.
+
+To run it for real, with everyone's agreement:
 
 ```bash
-# Install git-filter-repo (preferred over BFG for this use case)
-pip install git-filter-repo
-
-# In a fresh clone of the repo:
-git filter-repo --invert-paths --path project-master-spectrum/inspect_database.py
-# Then re-add inspect_database.py with the sanitized version from this audit.
-
-# For .env.example, replace text instead of removing the file:
-git filter-repo --replace-text <(cat <<'EOF'
-GOCSPX-REDACTED-rotate-immediately==>REDACTED
-nasireaglines_db_user:Mk9%239AvT==>REDACTED
-EOF
-)
-
-# Force-push the rewritten history.
-git push origin --force --all
-git push origin --force --tags
+# 1. re-run the script right before pushing, so it includes the latest commits
+# 2. then push the mirror it produced (%TEMP%/purge/repo.git):
+git push --force --mirror https://github.com/spectrumconnectin/spectrum-connect-full-stack-project-
 ```
 
-Coordinate this with everyone who has the repo cloned — they will need to re-clone.
+Afterwards everyone must re-clone; old clones and forks still hold the secrets.
 
 ### 4.5 Move state to Redis once you scale beyond one instance
 
