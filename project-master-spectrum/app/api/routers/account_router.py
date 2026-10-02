@@ -40,6 +40,8 @@ async def get_account_settings(
     try:
         settings = await AccountService.get_account_settings(str(current_user.id))
         return settings
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -74,6 +76,8 @@ async def update_profile(
             )
 
         return UpdateResponse(success=True, message="Profile updated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -100,6 +104,8 @@ async def update_email(
             )
 
         return UpdateResponse(success=True, message="Email updated successfully")
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -132,10 +138,12 @@ async def update_password(
             )
 
         return UpdateResponse(success=True, message="Password updated successfully")
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An unexpected error occurred. Please try again."
+            detail=str(e)
         )
     except Exception as e:
         raise HTTPException(
@@ -154,6 +162,8 @@ async def update_phone(
         current_user.phone_number = data.new_phone
         await current_user.save()
         return UpdateResponse(success=True, message="Phone number updated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -180,6 +190,8 @@ async def update_notification_settings(
             )
 
         return UpdateResponse(success=True, message="Notification settings updated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -206,6 +218,8 @@ async def update_privacy_settings(
             )
 
         return UpdateResponse(success=True, message="Privacy settings updated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -232,6 +246,8 @@ async def deactivate_account(
             )
 
         return UpdateResponse(success=True, message="Account deactivated successfully")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

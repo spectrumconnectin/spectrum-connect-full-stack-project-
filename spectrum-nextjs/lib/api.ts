@@ -301,20 +301,21 @@ export const auth = {
 };
 
 // ── Profile types matching backend schemas ────────────────────────────────────
+// Omit a field to leave it unchanged; send null to clear it.
 export interface ProfileUpdate {
-  first_name?: string;
-  last_name?: string;
-  display_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string | null;
   profile_picture?: string;
   cover_image?: string;
-  bio?: string;
-  tagline?: string;
-  headline?: string;
-  website?: string;
-  location?: { city?: string; country?: string; state?: string };
-  social_links?: { linkedin?: string; imdb?: string; vimeo?: string; portfolio?: string };
-  hourly_rate_min?: number;
-  hourly_rate_max?: number;
+  bio?: string | null;
+  tagline?: string | null;
+  headline?: string | null;
+  website?: string | null;
+  location?: { city?: string | null; country?: string | null; state?: string | null } | null;
+  social_links?: { linkedin?: string | null; imdb?: string | null; vimeo?: string | null; portfolio?: string | null } | null;
+  hourly_rate_min?: number | null;
+  hourly_rate_max?: number | null;
   availability_status?: string;
   availability_label?: string;
   remote_only?: boolean;

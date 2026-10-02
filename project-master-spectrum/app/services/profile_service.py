@@ -24,6 +24,14 @@ from app.api.schemas.profile_schemas import (
 class ProfileService:
     """Service class for user profile operations"""
 
+    # Profile fields an edit form may empty (sent as null).
+    CLEARABLE_FIELDS = {
+        "first_name", "last_name", "display_name", "tagline", "headline", "bio",
+        "website", "location", "social_links", "hourly_rate_min", "hourly_rate_max",
+        "availability_label", "remote_only", "hiring_categories", "typical_budget",
+        "typical_timeline",
+    }
+
     @staticmethod
     async def get_user_by_id(user_id: str) -> User:
         """Get user by ID"""
@@ -76,6 +84,12 @@ class ProfileService:
             profile_dict = profile_data.profile.model_dump(exclude_unset=True)
 
             # Handle nested objects
+            # An all-empty group (every box cleared) arrives as {} — clear it
+            # rather than storing a raw empty dict on the model.
+            for group in ("location", "social_links"):
+                if group in profile_dict and profile_dict[group] == {}:
+                    profile_dict[group] = None
+
             if "location" in profile_dict and profile_dict["location"]:
                 user.profile.location = Location(**profile_dict["location"])
                 del profile_dict["location"]
@@ -99,10 +113,14 @@ class ProfileService:
                     user.settings = UserSettings()
                 user.settings.availability_status = availability
 
-            # Update remaining fields
+            # Update remaining fields. Omitted fields are untouched; an explicit
+            # null clears the field — only for fields that may be empty, so a
+            # stray null can't blank something required like the template.
             for key, value in profile_dict.items():
                 if value is not None:
                     setattr(user.profile, key, value)
+                elif key in ProfileService.CLEARABLE_FIELDS:
+                    setattr(user.profile, key, None)
 
         # Update last_active timestamp
         user.last_active = datetime.utcnow()

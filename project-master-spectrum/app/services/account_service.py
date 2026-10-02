@@ -150,20 +150,18 @@ class AccountService:
     @staticmethod
     async def update_password(user_id: str, current_password: str, new_password: str) -> bool:
         """Update user password"""
+        user = await User.get(PydanticObjectId(user_id))
+        if not user:
+            return False
+
+        # Raised (not swallowed) so the route can tell the user what went wrong.
+        if not pwd_context.verify(current_password, user.password_hash):
+            raise ValueError("Current password is incorrect")
+
         try:
-            user = await User.get(PydanticObjectId(user_id))
-            if not user:
-                return False
-
-            # Verify current password
-            if not pwd_context.verify(current_password, user.password_hash):
-                raise ValueError("Current password is incorrect")
-
-            # Hash and save new password
             user.password_hash = pwd_context.hash(new_password)
             await user.save()
             return True
-
         except Exception as e:
             logger.error("Error in AccountService.update_password: %s", e)
             return False

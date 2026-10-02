@@ -16,7 +16,7 @@
 |---|---|---|
 | 1 | Security lockdown + tracking | ✅ Done (dummy-tested) — live values + deploy left |
 | 2 | Fix findings + start onboarding UX | ✅ Done (dummy-tested) — deploy left |
-| 3 | Onboarding UX + API access review | 🟡 Partly done |
+| 3 | Onboarding UX + API access review | ✅ Done (dummy-tested) — deploy left |
 | 4 | Month 1 security report | ⏳ Pending |
 | 5 | Referral MVP + UI sprint 2 | ⏳ Pending |
 | 6 | Upload, storage and messaging security | 🟡 Partly done |
@@ -116,10 +116,36 @@ Read in full: signup, verify-email, login, OAuth callback, creator onboarding, c
 | # | Task | Status | Notes |
 |---|---|---|---|
 | 3.1 | Review API authorization and object-level access (code) | ✅ Done | Jobs, services, workspace, messages, project members, portfolio all check ownership |
-| 3.2 | Test object-level access with two real accounts | 🟡 Partly done | Tested locally ✅: portfolio items and messages. Still to test: jobs, services, portfolio projects, project members — and repeat on live after deploy |
-| 3.3 | Finish the onboarding and profile UX sprint | ⏳ Pending | Epun sends a QA list on the new UI |
+| 3.2 | Test object-level access with two accounts | ✅ Done (dummy-tested) | 67/67 — no gaps found. **Live:** repeat a few checks after deploy |
+| 3.3 | Onboarding and profile UX sprint | ✅ Done (dummy-tested) | 5 bugs fixed (below). Epun's QA list still welcome after deploy |
 
 **Done when:** onboarding changes are live and no critical API access gaps exist.
+
+### Record access test (3.2) — 67/67 passed
+
+An unrelated logged-in user ("outsider") tried to read, change or delete other people's records. Every attempt was refused, nothing changed, and the real owner could still do the same action (control checks).
+
+- **Jobs:** edit, change status, delete, add role, open private workspace, read stats
+- **Proposals:** list a job's proposals, read one, accept/reject, withdraw; a creator can't accept their own proposal
+- **Services:** edit, change status, add/edit/delete packages, add/delete media, read stats, delete
+- **Portfolio projects:** edit, add media, delete
+- **Team projects:** read, read activity, edit, change progress, add self as member, change a member's role, remove members, delete; a member can't remove the owner
+- **Messages:** open someone else's conversation, read it, mark read, archive, post into it
+- **Payments (escrow):** view, release money, refund, mark delivered, approve, request revision, confirm review, open a dispute; the creator can't release or refund, the client can't mark delivered. Money untouched after every attempt
+
+### Profile review (3.3)
+
+Sent both profile pages' exact requests to the server (41 checks).
+
+| # | Bug | Fix |
+|---|---|---|
+| B7 | **Emptying a field didn't clear it** — website, bio, tagline, name, max rate came back after save | Pages send `null` for an emptied box; the server clears those fields (only fields that may be empty) |
+| B8 | **Password change accepted letters-only passwords** (signup rejects them) | Same letter + number rule on password change, server and both profile pages |
+| B9 | **Wrong current password → 500 server error** instead of a clear message | Returns 400 "Current password is incorrect" |
+| B10 | **7 account routes turned their own 400 errors into 500s** (profile, email, phone, password, notifications, privacy, deactivate) | Their real error now reaches the user |
+| B11 | Onboarding answers saved but never shown when the profile loads | Returned on your own profile. Client budget and timeline stay private (not on the public profile) |
+
+**Tested:** profile 41/41 · record access 67/67 · Week 2 18/18 · Week 1 21/21 · credentials 18/18 → **165/165** ✅ · frontend type-check ✅
 
 ---
 

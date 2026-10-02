@@ -223,23 +223,25 @@ export default function ProfilePage() {
 
     setProfileSaving(true); setProfileMsg('');
     try {
+      // null (not undefined) for an emptied box, so the server clears it
+      // instead of keeping the old value.
       await profileApi.updateMe({
         profile: {
-          first_name: firstName || undefined,
-          last_name: lastName || undefined,
-          display_name: displayName || undefined,
-          tagline: tagline || undefined,
-          bio: bio || undefined,
-          website: normaliseUrl(website) ?? undefined,
-          location: { city: city || undefined, country: country || undefined },
+          first_name: firstName.trim() || null,
+          last_name: lastName.trim() || null,
+          display_name: displayName.trim() || null,
+          tagline: tagline.trim() || null,
+          bio: bio.trim() || null,
+          website: normaliseUrl(website),
+          location: { city: city.trim() || null, country: country.trim() || null },
           social_links: {
-            linkedin: normaliseUrl(linkedin) ?? undefined,
-            imdb: normaliseUrl(imdb) ?? undefined,
-            vimeo: normaliseUrl(vimeo) ?? undefined,
-            portfolio: normaliseUrl(portfolio) ?? undefined,
+            linkedin: normaliseUrl(linkedin),
+            imdb: normaliseUrl(imdb),
+            vimeo: normaliseUrl(vimeo),
+            portfolio: normaliseUrl(portfolio),
           },
-          hourly_rate_min: hourlyMin ? parseFloat(hourlyMin) : undefined,
-          hourly_rate_max: hourlyMax ? parseFloat(hourlyMax) : undefined,
+          hourly_rate_min: hourlyMin ? parseFloat(hourlyMin) : null,
+          hourly_rate_max: hourlyMax ? parseFloat(hourlyMax) : null,
         },
       });
       setProfileMsg('Saved successfully!');
@@ -402,6 +404,7 @@ export default function ProfilePage() {
   const changePassword = async () => {
     if (newPw !== confirmPw) { setPwMsg('Passwords do not match'); return; }
     if (newPw.length < 8) { setPwMsg('Min 8 characters'); return; }
+    if (!/[A-Za-z]/.test(newPw) || !/\d/.test(newPw)) { setPwMsg('Must include at least one letter and one number'); return; }
     setPwSaving(true); setPwMsg('');
     try {
       await accountApi.updatePassword(currentPw, newPw);

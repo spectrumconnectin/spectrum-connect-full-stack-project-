@@ -200,6 +200,10 @@ class ProfileRead(BaseModel):
     social_links: Optional[SocialLinksRead] = None
     hourly_rate_min: Optional[float] = None
     hourly_rate_max: Optional[float] = None
+    # Onboarding answers that are fine to show publicly
+    availability_label: Optional[str] = None
+    remote_only: Optional[bool] = None
+    hiring_categories: Optional[List[str]] = None
     # Professional info (Fiverr-style)
     intro_video: Optional[str] = None
     skills: Optional[List[SkillRead]] = None
@@ -258,13 +262,20 @@ class UserStatsRead(BaseModel):
 # COMPLETE USER PROFILE SCHEMAS
 # ============================================================================
 
+class OwnProfileRead(ProfileRead):
+    """The signed-in user's own profile. Adds answers that stay private —
+    ProfileRead is also used for public profiles (PublicProfileRead)."""
+    typical_budget: Optional[str] = None
+    typical_timeline: Optional[str] = None
+
+
 class UserProfileRead(BaseModel):
     id: str
     email: str
     username: str
     account_type: str
     user_role: str = "user"
-    profile: Optional[ProfileRead] = None
+    profile: Optional[OwnProfileRead] = None
     stats: Optional[UserStatsRead] = None
     settings: Optional[UserSettingsRead] = None
     is_verified: bool = False

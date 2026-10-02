@@ -4,7 +4,9 @@ Account API Schemas
 Request/Response schemas for account settings endpoints
 """
 
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Dict, Any
 
 
@@ -24,7 +26,15 @@ class EmailUpdateRequest(BaseModel):
 class PasswordUpdateRequest(BaseModel):
     """Request schema for updating password"""
     current_password: str = Field(..., min_length=1)
-    new_password: str = Field(..., min_length=8)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        # Same rule as signup and password reset (app/auth/schemas.py).
+        if not re.search(r'[A-Za-z]', v) or not re.search(r'\d', v):
+            raise ValueError('Password must contain both letters and numbers')
+        return v
 
 
 class NotificationSettingsRequest(BaseModel):
